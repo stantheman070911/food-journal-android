@@ -62,3 +62,7 @@ Photos are stored in the app's private folder, resized to 1600 px on the long ed
 Device tests run only on an emulator, so they can never uninstall the app from a phone: `ANDROID_SERIAL=emulator-5560 ./gradlew :app:connectedDebugAndroidTest`.
 
 See the [product document](<Food Journal — Product Document.md>) for the full data model, screen details, and spending rules.
+
+## License
+
+Food Journal is licensed under the [Apache License 2.0](LICENSE). The bundled Fraunces font has its own license, the [SIL Open Font License 1.1](licenses/Fraunces-OFL.txt).
