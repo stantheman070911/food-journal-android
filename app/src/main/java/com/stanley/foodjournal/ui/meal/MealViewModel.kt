@@ -18,6 +18,7 @@ import com.stanley.foodjournal.data.MealDao
 import com.stanley.foodjournal.data.Place
 import com.stanley.foodjournal.data.PlaceDao
 import com.stanley.foodjournal.data.PlaceSummary
+import com.stanley.foodjournal.edits.PendingEdit
 import com.stanley.foodjournal.edits.RenameResult
 import com.stanley.foodjournal.edits.UndoableEdits
 import com.stanley.foodjournal.logic.LocationFix
@@ -101,11 +102,6 @@ class MealViewModel(
     /** The draft's place, deleted from the picker, so an undo can put it back on the draft. */
     private var deletedPlace: Long? = null
 
-    // A place counts as back only after the list has shown it gone: an update already on its way
-    // when the edit was made still lists it.
-    private var mergedAwayGone = false
-    private var deletedPlaceGone = false
-
     // Snapshot state rather than a flow, so text fields see every keystroke at once and typing
     // never races the keyboard. Each change is copied to the saved state for process death.
     private var draft by mutableStateOf(
@@ -157,11 +153,10 @@ class MealViewModel(
         viewModelScope.launch {
             placeDao.observeSummaries().collect {
                 places = it
-                followUndoneMerge()
-                followUndoneDelete()
                 prefill()
             }
         }
+        viewModelScope.launch { edits.undone.collect { followUndo(it) } }
         if (mealId != null) {
             viewModelScope.launch {
                 val meal = mealDao.get(mealId)
@@ -224,8 +219,6 @@ class MealViewModel(
             if (result is RenameResult.Merged && isDraftPlace && draft?.placeId == place.id) {
                 update { it.copy(placeId = result.survivor.id) }
                 mergedAway = place.id to result.survivor.id
-                // The list may already have dropped the merged-away place before this result.
-                mergedAwayGone = places.none { it.place.id == place.id }
             }
         }
     }
@@ -238,7 +231,6 @@ class MealViewModel(
         if (draft?.placeId == place.id) {
             update { it.copy(placeId = null, placeTouched = true) }
             deletedPlace = place.id
-            deletedPlaceGone = false
         }
         edits.deletePlace(place)
     }
@@ -501,28 +493,30 @@ class MealViewModel(
         if (placeId != current.placeId) update { it.copy(placeId = placeId) }
     }
 
-    /** An undone merge brings the merged-away place back; a draft moved off it moves back too. */
-    private fun followUndoneMerge() {
-        val (awayId, survivorId) = mergedAway ?: return
-        if (places.none { it.place.id == awayId }) {
-            mergedAwayGone = true
-            return
+    /**
+     * Follows an undo of the draft's own edit. An undone merge moves a draft that went to the
+     * survivor back to the merged-away place; an undone deletion gives the place back to a draft
+     * that has no other. Either applies only if the place itself came back: when its name was
+     * taken meanwhile, its meals joined that place instead, and the draft stays as it is.
+     */
+    private suspend fun followUndo(edit: PendingEdit) {
+        when (edit) {
+            is PendingEdit.PlacesMerged -> {
+                val (awayId, survivorId) = mergedAway ?: return
+                if (edit.mergedAway.id != awayId) return
+                mergedAway = null
+                if (placeDao.get(awayId) == null) return
+                if (draft?.placeId == survivorId) update { it.copy(placeId = awayId) }
+            }
+            is PendingEdit.PlaceDeleted -> {
+                val id = deletedPlace ?: return
+                if (edit.place.id != id) return
+                deletedPlace = null
+                if (placeDao.get(id) == null) return
+                if (draft?.placeId == null && draft?.newPlaceName == null) update { it.copy(placeId = id) }
+            }
+            is PendingEdit.MealDeleted -> Unit
         }
-        if (!mergedAwayGone) return
-        mergedAway = null
-        if (draft?.placeId == survivorId) update { it.copy(placeId = awayId) }
-    }
-
-    /** An undone deletion brings the place back; a draft that lost it, and has no other, gets it back. */
-    private fun followUndoneDelete() {
-        val id = deletedPlace ?: return
-        if (places.none { it.place.id == id }) {
-            deletedPlaceGone = true
-            return
-        }
-        if (!deletedPlaceGone) return
-        deletedPlace = null
-        if (draft?.placeId == null && draft?.newPlaceName == null) update { it.copy(placeId = id) }
     }
 
     private fun photoFile(name: String, isPending: Boolean): File =

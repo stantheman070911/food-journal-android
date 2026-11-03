@@ -11,8 +11,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -65,6 +68,11 @@ class UndoableEdits(
 
     /** The edit whose undo bar is showing, if any. */
     val pending: StateFlow<PendingEdit?> = _pending.asStateFlow()
+
+    private val _undone = MutableSharedFlow<PendingEdit>(extraBufferCapacity = 8)
+
+    /** Each edit that was undone, once its data is back, so an open screen can follow it. */
+    val undone: SharedFlow<PendingEdit> = _undone.asSharedFlow()
 
     fun deleteMeal(meal: Meal) {
         scope.launch {
@@ -124,6 +132,7 @@ class UndoableEdits(
                     is PendingEdit.PlacesMerged ->
                         placeDao.unmerge(edit.mergedAway, edit.survivorBefore, edit.movedMealIds)
                 }
+                _undone.tryEmit(edit)
             }
         }
     }

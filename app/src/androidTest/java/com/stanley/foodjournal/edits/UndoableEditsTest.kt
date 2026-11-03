@@ -11,7 +11,8 @@ import com.stanley.foodjournal.photos.PhotoStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -48,7 +49,9 @@ class UndoableEditsTest {
 
     @After
     fun tearDown() {
-        scope.cancel()
+        // Wait for work still writing to the database, or closing it under that work crashes
+        // the test process.
+        runBlocking { scope.coroutineContext.job.cancelAndJoin() }
         db.close()
         root.deleteRecursively()
     }

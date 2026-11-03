@@ -190,7 +190,10 @@ Built on Nov 3, 2026, after the Phase 2 review fixes.
   - Tiles sit 2 dp apart, and only the strip's two ends are rounded, so a week reads as one band.
   - Each tile names its weekday in the lower left: white with a soft shadow over a photo, grey on a plain tile. A day with several meals shows a tile for each.
   - A meal without a photo is a plain grey tile with its name, up to four lines.
+  - A name whose longest word is too wide for the tile, as at a large font size, first shrinks by up to a fifth until the word fits. Past that, words break with a hyphen ("Extraordi-narily"), using English patterns first, as the interface is English, then the phone's own locales, so Chinese names keep their glyphs. A word with no hyphenation point that still doesn't fit at four-fifths size can still break mid-word. Chinese text breaks between characters, as before. Added after the Phase 3 review.
+  - A thumbnail that can't be read, such as one not yet rebuilt after a restore, gives way to the full photo, then to the plain tile with the name. Added after the Phase 3 review.
   - No prices on tiles: totals are visible but never the focus.
+- **Scroll position.** The current week's strip opens at its newest meal, so a meal just logged is in view. Strips of earlier weeks open at Monday. A meal that turns up later in a strip, logged meanwhile or brought back by Undo, scrolls into view. Decided on Nov 3, 2026, after the Phase 3 review.
 - **Opening a meal.** Tapping a tile opens the Meal screen, with the photo at its full 3:4. A second tile tapped while the first opens is ignored.
 - **Settings icon.** Three sliders, top right. A gear's small teeth blur at this stroke weight. It does nothing until Phase 6 adds Export and Import.
 - **No page title.** The first week's header heads the screen; the product document lists no title.
@@ -222,6 +225,7 @@ Requested on Nov 3, 2026, after the change above, for a clean start: saved place
 - **No confirmation, with Undo**, like every delete. The grey bar shows inside the sheet.
 - **Meals are kept**, without a place. A meal open on the Meal screen loses the place too.
 - **Undo** brings the place back with its id and coordinates, and puts it back on its meals, except any given another place meanwhile. If a place with its name was created meanwhile, the meals join that one instead, which takes the coordinates if it has none. The open meal gets its place back if it has none.
+- **How the open meal follows an undo.** `UndoableEdits` announces each undo once its data is back, and the Meal screen follows that, for merges as well as deletions. It used to infer the undo from the place list showing the place gone and then back, which a quick undo could skip, leaving the meal on the survivor or without a place.
 
 ## Design references: Retro
 

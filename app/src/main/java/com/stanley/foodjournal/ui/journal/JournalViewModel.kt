@@ -13,6 +13,7 @@ import com.stanley.foodjournal.logic.formatPrice
 import com.stanley.foodjournal.logic.formatWeekRange
 import com.stanley.foodjournal.logic.formatWeekday
 import com.stanley.foodjournal.logic.groupIntoWeeks
+import com.stanley.foodjournal.logic.weekStart
 import com.stanley.foodjournal.photos.PhotoStore
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -21,20 +22,28 @@ import kotlinx.coroutines.flow.stateIn
 import java.io.File
 import java.time.LocalDate
 
-/** One meal's tile in a week's strip. A meal without a photo shows its [name] instead. */
+/**
+ * One meal's tile in a week's strip. A meal without a photo shows its [name] instead. [photo] is
+ * the full photo, used when the thumbnail can't be read.
+ */
 data class JournalTile(
     val mealId: Long,
     val thumb: File?,
     val name: String?,
     val weekday: String,
+    val photo: File? = null,
 )
 
-/** A week's row: its header, "Oct 26 – Nov 1 · 2,340", and its tiles, Monday to Sunday. */
+/**
+ * A week's row: its header, "Oct 26 – Nov 1 · 2,340", and its tiles, Monday to Sunday.
+ * [isCurrent] marks the week that holds today, whose strip opens at its newest meal.
+ */
 data class JournalWeek(
     val start: LocalDate,
     val range: String,
     val total: String,
     val tiles: List<JournalTile>,
+    val isCurrent: Boolean = false,
 )
 
 data class JournalUiState(
@@ -58,6 +67,7 @@ class JournalViewModel(
         range = formatWeekRange(start, today()),
         total = formatPrice(total),
         tiles = meals.map { it.toTile() },
+        isCurrent = start == weekStart(today()),
     )
 
     private fun Meal.toTile() = JournalTile(
@@ -65,6 +75,7 @@ class JournalViewModel(
         thumb = photo?.let(photos::thumbFile),
         name = name,
         weekday = formatWeekday(eatenAt.toLocalDate()),
+        photo = photo?.let(photos::photoFile),
     )
 
     companion object {

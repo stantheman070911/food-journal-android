@@ -13,6 +13,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.stanley.foodjournal.data.FoodJournalDatabase
 import com.stanley.foodjournal.data.Meal
 import com.stanley.foodjournal.data.Place
+import com.stanley.foodjournal.edits.PendingEdit
 import com.stanley.foodjournal.edits.UndoableEdits
 import com.stanley.foodjournal.logic.LocationFix
 import com.stanley.foodjournal.photos.PhotoMetadata
@@ -260,7 +261,7 @@ class MealViewModelTest {
 
         edits.undo()
         awaitTrue { main { vm.uiState!!.draft.placeId } == away }
-        assertEquals("Lin Dong Fang", main { vm.uiState!!.placeName })
+        awaitTrue { main { vm.uiState!!.placeName } == "Lin Dong Fang" }
     }
 
     @Test
@@ -273,12 +274,11 @@ class MealViewModelTest {
 
         main { vm.deletePlace(place) }
         assertNull(main { vm.uiState!!.draft.placeId })
-        // Undo only once the ViewModel's list has shown the place gone, as a person would.
-        awaitTrue { main { vm.placePicker("").places.none { it.place.id == placeId } } }
+        awaitTrue { edits.pending.value is PendingEdit.PlaceDeleted }
 
         edits.undo()
         awaitTrue { main { vm.uiState!!.draft.placeId } == placeId }
-        assertEquals("Kiosk", main { vm.uiState!!.placeName })
+        awaitTrue { main { vm.uiState!!.placeName } == "Kiosk" }
     }
 
     @Test
