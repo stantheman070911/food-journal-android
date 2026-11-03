@@ -185,6 +185,22 @@ All data lives on the phone. Nothing leaves it unless I export a backup.
 - **Android Auto Backup** is off for the whole app, so the database and photos never return out of step. My ZIP is the backup.
 - **Delete.** Deleting a meal removes its photo once the undo bar closes. A place with no meals left is removed.
 
+## Phases
+
+Each phase implements the named sections in full.
+
+**Phase 1 — Foundation.** Project setup, version catalog, light and dark themes, Room schema for Meal and Place with schema export, navigation for the three tabs and the Meal screen, floating Add button, manual app container. Manifest per Storage, privacy, backup: no INTERNET permission, Auto Backup off. Done when the app opens to the three tabs with their empty states.
+
+**Phase 2 — Meal and logging.** Quick logging flow, the Meal screen, Places, Favorites, Undo, and Photos. This includes the place picker, rename and merge, and gallery backfill with the Photo Picker location option. Flag anything that threatens the 15-second target.
+
+**Phase 3 — Journal.** The Journal screen, with weeks, filmstrip rows, and photo-less tiles as in Design direction. Add the settings icon; its contents come in Phase 6.
+
+**Phase 4 — Spending.** Spending analysis, with charts drawn in Compose Canvas.
+
+**Phase 5 — Search.** The Search screen, place chip, and results total. Place names in Meal and Spending open Search.
+
+**Phase 6 — Backup and restore.** Storage, privacy, backup: export, import, and the 30-day reminder.
+
 ## Decisions and next steps
 
 **Decisions**
