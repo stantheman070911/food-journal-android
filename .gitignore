@@ -11,6 +11,3 @@ build/
 
 # Screenshots of another app, kept here as a design reference but never published.
 /UI inspo(retro-screenshots)/
-
-# Release APKs are attached to GitHub Releases, not kept in the repo.
-/release/
