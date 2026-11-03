@@ -3,7 +3,6 @@ package com.stanley.foodjournal.ui.components
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -11,10 +10,10 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
-private val ActionGap = 20.dp
+private val ActionGap = 24.dp
 
 /**
- * One short line, and optionally one button below it.
+ * One short line, set as a quiet heading, and optionally one outlined pill below it.
  *
  * The line is always centered in the available space, with or without a button, so it sits at
  * the same height on every tab. Inside a scrolling container, where there is no height to center
@@ -31,14 +30,12 @@ fun EmptyState(
         content = {
             Text(
                 text = message,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center,
             )
             if (actionLabel != null) {
-                OutlinedButton(onClick = onAction) {
-                    Text(actionLabel)
-                }
+                OutlinedPillButton(text = actionLabel, onClick = onAction)
             }
         },
         modifier = modifier

@@ -69,6 +69,7 @@ import java.io.File
 private val CameraBackground = Color.Black
 private val CameraInk = Color.White
 private val CameraGrey = Color(0xFF8C8C8C)
+private val CameraControl = Color(0xFF2A2A2A)
 private val SideControlWidth = 80.dp
 
 /** Close to the stored size, so a capture needs little resizing. Sizes are in sensor landscape. */
@@ -150,7 +151,14 @@ fun CameraStage(
             .safeDrawingPadding(),
     ) {
         Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onClose) {
+            // A soft grey disc, so the close button holds its own over a bright viewfinder edge.
+            IconButton(
+                onClick = onClose,
+                modifier = Modifier
+                    .padding(start = 8.dp)
+                    .size(40.dp)
+                    .background(CameraControl, CircleShape),
+            ) {
                 Icon(FoodJournalIcons.Close, contentDescription = stringResource(R.string.close), tint = CameraInk)
             }
         }

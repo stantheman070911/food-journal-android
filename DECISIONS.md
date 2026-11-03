@@ -129,6 +129,7 @@ Requested on Nov 3, 2026, after Phase 1. This overrides "One sans-serif family" 
   - Spending: the period total (display) and the period name (headline). Phase 4.
   - Journal: each week's date range (headline). The week total beside it stays sans, in grey. Phase 3.
   - Meal screen: the price as it is typed (display), if it reads well at that size. Phase 2.
+  - Empty states: the line (headline small), from the Retro references below. Phase 2.
 - **Axis settings.** Fraunces is a variable font with four axes.
   - Display: weight 300, optical size 144, softness 100, wonky 0. Light numerals with high contrast.
   - Headline: weight 500, optical size 32, softness 100, wonky 0. Heavier, so headings hold their own beside the sans.
@@ -136,6 +137,33 @@ Requested on Nov 3, 2026, after Phase 1. This overrides "One sans-serif family" 
 - **Latin only.** Fraunces has no Chinese characters. Headings are dates and month names, so this doesn't come up. Any Chinese text in a Fraunces style falls back to the system font.
 - **File.** The Google Fonts build of the variable font, `Fraunces[SOFT,WONK,opsz,wght].ttf`: 360 KB, SHA-256 `177ff6c0f14e5550a3c624247cd1189611d4eb65d000b14944c63d967958abbb`. It is bundled as `app/src/main/res/font/fraunces.ttf`, so nothing is downloaded when the app runs. Its license, the SIL Open Font License 1.1, is in `licenses/Fraunces-OFL.txt`.
 - **Preview.** `ui/preview/TypePreview.kt` shows the styles together, in light and dark. The axis settings were checked on the API 37 emulator.
+- **Tracking.** Display and headline styles are set 2% tight, after the Retro references.
+
+## Design references: Retro
+
+Added on Nov 3, 2026, during the Phase 2 review. Screenshots of [Retro](https://retro.app/), the weekly photo journal the product document already names, are in `UI inspo(retro-screenshots)/`. They are a standing visual reference for every phase. Ideas are adapted to Food Journal's monochrome, photo-first identity, never copied: no Retro branding, art, or layouts are reproduced, and nothing they show is added unless the product document names it.
+
+**Applied in Phase 2**
+
+- **Pill buttons.** The main action is a solid pill, 56 dp, with a semibold label: black, or white in dark. Disabled, it turns plain mid grey rather than faded. Secondary actions, such as "Log your first meal", are outlined pills in the ink color. Both are in `ui/components/PillButton.kt`.
+- **Grouped card.** The Meal form's Name, Place, Time, and Note rows sit on one soft grey card (`surfaceContainer`, 16 dp corners), divided by hairlines inset to the labels. The price label and figure line up with the labels on the card.
+- **Rounded photos.** The Meal photo is inset 16 dp with 20 dp corners. Without a photo, a short grey tile reads "+ Add photo".
+- **Pills for small things.** Name suggestions are borderless pills, white on the grey card (black in dark). The place search field is a grey pill.
+- **Sheet header.** The place picker has a centered title and a close button instead of a drag handle. Swiping down still closes it.
+- **Undo bar** corners are 16 dp.
+- **Empty states.** The line is a short serif heading in the ink color, above an outlined pill.
+- **Camera.** The close button sits on a dark grey disc.
+
+**For later phases**
+
+- **Phase 3, Journal.** A big serif heading. Week rows as rounded filmstrips. Empty days as pale grey tiles with the month, date, and weekday stacked in grey. Day names set in white over the photo's lower-left corner. Opening a meal can borrow Retro's photo viewer: the photo first, then the place in bold and the date in grey below it.
+- **Phase 4, Spending.** The Week, Month, Year switch as a segmented pill, with the selected segment filled.
+- **Phase 6, Settings menu.** Rows grouped on rounded grey cards, with grey section labels.
+- **Sheets.** Action sheets can float inset from the screen edges, rounded on all corners.
+
+**Not adopted:** red notification dots and badges, colored buttons or text (Retro's blue Upgrade, red Delete), and everything social: friends, feeds, sharing, captions, comments, profiles, and reminders. They break the monochrome rule or the scope.
+
+**Found while applying them.** Name suggestions appeared below the Name field, hidden behind the keyboard and Save, so they were never seen. They now scroll into view when they appear.
 
 ## Phase 2 plan
 

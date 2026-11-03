@@ -1,23 +1,26 @@
 package com.stanley.foodjournal.ui.meal
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -34,6 +37,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -41,6 +45,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.TextFieldValue
@@ -85,6 +90,7 @@ fun PlacePickerSheet(
         containerColor = MaterialTheme.colorScheme.background,
         contentColor = MaterialTheme.colorScheme.onBackground,
         tonalElevation = 0.dp,
+        dragHandle = null,
     ) {
         Box(Modifier.fillMaxSize()) {
             PlacePicker(
@@ -94,6 +100,7 @@ fun PlacePickerSheet(
                 onSelect = { close { onSelect(it) } },
                 onAdd = { close { onAdd(it) } },
                 onRename = onRename,
+                onClose = { close {} },
                 focusQuery = true,
             )
             // The sheet is its own window, so the tabs' bar can't show over it.
@@ -111,14 +118,15 @@ private fun PlacePicker(
     onAdd: (String) -> Unit,
     onRename: (Place, String) -> Unit,
     modifier: Modifier = Modifier,
+    onClose: () -> Unit = {},
     focusQuery: Boolean = false,
     initialEditingId: Long? = null,
 ) {
     var editingId by rememberSaveable { mutableStateOf(initialEditingId) }
     Column(modifier.fillMaxSize()) {
+        PickerHeader(onClose = onClose)
         QueryField(query = query, onQueryChange = onQueryChange, requestFocus = focusQuery)
-        PickerDivider()
-        LazyColumn(Modifier.weight(1f)) {
+        LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(top = 8.dp, bottom = 88.dp)) {
             content.addName?.let { name ->
                 item(key = "add") {
                     PickerRow(icon = FoodJournalIcons.Add, onClick = { onAdd(name) }) {
@@ -161,12 +169,49 @@ private fun PlacePicker(
     }
 }
 
+/** A centered title with a close button, as on any sheet. */
+@Composable
+private fun PickerHeader(onClose: () -> Unit) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(64.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.meal_place),
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+            modifier = Modifier.align(Alignment.Center),
+        )
+        IconButton(
+            onClick = onClose,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 4.dp),
+        ) {
+            Icon(FoodJournalIcons.Close, contentDescription = stringResource(R.string.close))
+        }
+    }
+}
+
+/** The filter, in a soft grey pill. Its icon and text line up with the rows below. */
 @Composable
 private fun QueryField(query: String, onQueryChange: (String) -> Unit, requestFocus: Boolean) {
     val focus = remember { FocusRequester() }
     if (requestFocus) LaunchedEffect(Unit) { focus.requestFocus() }
     val colors = MaterialTheme.colorScheme
-    PickerRow(icon = FoodJournalIcons.Search, iconTint = colors.onSurfaceVariant) {
+    Row(
+        modifier = Modifier
+            .padding(horizontal = 16.dp)
+            .fillMaxWidth()
+            .height(48.dp)
+            .clip(CircleShape)
+            .background(colors.surfaceContainer)
+            .padding(start = RowStart - 16.dp, end = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.width(IconColumn)) {
+            Icon(FoodJournalIcons.Search, contentDescription = null, tint = colors.onSurfaceVariant, modifier = Modifier.size(20.dp))
+        }
         Box(Modifier.weight(1f)) {
             if (query.isEmpty()) {
                 Text(
@@ -260,7 +305,7 @@ private fun PickerRow(
             .fillMaxWidth()
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .heightIn(min = 56.dp)
-            .padding(start = 16.dp, end = if (trailingButton) 4.dp else 16.dp),
+            .padding(start = RowStart, end = if (trailingButton) 4.dp else 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.width(IconColumn)) {
@@ -292,11 +337,8 @@ private fun Detail(text: String) {
     )
 }
 
-@Composable
-private fun PickerDivider() {
-    HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
-}
-
+// The icon column sits inside the search pill's inset, so icons and names line up below it.
+private val RowStart = 28.dp
 private val IconColumn = 36.dp
 
 private val samplePlaces = listOf(

@@ -13,6 +13,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
@@ -25,6 +27,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -38,12 +41,11 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -61,6 +63,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -86,6 +89,7 @@ import com.stanley.foodjournal.logic.formatMealTime
 import com.stanley.foodjournal.logic.groupDigits
 import com.stanley.foodjournal.logic.groupedToOriginal
 import com.stanley.foodjournal.logic.originalToGrouped
+import com.stanley.foodjournal.ui.components.PillButton
 import com.stanley.foodjournal.ui.icons.FoodJournalIcons
 import com.stanley.foodjournal.ui.preview.PreviewSurface
 import com.stanley.foodjournal.ui.preview.ThemePreviews
@@ -247,46 +251,45 @@ fun MealScreen(
                 onDone = { if (uiState.isNew && draft.canSave) actions.onSave() },
                 focusRequester = priceFocus,
             )
-            Divider()
-            NameField(
-                name = draft.name,
-                suggestions = uiState.nameSuggestions,
-                onNameChange = actions.onNameChange,
-            )
-            Divider()
-            FieldRow(
-                label = stringResource(R.string.meal_place),
-                modifier = Modifier.clickable(onClick = actions.onPickPlace),
-            ) {
-                Text(
-                    text = uiState.placeName.orEmpty(),
-                    style = MaterialTheme.typography.bodyLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+            FieldGroup {
+                NameField(
+                    name = draft.name,
+                    suggestions = uiState.nameSuggestions,
+                    onNameChange = actions.onNameChange,
                 )
+                Divider()
+                FieldRow(
+                    label = stringResource(R.string.meal_place),
+                    modifier = Modifier.clickable(onClick = actions.onPickPlace),
+                ) {
+                    Text(
+                        text = uiState.placeName.orEmpty(),
+                        style = MaterialTheme.typography.bodyLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Divider()
+                FieldRow(
+                    label = stringResource(R.string.meal_time),
+                    modifier = Modifier.clickable { editingTime = true },
+                ) {
+                    Text(formatMealTime(draft.eatenAt, today), style = MaterialTheme.typography.bodyLarge)
+                }
+                Divider()
+                NoteField(note = draft.note, onNoteChange = actions.onNoteChange)
             }
-            Divider()
-            FieldRow(
-                label = stringResource(R.string.meal_time),
-                modifier = Modifier.clickable { editingTime = true },
-            ) {
-                Text(formatMealTime(draft.eatenAt, today), style = MaterialTheme.typography.bodyLarge)
-            }
-            Divider()
-            NoteField(note = draft.note, onNoteChange = actions.onNoteChange)
-            Divider()
+            Spacer(Modifier.height(16.dp))
         }
         if (uiState.showSave) {
-            Button(
+            PillButton(
+                text = stringResource(R.string.meal_save),
                 onClick = actions.onSave,
                 enabled = draft.canSave,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
-                    .height(52.dp),
-            ) {
-                Text(stringResource(R.string.meal_save))
-            }
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+            )
         }
     }
 
@@ -336,27 +339,42 @@ private fun MealTopBar(
 }
 
 /**
- * The photo on top, cropped to 4:3 so the price stays in view above the number pad. Tapping it
- * retakes or picks another. Without a photo, one quiet row offers to add one.
+ * The photo on top, inset with rounded corners and cropped to 4:3, so the price stays in view
+ * above the number pad. Tapping it retakes or picks another. Without a photo, a short grey tile
+ * offers to add one.
  */
 @Composable
 private fun PhotoArea(photoFile: File?, processing: Boolean, onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
     if (photoFile == null && !processing) {
-        FieldRow(label = stringResource(R.string.meal_photo), modifier = Modifier.clickable(onClick = onClick)) {
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 16.dp, vertical = 4.dp)
+                .fillMaxWidth()
+                .height(72.dp)
+                .clip(PhotoShape)
+                .background(colors.surfaceContainer)
+                .clickable(onClick = onClick),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(FoodJournalIcons.Add, contentDescription = null, tint = colors.onSurfaceVariant)
+            Spacer(Modifier.width(8.dp))
             Text(
                 text = stringResource(R.string.meal_add_photo),
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = colors.onSurfaceVariant,
             )
         }
-        Divider()
         return
     }
     Box(
         Modifier
+            .padding(horizontal = 16.dp, vertical = 4.dp)
             .fillMaxWidth()
             .aspectRatio(4f / 3f)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clip(PhotoShape)
+            .background(colors.surfaceContainer)
             .clickable(onClickLabel = stringResource(R.string.meal_change_photo), onClick = onClick),
     ) {
         if (!processing && photoFile != null) {
@@ -382,7 +400,7 @@ private fun PriceField(
     focusRequester: FocusRequester,
 ) {
     val colors = MaterialTheme.colorScheme
-    Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp)) {
+    Column(Modifier.padding(start = 32.dp, end = 32.dp, top = 12.dp, bottom = 12.dp)) {
         Text(
             text = stringResource(R.string.meal_price),
             style = MaterialTheme.typography.labelLarge,
@@ -429,10 +447,14 @@ private fun NameField(
     }
     if (focused && suggestions.isNotEmpty()) {
         val focusManager = LocalFocusManager.current
+        // The chips appear below the field, behind the keyboard; scroll them up into view.
+        val bringIntoView = remember { BringIntoViewRequester() }
+        LaunchedEffect(Unit) { bringIntoView.bringIntoView() }
         Row(
             modifier = Modifier
+                .bringIntoViewRequester(bringIntoView)
                 .horizontalScroll(rememberScrollState())
-                .padding(start = 16.dp + LabelWidth, end = 16.dp, bottom = 8.dp),
+                .padding(start = 16.dp + LabelWidth, end = 16.dp, bottom = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             suggestions.forEach { suggestion ->
@@ -443,10 +465,11 @@ private fun NameField(
                     },
                     label = { Text(suggestion) },
                     shape = CircleShape,
-                    border = SuggestionChipDefaults.suggestionChipBorder(
-                        enabled = true,
-                        borderColor = MaterialTheme.colorScheme.outlineVariant,
+                    colors = SuggestionChipDefaults.suggestionChipColors(
+                        containerColor = MaterialTheme.colorScheme.background,
+                        labelColor = MaterialTheme.colorScheme.onSurface,
                     ),
+                    border = null,
                 )
             }
         }
@@ -494,14 +517,31 @@ private fun FieldRow(
     }
 }
 
+/** Rows grouped on one soft grey card, so the form reads as a single block below the price. */
+@Composable
+private fun FieldGroup(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = Modifier
+            .padding(horizontal = 16.dp)
+            .fillMaxWidth()
+            .clip(GroupShape)
+            .background(MaterialTheme.colorScheme.surfaceContainer),
+        content = content,
+    )
+}
+
+/** A hairline between rows on the card, inset to start at the labels. */
 @Composable
 private fun Divider() {
     HorizontalDivider(
-        modifier = Modifier.padding(horizontal = 16.dp),
-        thickness = 0.5.dp,
-        color = MaterialTheme.colorScheme.outlineVariant,
+        modifier = Modifier.padding(start = 16.dp),
+        thickness = 1.dp,
+        color = MaterialTheme.colorScheme.background,
     )
 }
+
+private val PhotoShape = RoundedCornerShape(20.dp)
+private val GroupShape = RoundedCornerShape(16.dp)
 
 /** Shows "2340" as "2,340" while keeping the cursor where it belongs. */
 private object GroupedDigits : VisualTransformation {

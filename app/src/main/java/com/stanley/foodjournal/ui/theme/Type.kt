@@ -6,6 +6,7 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.em
 import com.stanley.foodjournal.R
 
 // The interface is set in the system sans-serif, with tabular figures so prices line up.
@@ -43,9 +44,14 @@ private val FrauncesHeadline = FontFamily(
     ),
 )
 
-private fun TextStyle.display() = copy(fontFamily = FrauncesDisplay, fontWeight = FontWeight.Light)
+// The serif is set slightly tight, so headings and big numbers read as one shape.
+private val SerifTracking = (-0.02).em
 
-private fun TextStyle.headline() = copy(fontFamily = FrauncesHeadline, fontWeight = FontWeight.Medium)
+private fun TextStyle.display() =
+    copy(fontFamily = FrauncesDisplay, fontWeight = FontWeight.Light, letterSpacing = SerifTracking)
+
+private fun TextStyle.headline() =
+    copy(fontFamily = FrauncesHeadline, fontWeight = FontWeight.Medium, letterSpacing = SerifTracking)
 
 val FoodJournalTypography: Typography = Typography().run {
     copy(
