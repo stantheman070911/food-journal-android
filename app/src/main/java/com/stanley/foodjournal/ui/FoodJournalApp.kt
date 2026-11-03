@@ -48,7 +48,7 @@ fun FoodJournalApp() {
                 )
             }
             composable<MealRoute> {
-                MealScreen(onBack = dropUnlessResumed { navController.popBackStack() })
+                MealScreen(onClose = dropUnlessResumed { navController.popBackStack() })
             }
         }
     }

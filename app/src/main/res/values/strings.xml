@@ -7,6 +7,22 @@
 
     <string name="add_meal">Add meal</string>
     <string name="back">Back</string>
+    <string name="next">Next</string>
+    <string name="done">Done</string>
+    <string name="cancel">Cancel</string>
+
+    <string name="meal_price">Price</string>
+    <string name="meal_name">Name</string>
+    <string name="meal_time">Time</string>
+    <string name="meal_note">Note</string>
+    <string name="meal_save">Save</string>
+    <string name="meal_favorite">Favorite</string>
+    <string name="meal_unfavorite">Remove from favorites</string>
+    <string name="meal_delete">Delete</string>
+
+    <string name="undo">Undo</string>
+    <string name="undo_deleted">Deleted</string>
+    <string name="undo_merged">Merged</string>
 
     <string name="empty_journal">No meals yet</string>
     <string name="empty_search">Nothing to search yet</string>

@@ -26,6 +26,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.stanley.foodjournal.R
+import com.stanley.foodjournal.ui.components.UndoBar
 import com.stanley.foodjournal.ui.icons.FoodJournalIcons
 import com.stanley.foodjournal.ui.journal.JournalScreen
 import com.stanley.foodjournal.ui.journal.JournalUiState
@@ -56,6 +57,7 @@ fun HomeScreen(
         onSelect = tabNavController::navigateToTab,
         onAddMeal = onAddMeal,
         modifier = modifier,
+        undoBar = { UndoBar() },
     ) {
         NavHost(
             navController = tabNavController,
@@ -76,6 +78,7 @@ private fun HomeScaffold(
     onSelect: (TopLevelDestination) -> Unit,
     onAddMeal: () -> Unit,
     modifier: Modifier = Modifier,
+    undoBar: @Composable () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     Scaffold(
@@ -83,6 +86,7 @@ private fun HomeScaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = { FoodJournalBottomBar(selected = selected, onSelect = onSelect) },
         floatingActionButton = { AddMealButton(onClick = onAddMeal) },
+        snackbarHost = undoBar,
     ) { innerPadding ->
         Box(
             Modifier

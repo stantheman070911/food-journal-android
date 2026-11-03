@@ -46,11 +46,31 @@ object FoodJournalIcons {
     val Back: ImageVector by lazy {
         strokeIcon("Back", "M19,12H5", "M11,6L5,12L11,18")
     }
+
+    val Favorite: ImageVector by lazy { strokeIcon("Favorite", STAR) }
+
+    /** The favorite star, filled in. The only filled icon, so a favorite reads at a glance. */
+    val FavoriteOn: ImageVector by lazy { strokeIcon("FavoriteOn", STAR, filled = true) }
+
+    val Delete: ImageVector by lazy {
+        strokeIcon(
+            "Delete",
+            "M4.5,6.5H19.5",
+            "M9.5,6.5V4.5A1,1 0 0 1 10.5,3.5H13.5A1,1 0 0 1 14.5,4.5V6.5",
+            "M6.5,6.5L7.3,19.1A1.5,1.5 0 0 0 8.8,20.5H15.2A1.5,1.5 0 0 0 16.7,19.1L17.5,6.5",
+            "M10,10.5V16.5",
+            "M14,10.5V16.5",
+        )
+    }
 }
+
+private const val STAR =
+    "M12,3.6L14.29,9.45L20.56,9.82L15.71,13.81L17.29,19.88L12,16.5" +
+        "L6.71,19.88L8.29,13.81L3.44,9.82L9.71,9.45Z"
 
 private const val STROKE_WIDTH = 1.5f
 
-private fun strokeIcon(name: String, vararg paths: String): ImageVector =
+private fun strokeIcon(name: String, vararg paths: String, filled: Boolean = false): ImageVector =
     ImageVector.Builder(
         name = name,
         defaultWidth = 24.dp,
@@ -61,6 +81,7 @@ private fun strokeIcon(name: String, vararg paths: String): ImageVector =
         paths.forEach { data ->
             addPath(
                 pathData = addPathNodes(data),
+                fill = if (filled) SolidColor(Color.Black) else null,
                 stroke = SolidColor(Color.Black),
                 strokeLineWidth = STROKE_WIDTH,
                 strokeLineCap = StrokeCap.Round,
