@@ -210,10 +210,3 @@ Each phase implements the named sections in full.
 - Rating and mood: neither. A favorite star replaces both.
 - Spending: its own tab, for analysis. Search totals cover one-off questions.
 
-**Next steps**
-
-1. Mock up Journal, Meal, Spending, and Search in monochrome.
-2. Set up the project: Gradle, Room schema, navigation, app container.
-3. Build Meal and Journal first, then Spending, then Search.
-4. Add backup and restore.
-5. Use it for four weeks, then decide what comes next.
