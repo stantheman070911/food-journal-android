@@ -100,7 +100,7 @@ The app does not use the phone's location (see "Places without phone location" b
 
 - **Room 2.8, not Room 3.** Room 3.0 is stable but moves to new `androidx.room3` packages. The product document only says Room, and 2.8 is the mature line. Moving to Room 3 later would be a dependency change, not a data migration.
 - **Kotlin through AGP's built-in support.** AGP 9 compiles Kotlin itself. The Kotlin Gradle plugin is declared but not applied, which pins the compiler to 2.4.21.
-- **SDK levels.** compileSdk, minSdk, and targetSdk are all 37. Bytecode targets Java 17.
+- **SDK levels.** compileSdk, minSdk, and targetSdk are all 37. Bytecode targets Java 17. *From version 1.00.01, minSdk is 36; see Android 16 below.*
 - **`eatenAt` is wall-clock time.** It is stored as text such as `2026-11-03T12:30:00`. A meal's day and time-of-day band never shift when the phone changes time zone. Gallery metadata (EXIF) records wall-clock time too, and the text sorts in time order.
 - **`photo` holds a file name**, not a full path, so restored backups work on a fresh install.
 - **Place names are unique, ignoring case**, enforced by the database. Merging relies on it.
@@ -346,8 +346,17 @@ Settled on Nov 4, 2026, all as recommended. On request, Settings grows from the 
 - **The reminder** sits at the left of the Journal's top bar, beside the settings icon: "Last backup Oct 2 · Back up", or "Not backed up yet · Back up", grey with the action in ink. It shows only while there are meals. A tap opens the save dialog at once, the line reads "Exporting…" while it runs, and it disappears when the export is done. A failed export shows its reason where it was started, on the Journal or in Settings.
 - **Export failures.** A meal whose photo file is missing stops the export before anything is written: "A meal's photo is missing, so the backup wasn't made." A file that can't be written, such as on a full drive, is deleted rather than left half-written. If a meal is deleted during an export and its undo bar closes before the export reaches its photo, that export fails and can be run again.
 - **Import picks** ZIP files, including those other file apps label as "x-zip-compressed" or plain binary.
-- **About.** The version comes from the app itself: "0.1" when Phase 6 was built, "1.00.00" from Nov 4, 2026, as the user asked. The version code stays 1, so the new build installs over the old one with its data. The licenses page holds Fraunces' Open Font License; the Apache License 2.0 for AndroidX, Coil, Dagger, Guava, Kotlin, kotlinx.coroutines, kotlinx.serialization, and Okio; and the BSD license of Protocol Buffers, which DataStore carries inside it, found by listing what the release build ships. The texts are wrapped to the screen. The license file in `licenses/` is copied into the app's resources.
+- **About.** The version comes from the app itself: "0.1" when Phase 6 was built, "1.00.00" from Nov 4, 2026, as the user asked, and "1.00.01" with Android 16 support. The version code stays 1, so the new build installs over the old one with its data. The licenses page holds Fraunces' Open Font License; the Apache License 2.0 for AndroidX, Coil, Dagger, Guava, Kotlin, kotlinx.coroutines, kotlinx.serialization, and Okio; and the BSD license of Protocol Buffers, which DataStore carries inside it, found by listing what the release build ships. The texts are wrapped to the screen. The license file in `licenses/` is copied into the app's resources.
 - **Known nit.** The reminder reads today's date when the meals or the backup day change, so if the app stays open across midnight, a reminder due that day can appear only once something changes.
+
+## Android 16
+
+Requested on Nov 4, 2026, after version 1.00.00, so friends on Android 16 can install the app. This overrides the product document's Targets, which set the minimum SDK to the test phone's Android version.
+
+- **minSdk is 36.** compileSdk and targetSdk stay 37. With minSdk 36, lint finds no call that needs API 37, and the unit tests pass.
+- **Gallery location needs Android 17.** The Photo Picker's location option is new in Android 17. Android 16's picker doesn't know it and is expected to strip the location, so a gallery meal there takes the photo's date and time, but its place is picked by hand. Android 16 would need `ACCESS_MEDIA_LOCATION` for the location; it was not added, so the camera stays the only permission.
+- **Not tested on Android 16,** on a device or an emulator, at the user's request. The device tests have run on Android 17 only.
+- **Version 1.00.01.** The version code stays 1, so it installs over 1.00.00 with its data.
 
 ## Design references: Retro
 

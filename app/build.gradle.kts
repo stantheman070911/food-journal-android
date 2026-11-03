@@ -23,10 +23,10 @@ android {
 
     defaultConfig {
         applicationId = "com.stanley.foodjournal"
-        minSdk = 37
+        minSdk = 36
         targetSdk = 37
         versionCode = 1
-        versionName = "1.00.00"
+        versionName = "1.00.01"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -1,5 +1,5 @@
 // Lint prefers the AndroidX ExifInterface for fixes to old Android versions, and core-ktx's
-// Bitmap.scale. With minSdk 37 the framework ExifInterface has the fixes, and neither library
+// Bitmap.scale. With minSdk 36 the framework ExifInterface has the fixes, and neither library
 // is in the stack.
 @file:Suppress("ExifInterface", "UseKtx")
 

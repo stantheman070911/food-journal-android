@@ -8,7 +8,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 /**
  * The system Photo Picker for one image, asking it to keep the photo's location. The picker
  * asks the user once per app, and the user's choice is final. Apps targeting Android 17 need no
- * permission for this; a picker without the option simply strips the location as before.
+ * permission for this; a picker without the option, such as Android 16's, simply strips the
+ * location as before.
  */
 class PickPhotoWithLocation : ActivityResultContracts.PickVisualMedia() {
     override fun createIntent(context: Context, input: PickVisualMediaRequest): Intent =
