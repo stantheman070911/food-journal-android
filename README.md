@@ -4,7 +4,7 @@ A personal Android app for recording what I eat, where, and what I spend. It is 
 
 The goal is a personal archive of meals that is quick to add to and pleasant to look back on.
 
-> **Status:** planning. The product is specified in [Food Journal — Product Document](<Food Journal — Product Document.md>); no code has been written yet.
+> **Status:** Phase 1 of 6 (foundation) is built. The product is specified in [Food Journal — Product Document](<Food Journal — Product Document.md>); open points and decisions are in [Development Notes](DECISIONS.md).
 
 ## Principles
 

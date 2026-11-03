@@ -1,0 +1,118 @@
+package com.stanley.foodjournal.ui.theme
+
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.ui.graphics.Color
+
+// Black, white, and greys only. Every Material role is set so no baseline color can leak in.
+
+private val Black = Color(0xFF000000)
+private val White = Color(0xFFFFFFFF)
+
+// Fixed roles keep the same value in both themes.
+private val FixedLight = Color(0xFFE6E6E6)
+private val FixedDim = Color(0xFFCFCFCF)
+private val FixedInkVariant = Color(0xFF3A3A3A)
+
+val LightColors: ColorScheme = lightColorScheme(
+    primary = Black,
+    onPrimary = White,
+    primaryContainer = Color(0xFFE6E6E6),
+    onPrimaryContainer = Black,
+    inversePrimary = White,
+    secondary = Color(0xFF6E6E6E),
+    onSecondary = White,
+    secondaryContainer = Color(0xFFEBEBEB),
+    onSecondaryContainer = Black,
+    tertiary = Color(0xFF6E6E6E),
+    onTertiary = White,
+    tertiaryContainer = Color(0xFFEBEBEB),
+    onTertiaryContainer = Black,
+    background = White,
+    onBackground = Black,
+    surface = White,
+    onSurface = Black,
+    surfaceVariant = Color(0xFFEFEFEF),
+    onSurfaceVariant = Color(0xFF6E6E6E),
+    surfaceTint = Black,
+    inverseSurface = Color(0xFF3A3A3A),
+    inverseOnSurface = White,
+    error = Black,
+    onError = White,
+    errorContainer = Color(0xFFE6E6E6),
+    onErrorContainer = Black,
+    outline = Color(0xFF8C8C8C),
+    outlineVariant = Color(0xFFE4E4E4),
+    scrim = Black,
+    surfaceBright = White,
+    surfaceContainer = Color(0xFFF2F2F2),
+    surfaceContainerHigh = Color(0xFFECECEC),
+    surfaceContainerHighest = Color(0xFFE6E6E6),
+    surfaceContainerLow = Color(0xFFF7F7F7),
+    surfaceContainerLowest = White,
+    surfaceDim = Color(0xFFDCDCDC),
+    primaryFixed = FixedLight,
+    primaryFixedDim = FixedDim,
+    onPrimaryFixed = Black,
+    onPrimaryFixedVariant = FixedInkVariant,
+    secondaryFixed = FixedLight,
+    secondaryFixedDim = FixedDim,
+    onSecondaryFixed = Black,
+    onSecondaryFixedVariant = FixedInkVariant,
+    tertiaryFixed = FixedLight,
+    tertiaryFixedDim = FixedDim,
+    onTertiaryFixed = Black,
+    onTertiaryFixedVariant = FixedInkVariant,
+)
+
+val DarkColors: ColorScheme = darkColorScheme(
+    primary = White,
+    onPrimary = Black,
+    primaryContainer = Color(0xFF2A2A2A),
+    onPrimaryContainer = White,
+    inversePrimary = White,
+    secondary = Color(0xFF9A9A9A),
+    onSecondary = Black,
+    secondaryContainer = Color(0xFF2A2A2A),
+    onSecondaryContainer = Color(0xFFF2F2F2),
+    tertiary = Color(0xFF9A9A9A),
+    onTertiary = Black,
+    tertiaryContainer = Color(0xFF2A2A2A),
+    onTertiaryContainer = Color(0xFFF2F2F2),
+    background = Black,
+    onBackground = Color(0xFFF2F2F2),
+    surface = Black,
+    onSurface = Color(0xFFF2F2F2),
+    surfaceVariant = Color(0xFF1C1C1C),
+    onSurfaceVariant = Color(0xFF9A9A9A),
+    surfaceTint = White,
+    inverseSurface = Color(0xFF333333),
+    inverseOnSurface = White,
+    error = White,
+    onError = Black,
+    errorContainer = Color(0xFF2A2A2A),
+    onErrorContainer = White,
+    outline = Color(0xFF6B6B6B),
+    outlineVariant = Color(0xFF262626),
+    scrim = Black,
+    surfaceBright = Color(0xFF2A2A2A),
+    surfaceContainer = Color(0xFF141414),
+    surfaceContainerHigh = Color(0xFF1C1C1C),
+    surfaceContainerHighest = Color(0xFF242424),
+    surfaceContainerLow = Color(0xFF0E0E0E),
+    surfaceContainerLowest = Black,
+    surfaceDim = Black,
+    primaryFixed = FixedLight,
+    primaryFixedDim = FixedDim,
+    onPrimaryFixed = Black,
+    onPrimaryFixedVariant = FixedInkVariant,
+    secondaryFixed = FixedLight,
+    secondaryFixedDim = FixedDim,
+    onSecondaryFixed = Black,
+    onSecondaryFixedVariant = FixedInkVariant,
+    tertiaryFixed = FixedLight,
+    tertiaryFixedDim = FixedDim,
+    onTertiaryFixed = Black,
+    onTertiaryFixedVariant = FixedInkVariant,
+)

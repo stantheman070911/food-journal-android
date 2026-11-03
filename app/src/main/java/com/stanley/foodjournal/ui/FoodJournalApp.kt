@@ -1,0 +1,55 @@
+package com.stanley.foodjournal.ui
+
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.dropUnlessResumed
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.stanley.foodjournal.ui.home.HomeScreen
+import com.stanley.foodjournal.ui.meal.MealScreen
+import com.stanley.foodjournal.ui.navigation.HomeRoute
+import com.stanley.foodjournal.ui.navigation.MealRoute
+
+private const val SCREEN_MOTION_MILLIS = 220
+
+/** The tabs, with the Meal screen rising over them. */
+@Composable
+fun FoodJournalApp() {
+    val navController = rememberNavController()
+    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
+        NavHost(
+            navController = navController,
+            startDestination = HomeRoute,
+            enterTransition = {
+                fadeIn(tween(SCREEN_MOTION_MILLIS)) +
+                    slideInVertically(tween(SCREEN_MOTION_MILLIS)) { height -> height / 12 }
+            },
+            exitTransition = { fadeOut(tween(SCREEN_MOTION_MILLIS)) },
+            popEnterTransition = { fadeIn(tween(SCREEN_MOTION_MILLIS)) },
+            popExitTransition = {
+                fadeOut(tween(SCREEN_MOTION_MILLIS)) +
+                    slideOutVertically(tween(SCREEN_MOTION_MILLIS)) { height -> height / 12 }
+            },
+        ) {
+            composable<HomeRoute> {
+                HomeScreen(
+                    onAddMeal = dropUnlessResumed {
+                        navController.navigate(MealRoute()) { launchSingleTop = true }
+                    },
+                )
+            }
+            composable<MealRoute> {
+                MealScreen(onBack = dropUnlessResumed { navController.popBackStack() })
+            }
+        }
+    }
+}

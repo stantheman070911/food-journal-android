@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">Food Journal</string>
+
+    <string name="tab_journal">Journal</string>
+    <string name="tab_spending">Spending</string>
+    <string name="tab_search">Search</string>
+
+    <string name="add_meal">Add meal</string>
+    <string name="back">Back</string>
+
+    <string name="empty_journal">No meals yet</string>
+    <string name="empty_search">Nothing to search yet</string>
+    <string name="empty_spending">No meals</string>
+    <string name="log_first_meal">Log your first meal</string>
+</resources>

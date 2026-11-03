@@ -1,0 +1,7 @@
+<resources>
+    <!-- Only the window and splash background live here. Compose draws everything else. -->
+    <style name="Theme.FoodJournal" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+        <item name="android:windowSplashScreenBackground">@color/window_background</item>
+    </style>
+</resources>
