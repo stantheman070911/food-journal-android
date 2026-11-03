@@ -148,6 +148,16 @@ class MealViewModel(
     /** Set when the screen should close. */
     val finished: StateFlow<Boolean> = _finished.asStateFlow()
 
+    /**
+     * The place "Meals here" opens in Search: the meal's own, once the meal and the place are both
+     * saved. A new meal has none, since leaving would discard it. Read it from composition.
+     */
+    val mealsHerePlaceId: Long?
+        get() = draft
+            ?.takeIf { !isNew && it.newPlaceName == null }
+            ?.placeId
+            ?.takeIf { id -> places.any { it.place.id == id } }
+
     init {
         viewModelScope.launch { recentNames = mealDao.recentNames(RECENT_NAME_COUNT) }
         viewModelScope.launch {
@@ -336,6 +346,17 @@ class MealViewModel(
             else -> discard(current)
         }
         _finished.value = true
+    }
+
+    /**
+     * "Meals here": closes the screen as Back does, keeping edits that still make a valid meal,
+     * and returns the place to open in Search. Null when there is none, or the screen is closing.
+     */
+    fun leaveForPlace(): Long? {
+        if (closing) return null
+        val placeId = mealsHerePlaceId ?: return null
+        onBack()
+        return placeId
     }
 
     /** Deletes a saved meal, with undo. A new meal is simply discarded. */

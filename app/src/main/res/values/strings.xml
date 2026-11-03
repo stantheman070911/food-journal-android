@@ -39,6 +39,7 @@
     <string name="place_rename">Rename %1$s</string>
     <string name="place_rename_done">Save name</string>
     <string name="place_delete">Delete %1$s</string>
+    <string name="place_meals_here">Meals here</string>
 
     <string name="undo">Undo</string>
     <string name="undo_deleted">Deleted</string>
@@ -60,6 +61,7 @@
     <string name="spending_priciest">Priciest</string>
     <string name="spending_other">Other</string>
     <string name="spending_show_amount">Show amount</string>
+    <string name="spending_show_meals">Show meals</string>
     <string name="spending_morning">Morning</string>
     <string name="spending_midday">Midday</string>
     <string name="spending_evening">Evening</string>
@@ -68,10 +70,20 @@
         <item quantity="one">%1$s visit</item>
         <item quantity="other">%1$s visits</item>
     </plurals>
-    <plurals name="spending_meals">
+    <plurals name="meal_count">
         <item quantity="one">%1$s meal</item>
         <item quantity="other">%1$s meals</item>
     </plurals>
+
+    <string name="search_hint">Search</string>
+    <string name="search_dates">Dates</string>
+    <string name="search_favorites">Favorites</string>
+    <string name="search_filter_on">On</string>
+    <string name="search_total">%1$s  ·  %2$s</string>
+    <string name="search_no_results">No meals found</string>
+    <string name="search_clear_text">Clear search</string>
+    <string name="search_clear_place">Clear place</string>
+    <string name="search_clear_dates">Clear dates</string>
 
     <string name="empty_journal">No meals yet</string>
     <string name="empty_search">Nothing to search yet</string>

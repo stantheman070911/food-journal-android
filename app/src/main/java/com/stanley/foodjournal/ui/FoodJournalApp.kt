@@ -9,6 +9,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.dropUnlessResumed
@@ -19,6 +23,7 @@ import com.stanley.foodjournal.ui.home.HomeScreen
 import com.stanley.foodjournal.ui.meal.MealScreen
 import com.stanley.foodjournal.ui.navigation.HomeRoute
 import com.stanley.foodjournal.ui.navigation.MealRoute
+import com.stanley.foodjournal.ui.navigation.SearchRoute
 
 private const val SCREEN_MOTION_MILLIS = 220
 
@@ -26,6 +31,8 @@ private const val SCREEN_MOTION_MILLIS = 220
 @Composable
 fun FoodJournalApp() {
     val navController = rememberNavController()
+    // A place picked from the Meal screen's "Meals here", for the tabs to open in Search.
+    var searchRequest by remember { mutableStateOf<SearchRoute?>(null) }
     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
         NavHost(
             navController = navController,
@@ -43,6 +50,8 @@ fun FoodJournalApp() {
         ) {
             composable<HomeRoute> { entry ->
                 HomeScreen(
+                    searchRequest = searchRequest,
+                    onSearchRequestHandled = { searchRequest = null },
                     onAddMeal = dropUnlessResumed {
                         navController.navigate(MealRoute()) { launchSingleTop = true }
                     },
@@ -55,7 +64,10 @@ fun FoodJournalApp() {
                 )
             }
             composable<MealRoute> {
-                MealScreen(onClose = dropUnlessResumed { navController.popBackStack() })
+                MealScreen(
+                    onClose = dropUnlessResumed { navController.popBackStack() },
+                    onOpenPlace = { placeId -> searchRequest = SearchRoute(placeId = placeId) },
+                )
             }
         }
     }

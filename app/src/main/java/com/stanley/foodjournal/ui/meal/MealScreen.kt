@@ -98,11 +98,12 @@ import com.stanley.foodjournal.ui.preview.ThemePreviews
 import java.time.LocalDate
 import java.time.LocalDateTime
 
-/** Adds, shows, and edits one meal. */
+/** Adds, shows, and edits one meal. [onOpenPlace] opens a place's meals in Search. */
 @Composable
 fun MealScreen(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenPlace: (placeId: Long) -> Unit = {},
     viewModel: MealViewModel = viewModel(factory = MealViewModel.Factory),
 ) {
     val uiState = viewModel.uiState
@@ -175,6 +176,11 @@ fun MealScreen(
                     onRename = viewModel::renamePlace,
                     onDelete = viewModel::deletePlace,
                     onDismiss = { pickingPlace = false },
+                    onMealsHere = if (viewModel.mealsHerePlaceId != null) {
+                        { viewModel.leaveForPlace()?.let(onOpenPlace) }
+                    } else {
+                        null
+                    },
                 )
             }
         }

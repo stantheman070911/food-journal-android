@@ -190,9 +190,19 @@ class SpendingViewModelTest {
 
         val figures = viewModel().state { it.pages.isNotEmpty() }.pages.last().figures!!
 
-        assertEquals(listOf(PlaceRow("林家乾麵", 2, ShareRow("400", 0.8f))), figures.places)
+        assertEquals(listOf(PlaceRow(noodles, "林家乾麵", 2, ShareRow("400", 0.8f))), figures.places)
         assertEquals(OtherRow(1, ShareRow("100", 0.2f)), figures.other)
         assertEquals(listOf("0", "400", "0", "100"), figures.bands.map { it.row.total })
+    }
+
+    @Test
+    fun aPlacesMealsInSearchEndAtToday() = runBlocking {
+        db.mealDao().insert(meal(LocalDateTime.of(2026, 10, 3, 12, 0)))
+
+        val pages = viewModel().state { it.pages.isNotEmpty() }.pages
+
+        assertEquals(LocalDate.of(2026, 10, 31), pages[0].lastDay)
+        assertEquals(today, pages[1].lastDay)
     }
 
     @Test

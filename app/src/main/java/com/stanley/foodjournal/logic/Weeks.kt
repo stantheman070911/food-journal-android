@@ -41,9 +41,18 @@ private val Weekday = DateTimeFormatter.ofPattern("EEE", Locale.ENGLISH)
  * The year shows only for dates outside [today]'s year: "Oct 20 – 26, 2025", and across New
  * Year "Dec 29, 2025 – Jan 4".
  */
-fun formatWeekRange(start: LocalDate, today: LocalDate): String {
-    val end = start.plusDays(6)
+fun formatWeekRange(start: LocalDate, today: LocalDate): String = formatDateRange(start, start.plusDays(6), today)
+
+/**
+ * Any run of days, written as a week's header is: "Oct 1 – Nov 4", "Nov 2 – 8", and a single
+ * day as "Nov 4". The year shows only for dates outside [today]'s year.
+ */
+fun formatDateRange(start: LocalDate, end: LocalDate, today: LocalDate): String {
     val thisYear = today.year
+    if (start == end) {
+        val year = if (start.year != thisYear) ", ${start.format(Year)}" else ""
+        return "${start.format(MonthDay)}$year"
+    }
     return if (start.year == end.year) {
         val endText = if (start.month == end.month) end.format(Day) else end.format(MonthDay)
         val year = if (start.year != thisYear) ", ${start.format(Year)}" else ""

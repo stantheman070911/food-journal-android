@@ -50,7 +50,7 @@ data class ChartBar(
 /** A row with a share bar: a place, Other, or a time band. [share] runs from 0 to 1. */
 data class ShareRow(val total: String, val share: Float)
 
-data class PlaceRow(val name: String, val visits: Int, val row: ShareRow)
+data class PlaceRow(val placeId: Long, val name: String, val visits: Int, val row: ShareRow)
 
 data class OtherRow(val meals: Int, val row: ShareRow)
 
@@ -81,11 +81,15 @@ data class SpendingFigures(
     val priciest: List<PriciestTile>,
 )
 
-/** One period's page. [figures] is null when the period has no meals. */
+/**
+ * One period's page. [figures] is null when the period has no meals. [lastDay] is the period's
+ * last day so far, where a place's meals in Search end.
+ */
 data class SpendingPage(
     val period: Period,
     val name: String,
     val figures: SpendingFigures?,
+    val lastDay: LocalDate = period.end,
 )
 
 /**
@@ -178,7 +182,7 @@ class SpendingViewModel(
                 today = today,
                 knownPlaces = names.keys,
             )
-            SpendingPage(period, formatPeriodName(period, today), spending?.toFigures(names, today))
+            SpendingPage(period, formatPeriodName(period, today), spending?.toFigures(names, today), minOf(period.end, today))
         }
     }
 
@@ -198,7 +202,7 @@ class SpendingViewModel(
                     isFuture = bar.isFuture,
                 )
             },
-            places = topPlaces.map { PlaceRow(names.getValue(it.placeId), it.visits, share(it.total)) },
+            places = topPlaces.map { PlaceRow(it.placeId, names.getValue(it.placeId), it.visits, share(it.total)) },
             other = other?.let { OtherRow(it.meals, share(it.total)) },
             bands = bands.map { (band, amount) -> BandRow(band, share(amount)) },
             priciest = priciest.map { meal ->

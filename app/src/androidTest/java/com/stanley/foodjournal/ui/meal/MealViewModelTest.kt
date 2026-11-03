@@ -282,6 +282,42 @@ class MealViewModelTest {
     }
 
     @Test
+    fun mealsHereLeavesAsBackDoesAndKeepsValidEdits() = runBlocking {
+        val placeId = db.placeDao().insert(Place(name = "Kiosk"))
+        val mealId = db.mealDao().insert(Meal(eatenAt = noon, name = "Tea", price = 50, placeId = placeId))
+        val vm = savedMeal(mealId)
+        awaitTrue { main { vm.mealsHerePlaceId } == placeId }
+
+        main { vm.onNameChange("Milk tea") }
+        assertEquals(placeId, main { vm.leaveForPlace() })
+
+        assertTrue(vm.finished.value)
+        awaitTrue { db.mealDao().get(mealId)?.name == "Milk tea" }
+        // Already closing: a second tap opens nothing.
+        assertNull(main { vm.leaveForPlace() })
+    }
+
+    @Test
+    fun aNewMealOrANewPlaceHasNoMealsHere() = runBlocking {
+        val placeId = db.placeDao().insert(Place(name = "Kiosk"))
+        val fresh = newMeal()
+        main {
+            fresh.onSkipPhoto()
+            fresh.onPlaceSelected(placeId)
+        }
+        delay(200)
+        assertNull(main { fresh.mealsHerePlaceId })
+        assertNull(main { fresh.leaveForPlace() })
+        assertFalse(fresh.finished.value)
+
+        val mealId = db.mealDao().insert(Meal(eatenAt = noon, name = "Tea", price = 50, placeId = placeId))
+        val saved = savedMeal(mealId)
+        awaitTrue { main { saved.mealsHerePlaceId } == placeId }
+        main { saved.onNewPlace("Corner stall") }
+        assertNull(main { saved.mealsHerePlaceId })
+    }
+
+    @Test
     fun aCaptureLandingAfterTheScreenClosedIsDeleted() = runBlocking {
         val vm = newMeal()
         val (name, file) = main { vm.newCaptureFile() }

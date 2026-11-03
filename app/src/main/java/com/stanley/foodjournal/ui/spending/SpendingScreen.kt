@@ -73,6 +73,7 @@ import java.time.LocalDate
 @Composable
 fun SpendingScreen(
     onOpenMeal: (Long) -> Unit,
+    onOpenPlace: (placeId: Long, from: LocalDate, to: LocalDate) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SpendingViewModel = viewModel(factory = SpendingViewModel.Factory),
 ) {
@@ -87,13 +88,15 @@ fun SpendingScreen(
         onSelectKind = viewModel::selectKind,
         onShowPeriod = viewModel::showPeriod,
         onOpenMeal = onOpenMeal,
+        onOpenPlace = onOpenPlace,
         modifier = modifier,
     )
 }
 
 /**
  * The Week, Month, Year switch, with the periods beneath it to swipe through: total, change,
- * averages, bars, places, time of day, and the priciest meals.
+ * averages, bars, places, time of day, and the priciest meals. A place's row opens its meals of
+ * the period in Search.
  */
 @Composable
 fun SpendingScreen(
@@ -102,6 +105,7 @@ fun SpendingScreen(
     onShowPeriod: (Period) -> Unit,
     onOpenMeal: (Long) -> Unit,
     modifier: Modifier = Modifier,
+    onOpenPlace: (placeId: Long, from: LocalDate, to: LocalDate) -> Unit = { _, _, _ -> },
 ) {
     when {
         // No meal has been logged yet.
@@ -110,7 +114,12 @@ fun SpendingScreen(
             PeriodSwitch(selected = uiState.kind, onSelect = onSelectKind)
             // A new pager for each kind, opening on the period the view model picked.
             key(uiState.kind) {
-                PeriodPager(uiState = uiState, onShowPeriod = onShowPeriod, onOpenMeal = onOpenMeal)
+                PeriodPager(
+                    uiState = uiState,
+                    onShowPeriod = onShowPeriod,
+                    onOpenMeal = onOpenMeal,
+                    onOpenPlace = onOpenPlace,
+                )
             }
         }
     }
@@ -174,6 +183,7 @@ private fun PeriodPager(
     uiState: SpendingUiState,
     onShowPeriod: (Period) -> Unit,
     onOpenMeal: (Long) -> Unit,
+    onOpenPlace: (placeId: Long, from: LocalDate, to: LocalDate) -> Unit,
 ) {
     val pages = uiState.pages
     val currentPages by rememberUpdatedState(pages)
@@ -195,12 +205,16 @@ private fun PeriodPager(
         verticalAlignment = Alignment.Top,
         modifier = Modifier.fillMaxSize(),
     ) { index ->
-        PeriodPage(page = pages[index], onOpenMeal = onOpenMeal)
+        PeriodPage(page = pages[index], onOpenMeal = onOpenMeal, onOpenPlace = onOpenPlace)
     }
 }
 
 @Composable
-private fun PeriodPage(page: SpendingPage, onOpenMeal: (Long) -> Unit) {
+private fun PeriodPage(
+    page: SpendingPage,
+    onOpenMeal: (Long) -> Unit,
+    onOpenPlace: (placeId: Long, from: LocalDate, to: LocalDate) -> Unit,
+) {
     val figures = page.figures
     if (figures == null) {
         // The switch and swiping stay, so an empty period never strands you.
@@ -249,12 +263,13 @@ private fun PeriodPage(page: SpendingPage, onOpenMeal: (Long) -> Unit) {
                     name = place.name,
                     detail = pluralStringResource(R.plurals.spending_visits, place.visits, formatPrice(place.visits)),
                     row = place.row,
+                    onClick = { onOpenPlace(place.placeId, page.period.start, page.lastDay) },
                 )
             }
             figures.other?.let { other ->
                 ShareLine(
                     name = stringResource(R.string.spending_other),
-                    detail = pluralStringResource(R.plurals.spending_meals, other.meals, formatPrice(other.meals)),
+                    detail = pluralStringResource(R.plurals.meal_count, other.meals, formatPrice(other.meals)),
                     row = other.row,
                 )
             }
@@ -396,11 +411,19 @@ private fun BarChart(bars: List<ChartBar>) {
     }
 }
 
-/** A name, an optional grey detail, and a total, over a thin bar showing its share. */
+/**
+ * A name, an optional grey detail, and a total, over a thin bar showing its share. With
+ * [onClick], as for a place, the row opens its meals.
+ */
 @Composable
-private fun ShareLine(name: String, detail: String?, row: ShareRow) {
+private fun ShareLine(name: String, detail: String?, row: ShareRow, onClick: (() -> Unit)? = null) {
     val colors = MaterialTheme.colorScheme
-    Column(Modifier.padding(vertical = 8.dp)) {
+    val showMeals = stringResource(R.string.spending_show_meals)
+    Column(
+        Modifier
+            .then(if (onClick != null) Modifier.clickable(onClickLabel = showMeals, onClick = onClick) else Modifier)
+            .padding(vertical = 8.dp),
+    ) {
         Row {
             Text(
                 text = name,
@@ -510,8 +533,8 @@ private fun samplePage(): SpendingPage {
                 ChartBar(amount, "$amount", "MTWTFSS"[index].toString(), "Nov ${index + 2}, $amount", isFuture = index > 3)
             },
             places = listOf(
-                PlaceRow("林家乾麵", 2, ShareRow("410", 0.43f)),
-                PlaceRow("Corner café", 1, ShareRow("180", 0.19f)),
+                PlaceRow(1, "林家乾麵", 2, ShareRow("410", 0.43f)),
+                PlaceRow(2, "Corner café", 1, ShareRow("180", 0.19f)),
             ),
             other = OtherRow(2, ShareRow("365", 0.38f)),
             bands = listOf(

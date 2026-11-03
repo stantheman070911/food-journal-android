@@ -16,5 +16,5 @@ enum class TopLevelDestination(
 ) {
     Journal(JournalRoute, FoodJournalIcons.Journal, R.string.tab_journal),
     Spending(SpendingRoute, FoodJournalIcons.Spending, R.string.tab_spending),
-    Search(SearchRoute, FoodJournalIcons.Search, R.string.tab_search),
+    Search(SearchRoute(), FoodJournalIcons.Search, R.string.tab_search),
 }

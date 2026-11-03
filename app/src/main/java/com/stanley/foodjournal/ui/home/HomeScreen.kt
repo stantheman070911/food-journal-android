@@ -13,6 +13,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -40,14 +41,25 @@ import com.stanley.foodjournal.ui.spending.SpendingScreen
 
 private const val TAB_FADE_MILLIS = 150
 
-/** The three tabs, the bottom bar, and the Add button. */
+/**
+ * The three tabs, the bottom bar, and the Add button. A [searchRequest], from a screen above the
+ * tabs, opens Search with it once the tabs show again.
+ */
 @Composable
 fun HomeScreen(
     onAddMeal: () -> Unit,
     onOpenMeal: (Long) -> Unit,
     modifier: Modifier = Modifier,
+    searchRequest: SearchRoute? = null,
+    onSearchRequestHandled: () -> Unit = {},
 ) {
     val tabNavController = rememberNavController()
+    LaunchedEffect(searchRequest) {
+        if (searchRequest != null) {
+            tabNavController.openSearch(searchRequest)
+            onSearchRequestHandled()
+        }
+    }
     val backStackEntry by tabNavController.currentBackStackEntryAsState()
     val selected = TopLevelDestination.entries.firstOrNull { tab ->
         backStackEntry?.destination?.hierarchy?.any { it.hasRoute(tab.route::class) } == true
@@ -67,8 +79,15 @@ fun HomeScreen(
             exitTransition = { fadeOut(tween(TAB_FADE_MILLIS)) },
         ) {
             composable<JournalRoute> { JournalScreen(onAddMeal = onAddMeal, onOpenMeal = onOpenMeal) }
-            composable<SpendingRoute> { SpendingScreen(onOpenMeal = onOpenMeal) }
-            composable<SearchRoute> { SearchScreen(onAddMeal = onAddMeal) }
+            composable<SpendingRoute> {
+                SpendingScreen(
+                    onOpenMeal = onOpenMeal,
+                    onOpenPlace = { placeId, from, to ->
+                        tabNavController.openSearch(SearchRoute(placeId, from.toEpochDay(), to.toEpochDay()))
+                    },
+                )
+            }
+            composable<SearchRoute> { SearchScreen(onAddMeal = onAddMeal, onOpenMeal = onOpenMeal) }
         }
     }
 }
@@ -123,6 +142,16 @@ private fun NavController.navigateToTab(tab: TopLevelDestination) {
         popUpTo(graph.findStartDestination().id) { saveState = true }
         launchSingleTop = true
         restoreState = true
+    }
+}
+
+/**
+ * Opens Search as a fresh search holding only what [route] names. Unlike a tab switch, the
+ * Search tab's saved state isn't restored, and a Search already showing is replaced.
+ */
+private fun NavController.openSearch(route: SearchRoute) {
+    navigate(route) {
+        popUpTo(graph.findStartDestination().id) { saveState = true }
     }
 }
 

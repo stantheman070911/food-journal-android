@@ -274,6 +274,33 @@ Settled on Nov 4, 2026, before any Phase 4 code, all as recommended. These add t
 
 **Left open:** one stray old date, such as a camera's default of 1980, would add thousands of empty weeks to swipe through. That is a product question for later, not a bug.
 
+## Phase 5: Search
+
+Settled on Nov 4, 2026, before any Phase 5 code, all as recommended. These add to the Search rows of the Ambiguities table and to "Opening Search with a place" under the Phase 2 plan.
+
+- **Result rows.** A 3:4 thumbnail, or a grey tile when the meal has no photo. Beside it, the name, with "Tue, Nov 3 · 林家乾麵" in grey below and the price on the right in tabular sans. The year shows only outside the current year. A small star marks favorites. Tapping a row opens the meal.
+- **Matching.** Ignores case and full-width letters, cleaned the way place names are. Each typed word must appear in the name, the note, or the place, so "beef soup" finds "Beef noodle soup". Chinese works by substring. Filtering happens in memory, from every meal, as a pure function with JVM tests.
+- **Layout.** The search field is a grey pill with the place chip inside it, before the text. Below it sit two pill filters, "Dates" and "★ Favorites". Then the total, "42 meals · 12,340", in sans. Then the results, newest first.
+- **Dates.** "Dates" opens Material's date-range dialog, which can't pick future days. Once set, the pill reads "Oct 1 – Nov 4", written as the Journal writes weeks, with an × that clears it. Both days are included in full. The dialog starts weeks on Sunday, the same known nit as the Meal screen.
+- **The place chip.** With a chip, the text filters within that place. Its × clears it. Place names in result rows aren't tappable, so a row always opens its meal.
+- **Arriving with a place** opens the Search tab with a fresh search holding only that place: no text and no other filters. Back follows the tab rule and returns to Journal.
+- **"Meals here" in the place picker** shows only for a saved meal whose place is saved, at the top of the list, before anything is typed. It closes the Meal screen as Back does, so valid edits are kept, then opens Search. A new meal never shows it, since leaving would discard the meal.
+- **From Spending,** a place's row opens Search with that place and the period on screen as the dates, up to today, so the totals match. Other isn't tappable.
+- **Empty results** show one line, "No meals found". With no meals at all, the tab keeps its empty state, "Nothing to search yet".
+- **Focus and memory.** The field doesn't take focus when the tab opens. A search is kept while switching tabs, but not across a cold start.
+
+**Built** on Nov 4, 2026.
+
+- **Rules in one place.** `logic/Search.kt` holds the matching, with JVM tests. A space joins a meal's name, note, and place before matching, so no word matches across two of them.
+- **The route.** `SearchRoute` carries an optional place and first and last days. A screen above the tabs, the Meal screen, hands its place to the tabs, which open Search once they show again. Opening Search this way replaces any Search showing and doesn't restore the tab's saved search.
+- **Back** from a search opened with a place returns to Journal and drops that search, as Back drops any tab's state. The Search tab then shows a search without the place.
+- **The dates are one saved value,** so the first and last day always change together. Kept as two, they briefly disagreed, and results ran past the last day for a moment; a device test caught it.
+- **The date-range dialog** sets its title and headline with dialog padding, since the defaults leave room for a full-screen picker's close button. The days between the two ends get a band in the ink at 12%, because Material's default grey matched the dialog's own and vanished.
+- **A chip whose place is gone,** merged away or deleted, disappears and filters nothing out. It comes back if the change is undone.
+- **Meals without a name** show their date and place as their only line.
+- **Spending's place rows** are buttons labelled "Show meals".
+- **Checked on the emulator** with seeded meals, in light and dark: typing, Favorites, picking a range, Spending's October place row giving the same 8 meals and 5,440 in Search, and "Meals here" from a saved meal.
+
 ## Design references: Retro
 
 Added on Nov 3, 2026, during the Phase 2 review. Screenshots of [Retro](https://retro.app/), the weekly photo journal the product document already names, are in `UI inspo(retro-screenshots)/`. They are a standing visual reference for every phase. Ideas are adapted to Food Journal's monochrome, photo-first identity, never copied: no Retro branding, art, or layouts are reproduced, and nothing they show is added unless the product document names it.

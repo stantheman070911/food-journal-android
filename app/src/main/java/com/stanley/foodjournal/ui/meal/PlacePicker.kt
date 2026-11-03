@@ -67,7 +67,8 @@ import kotlinx.coroutines.launch
 /**
  * The place picker: a full-height sheet with a field that filters saved places and offers a
  * new one, "No place", and the places nearest first. Each place can be renamed in its row;
- * renaming to another place's name merges the two, with the undo bar inside the sheet.
+ * renaming to another place's name merges the two, with the undo bar inside the sheet. With
+ * [onMealsHere], a "Meals here" row heads the list before anything is typed.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,6 +79,7 @@ fun PlacePickerSheet(
     onRename: (Place, String) -> Unit,
     onDelete: (Place) -> Unit,
     onDismiss: () -> Unit,
+    onMealsHere: (() -> Unit)? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
@@ -106,6 +108,7 @@ fun PlacePickerSheet(
                 onRename = onRename,
                 onDelete = onDelete,
                 onClose = { close {} },
+                onMealsHere = onMealsHere?.let { action -> { close(action) } },
                 focusQuery = true,
             )
             // The sheet is its own window, so the tabs' bar can't show over it.
@@ -125,6 +128,7 @@ private fun PlacePicker(
     modifier: Modifier = Modifier,
     onDelete: (Place) -> Unit = {},
     onClose: () -> Unit = {},
+    onMealsHere: (() -> Unit)? = null,
     focusQuery: Boolean = false,
     initialEditingId: Long? = null,
 ) {
@@ -144,6 +148,13 @@ private fun PlacePicker(
             requestFocus = focusQuery,
         )
         LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(top = 8.dp, bottom = 88.dp)) {
+            if (onMealsHere != null && content.showNoPlace) {
+                item(key = "meals here") {
+                    PickerRow(icon = FoodJournalIcons.Search, onClick = onMealsHere) {
+                        RowText(stringResource(R.string.place_meals_here))
+                    }
+                }
+            }
             content.addName?.let { name ->
                 item(key = "add") {
                     PickerRow(icon = FoodJournalIcons.Add, onClick = { onAdd(name) }) {
