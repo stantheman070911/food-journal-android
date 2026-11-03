@@ -11,6 +11,8 @@ import androidx.room.TypeConverters
 abstract class FoodJournalDatabase : RoomDatabase() {
     abstract fun mealDao(): MealDao
 
+    abstract fun placeDao(): PlaceDao
+
     companion object {
         fun create(context: Context): FoodJournalDatabase =
             Room.databaseBuilder(context, FoodJournalDatabase::class.java, "food-journal.db").build()

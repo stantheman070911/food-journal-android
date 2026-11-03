@@ -11,6 +11,7 @@ class FoodJournalApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        container.sweepOnLaunch()
     }
 }
 
