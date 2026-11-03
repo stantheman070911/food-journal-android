@@ -38,6 +38,7 @@
     <string name="place_new">New</string>
     <string name="place_rename">Rename %1$s</string>
     <string name="place_rename_done">Save name</string>
+    <string name="place_delete">Delete %1$s</string>
 
     <string name="undo">Undo</string>
     <string name="undo_deleted">Deleted</string>

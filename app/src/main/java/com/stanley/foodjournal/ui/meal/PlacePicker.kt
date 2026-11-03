@@ -76,6 +76,7 @@ fun PlacePickerSheet(
     onSelect: (placeId: Long?) -> Unit,
     onAdd: (name: String) -> Unit,
     onRename: (Place, String) -> Unit,
+    onDelete: (Place) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -103,6 +104,7 @@ fun PlacePickerSheet(
                 onSelect = { close { onSelect(it) } },
                 onAdd = { close { onAdd(it) } },
                 onRename = onRename,
+                onDelete = onDelete,
                 onClose = { close {} },
                 focusQuery = true,
             )
@@ -121,6 +123,7 @@ private fun PlacePicker(
     onAdd: (String) -> Unit,
     onRename: (Place, String) -> Unit,
     modifier: Modifier = Modifier,
+    onDelete: (Place) -> Unit = {},
     onClose: () -> Unit = {},
     focusQuery: Boolean = false,
     initialEditingId: Long? = null,
@@ -173,6 +176,10 @@ private fun PlacePicker(
                         onDone = { typed ->
                             editingId = null
                             onRename(row.place, typed)
+                        },
+                        onDelete = {
+                            editingId = null
+                            onDelete(row.place)
                         },
                     )
                 } else {
@@ -282,9 +289,12 @@ private fun PlaceRow(row: PickerPlace, onSelect: () -> Unit, onEdit: () -> Unit)
     }
 }
 
-/** A place's row turned into a field, with its name selected so typing replaces it. */
+/**
+ * A place's row turned into a field, with its name selected so typing replaces it. Delete sits
+ * beside the check; like every delete, it asks nothing and offers Undo.
+ */
 @Composable
-private fun RenameRow(place: Place, onDone: (String) -> Unit) {
+private fun RenameRow(place: Place, onDone: (String) -> Unit, onDelete: () -> Unit) {
     var value by remember { mutableStateOf(TextFieldValue(place.name, TextRange(0, place.name.length))) }
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
@@ -305,6 +315,13 @@ private fun RenameRow(place: Place, onDone: (String) -> Unit) {
                 .weight(1f)
                 .focusRequester(focus),
         )
+        IconButton(onClick = onDelete) {
+            Icon(
+                FoodJournalIcons.Delete,
+                contentDescription = stringResource(R.string.place_delete, place.name),
+                tint = colors.onSurfaceVariant,
+            )
+        }
         IconButton(onClick = { onDone(value.text) }) {
             Icon(FoodJournalIcons.Check, contentDescription = stringResource(R.string.place_rename_done))
         }

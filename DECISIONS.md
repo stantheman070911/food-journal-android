@@ -214,6 +214,15 @@ Requested on Nov 3, 2026, after Phase 3. This overrides the product document in 
   - **Places saved earlier keep the coordinates they have,** including any taken from the phone.
 - **Autocomplete.** Typing in the picker already filtered saved places by any part of the name. Now names that start with what is typed come first, then names that contain it. Typing 林 lists 林家乾麵 before 小林拉麵. Matching ignores case and full-width letters, as before.
 
+## Deleting places
+
+Requested on Nov 3, 2026, after the change above, for a clean start: saved places still held coordinates taken from the phone. The product document only says a place with no meals left is removed.
+
+- **Where.** In the place picker, a place's rename row has a delete icon beside the check.
+- **No confirmation, with Undo**, like every delete. The grey bar shows inside the sheet.
+- **Meals are kept**, without a place. A meal open on the Meal screen loses the place too.
+- **Undo** brings the place back with its id and coordinates, and puts it back on its meals, except any given another place meanwhile. If a place with its name was created meanwhile, the meals join that one instead, which takes the coordinates if it has none. The open meal gets its place back if it has none.
+
 ## Design references: Retro
 
 Added on Nov 3, 2026, during the Phase 2 review. Screenshots of [Retro](https://retro.app/), the weekly photo journal the product document already names, are in `UI inspo(retro-screenshots)/`. They are a standing visual reference for every phase. Ideas are adapted to Food Journal's monochrome, photo-first identity, never copied: no Retro branding, art, or layouts are reproduced, and nothing they show is added unless the product document names it.

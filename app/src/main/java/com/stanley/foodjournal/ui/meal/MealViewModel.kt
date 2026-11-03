@@ -98,6 +98,14 @@ class MealViewModel(
     /** The last merge that moved the draft to its survivor, so an undo can move it back. */
     private var mergedAway: Pair<Long, Long>? = null
 
+    /** The draft's place, deleted from the picker, so an undo can put it back on the draft. */
+    private var deletedPlace: Long? = null
+
+    // A place counts as back only after the list has shown it gone: an update already on its way
+    // when the edit was made still lists it.
+    private var mergedAwayGone = false
+    private var deletedPlaceGone = false
+
     // Snapshot state rather than a flow, so text fields see every keystroke at once and typing
     // never races the keyboard. Each change is copied to the saved state for process death.
     private var draft by mutableStateOf(
@@ -150,6 +158,7 @@ class MealViewModel(
             placeDao.observeSummaries().collect {
                 places = it
                 followUndoneMerge()
+                followUndoneDelete()
                 prefill()
             }
         }
@@ -215,8 +224,23 @@ class MealViewModel(
             if (result is RenameResult.Merged && isDraftPlace && draft?.placeId == place.id) {
                 update { it.copy(placeId = result.survivor.id) }
                 mergedAway = place.id to result.survivor.id
+                // The list may already have dropped the merged-away place before this result.
+                mergedAwayGone = places.none { it.place.id == place.id }
             }
         }
+    }
+
+    /**
+     * Deletes a place from the picker, with undo. Its meals stay, without a place. A draft at
+     * that place loses it too, and gets it back if the deletion is undone.
+     */
+    fun deletePlace(place: Place) {
+        if (draft?.placeId == place.id) {
+            update { it.copy(placeId = null, placeTouched = true) }
+            deletedPlace = place.id
+            deletedPlaceGone = false
+        }
+        edits.deletePlace(place)
     }
 
     /** A name and file for the next camera capture. */
@@ -480,9 +504,25 @@ class MealViewModel(
     /** An undone merge brings the merged-away place back; a draft moved off it moves back too. */
     private fun followUndoneMerge() {
         val (awayId, survivorId) = mergedAway ?: return
-        if (places.none { it.place.id == awayId }) return
+        if (places.none { it.place.id == awayId }) {
+            mergedAwayGone = true
+            return
+        }
+        if (!mergedAwayGone) return
         mergedAway = null
         if (draft?.placeId == survivorId) update { it.copy(placeId = awayId) }
+    }
+
+    /** An undone deletion brings the place back; a draft that lost it, and has no other, gets it back. */
+    private fun followUndoneDelete() {
+        val id = deletedPlace ?: return
+        if (places.none { it.place.id == id }) {
+            deletedPlaceGone = true
+            return
+        }
+        if (!deletedPlaceGone) return
+        deletedPlace = null
+        if (draft?.placeId == null && draft?.newPlaceName == null) update { it.copy(placeId = id) }
     }
 
     private fun photoFile(name: String, isPending: Boolean): File =

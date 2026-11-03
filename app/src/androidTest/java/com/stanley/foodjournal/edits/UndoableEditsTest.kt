@@ -174,6 +174,60 @@ class UndoableEditsTest {
         assertNull(db.placeDao().get(awayId))
     }
 
+    @Test
+    fun deletingAPlaceKeepsItsMealsAndCanBeUndone() = runBlocking {
+        val placeId = db.placeDao().insert(Place(name = "Lin Dong Fang", latitude = 25.05, longitude = 121.53))
+        val first = db.mealDao().insert(meal(placeId = placeId))
+        val second = db.mealDao().insert(meal(placeId = placeId))
+        val place = db.placeDao().get(placeId)!!
+
+        edits.deletePlace(place)
+        awaitPending { it is PendingEdit.PlaceDeleted }
+
+        assertNull(db.placeDao().get(placeId))
+        assertNull(db.mealDao().get(first)?.placeId)
+        assertNull(db.mealDao().get(second)?.placeId)
+
+        edits.undo()
+        awaitTrue { db.placeDao().get(placeId) != null }
+
+        assertEquals(place, db.placeDao().get(placeId))
+        assertEquals(placeId, db.mealDao().get(first)?.placeId)
+        assertEquals(placeId, db.mealDao().get(second)?.placeId)
+    }
+
+    @Test
+    fun undoingAPlaceDeletionWhenItsNameWasTakenJoinsThatPlace() = runBlocking {
+        val placeId = db.placeDao().insert(Place(name = "Kiosk", latitude = 25.05, longitude = 121.53))
+        val mealId = db.mealDao().insert(meal(placeId = placeId))
+        edits.deletePlace(db.placeDao().get(placeId)!!)
+        awaitPending { it is PendingEdit.PlaceDeleted }
+        val retakenId = db.placeDao().insert(Place(name = "KIOSK"))
+
+        edits.undo()
+        awaitTrue { db.mealDao().get(mealId)?.placeId == retakenId }
+
+        assertNull(db.placeDao().get(placeId))
+        assertEquals(25.05, db.placeDao().get(retakenId)?.latitude!!, 0.0)
+    }
+
+    @Test
+    fun undoingAPlaceDeletionLeavesAMealGivenAnotherPlaceMeanwhile() = runBlocking {
+        val placeId = db.placeDao().insert(Place(name = "Kiosk"))
+        val otherId = db.placeDao().insert(Place(name = "Bakery"))
+        val moved = db.mealDao().insert(meal(placeId = placeId))
+        val left = db.mealDao().insert(meal(placeId = placeId))
+        edits.deletePlace(db.placeDao().get(placeId)!!)
+        awaitPending { it is PendingEdit.PlaceDeleted }
+        db.mealDao().update(db.mealDao().get(moved)!!.copy(placeId = otherId))
+
+        edits.undo()
+        awaitTrue { db.placeDao().get(placeId) != null }
+
+        assertEquals(otherId, db.mealDao().get(moved)?.placeId)
+        assertEquals(placeId, db.mealDao().get(left)?.placeId)
+    }
+
     private suspend fun savedMealWithPhotoAndPlace(placeName: String = "Dumplings"): Triple<Meal, String, Long> {
         val photo = photos.newName()
         photos.photoFile(photo).writeText("photo")

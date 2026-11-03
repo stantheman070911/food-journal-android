@@ -22,7 +22,8 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -69,8 +70,13 @@ class MealViewModelTest {
 
     @After
     fun tearDown() {
-        runBlocking { withContext(Dispatchers.Main) { store.clear() } }
-        scope.cancel()
+        runBlocking {
+            withContext(Dispatchers.Main) { store.clear() }
+            scope.coroutineContext.job.cancelAndJoin()
+            // A query the ViewModel's place list started may still be running on Room's own
+            // threads; closing the database under it would crash the test process.
+            delay(300)
+        }
         db.close()
         root.deleteRecursively()
     }
@@ -258,6 +264,24 @@ class MealViewModelTest {
     }
 
     @Test
+    fun theMealFollowsAPlaceDeletionAndItsUndo() = runBlocking {
+        val placeId = db.placeDao().insert(Place(name = "Kiosk"))
+        db.mealDao().insert(Meal(eatenAt = noon, name = "Tea", price = 50, placeId = placeId))
+        val vm = newMeal()
+        main { vm.onPlaceSelected(placeId) }
+        val place = db.placeDao().get(placeId)!!
+
+        main { vm.deletePlace(place) }
+        assertNull(main { vm.uiState!!.draft.placeId })
+        // Undo only once the ViewModel's list has shown the place gone, as a person would.
+        awaitTrue { main { vm.placePicker("").places.none { it.place.id == placeId } } }
+
+        edits.undo()
+        awaitTrue { main { vm.uiState!!.draft.placeId } == placeId }
+        assertEquals("Kiosk", main { vm.uiState!!.placeName })
+    }
+
+    @Test
     fun aCaptureLandingAfterTheScreenClosedIsDeleted() = runBlocking {
         val vm = newMeal()
         val (name, file) = main { vm.newCaptureFile() }
@@ -280,9 +304,13 @@ class MealViewModelTest {
         val second = capture(vm)
 
         processing.finish(second, ok = true)
+        awaitTrue { photos.pendingPhotoFile(second).exists() && !main { vm.uiState!!.photoProcessing } }
         processing.finish(first, ok = true)
+        // The first photo's files are written as it finishes, then dropped as no longer shown.
+        delay(500)
 
-        awaitTrue { !photos.pendingPhotoFile(first).exists() }
+        assertFalse(photos.pendingPhotoFile(first).exists())
+        assertFalse(photos.pendingThumbFile(first).exists())
         assertTrue(photos.pendingPhotoFile(second).exists())
         assertEquals(second, main { vm.uiState!!.draft.photo })
     }

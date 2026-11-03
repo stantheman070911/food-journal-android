@@ -56,6 +56,9 @@ abstract class PlaceDao {
     @Query("UPDATE meal SET placeId = :placeId WHERE id IN (:mealIds)")
     protected abstract suspend fun moveMeals(mealIds: List<Long>, placeId: Long)
 
+    @Query("UPDATE meal SET placeId = :placeId WHERE id IN (:mealIds) AND placeId IS NULL")
+    protected abstract suspend fun placeUnplacedMeals(mealIds: List<Long>, placeId: Long)
+
     /**
      * Merges [mergedAway] into [survivor] in one step: its meals move over, it is removed, and
      * the survivor takes its coordinates if it has none. Returns the ids of the meals moved.
@@ -67,6 +70,34 @@ abstract class PlaceDao {
         delete(mergedAway)
         update(mergedPlace(survivor, mergedAway))
         return moved
+    }
+
+    /**
+     * Deletes [place] in one step. Its meals stay, without a place. Returns their ids, so an undo
+     * can put them back.
+     */
+    @Transaction
+    open suspend fun remove(place: Place): List<Long> {
+        val meals = mealIdsAt(place.id)
+        delete(place)
+        return meals
+    }
+
+    /**
+     * Reverses [remove]: [place] returns with its id and [mealIds] go back to it, except any given
+     * another place meanwhile. If a place with its name was created meanwhile, the meals join
+     * that place instead.
+     */
+    @Transaction
+    open suspend fun restore(place: Place, mealIds: List<Long>) {
+        val taken = all().firstOrNull { sameName(it.name, place.name) }
+        if (taken == null) {
+            insert(place)
+            placeUnplacedMeals(mealIds, place.id)
+        } else {
+            placeUnplacedMeals(mealIds, taken.id)
+            update(mergedPlace(survivor = taken, mergedAway = place))
+        }
     }
 
     /**

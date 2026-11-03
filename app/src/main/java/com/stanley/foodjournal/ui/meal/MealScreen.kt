@@ -173,6 +173,7 @@ fun MealScreen(
                     onSelect = viewModel::onPlaceSelected,
                     onAdd = viewModel::onNewPlace,
                     onRename = viewModel::renamePlace,
+                    onDelete = viewModel::deletePlace,
                     onDismiss = { pickingPlace = false },
                 )
             }

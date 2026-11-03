@@ -17,7 +17,7 @@ The goal is a personal archive of meals that is quick to add to and pleasant to 
 
 ## Version 1
 
-- **Log a meal:** photo, name, price, favorite, note, and place. Saved places come up as you type. A gallery photo with a location fills in the one saved place within 150 m; the phone's own location is never used.
+- **Log a meal:** photo, name, price, favorite, note, and place. Saved places come up as you type, and can be renamed, merged, or deleted. A gallery photo with a location fills in the one saved place within 150 m; the phone's own location is never used.
 - **Backfill from the gallery:** date, time, and location come from the photo's metadata.
 - **Journal:** one row per week (Monday to Sunday), newest first, with a horizontal filmstrip of photo tiles.
 - **Spending:** totals, averages, a bar chart, top places, time of day, and priciest meals by week, month, or year. Numbers are shown, never judged.

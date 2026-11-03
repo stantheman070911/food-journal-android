@@ -24,6 +24,9 @@ import kotlin.time.Duration.Companion.seconds
 sealed interface PendingEdit {
     data class MealDeleted(val meal: Meal) : PendingEdit
 
+    /** A place deleted from the picker; [mealIds] were at it and are now without a place. */
+    data class PlaceDeleted(val place: Place, val mealIds: List<Long>) : PendingEdit
+
     data class PlacesMerged(
         val mergedAway: Place,
         val survivorBefore: Place,
@@ -73,6 +76,18 @@ class UndoableEdits(
         }
     }
 
+    /** Deletes [place], with undo. Its meals stay, without a place, unless the deletion is undone. */
+    fun deletePlace(place: Place) {
+        scope.launch {
+            mutex.withLock {
+                closeLocked()
+                val current = placeDao.get(place.id) ?: return@withLock
+                val mealIds = placeDao.remove(current)
+                openLocked(PendingEdit.PlaceDeleted(current, mealIds))
+            }
+        }
+    }
+
     /**
      * Renames [place] to [typed], merging it into another place that already has the name.
      * Any pending edit is closed first, so the rename works on settled data.
@@ -105,6 +120,7 @@ class UndoableEdits(
                 _pending.value = null
                 when (edit) {
                     is PendingEdit.MealDeleted -> mealDao.insert(edit.meal)
+                    is PendingEdit.PlaceDeleted -> placeDao.restore(edit.place, edit.mealIds)
                     is PendingEdit.PlacesMerged ->
                         placeDao.unmerge(edit.mergedAway, edit.survivorBefore, edit.movedMealIds)
                 }
