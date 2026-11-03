@@ -146,12 +146,15 @@ private fun NavController.navigateToTab(tab: TopLevelDestination) {
 }
 
 /**
- * Opens Search as a fresh search holding only what [route] names. Unlike a tab switch, the
- * Search tab's saved state isn't restored, and a Search already showing is replaced.
+ * Opens Search as a fresh search holding only what [route] names. The search it replaces, a
+ * Search showing or one the tab saved earlier, is dropped for good; kept, it would come back on
+ * the next tab switch in place of this one.
  */
 private fun NavController.openSearch(route: SearchRoute) {
+    val onSearch = currentDestination?.hasRoute(SearchRoute::class) == true
+    clearBackStack<SearchRoute>()
     navigate(route) {
-        popUpTo(graph.findStartDestination().id) { saveState = true }
+        popUpTo(graph.findStartDestination().id) { saveState = !onSearch }
     }
 }
 

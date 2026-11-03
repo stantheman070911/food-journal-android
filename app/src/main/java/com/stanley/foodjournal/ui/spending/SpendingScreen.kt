@@ -421,7 +421,13 @@ private fun ShareLine(name: String, detail: String?, row: ShareRow, onClick: (()
     val showMeals = stringResource(R.string.spending_show_meals)
     Column(
         Modifier
-            .then(if (onClick != null) Modifier.clickable(onClickLabel = showMeals, onClick = onClick) else Modifier)
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(onClickLabel = showMeals, role = Role.Button, onClick = onClick)
+                } else {
+                    Modifier
+                },
+            )
             .padding(vertical = 8.dp),
     ) {
         Row {

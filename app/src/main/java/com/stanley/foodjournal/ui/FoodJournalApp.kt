@@ -11,7 +11,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.Lifecycle
@@ -31,8 +31,9 @@ private const val SCREEN_MOTION_MILLIS = 220
 @Composable
 fun FoodJournalApp() {
     val navController = rememberNavController()
-    // A place picked from the Meal screen's "Meals here", for the tabs to open in Search.
-    var searchRequest by remember { mutableStateOf<SearchRoute?>(null) }
+    // A place picked from the Meal screen's "Meals here", for the tabs to open in Search. Saved,
+    // so a rotation between closing the Meal screen and opening Search can't lose it.
+    var searchPlaceId by rememberSaveable { mutableStateOf<Long?>(null) }
     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
         NavHost(
             navController = navController,
@@ -50,8 +51,8 @@ fun FoodJournalApp() {
         ) {
             composable<HomeRoute> { entry ->
                 HomeScreen(
-                    searchRequest = searchRequest,
-                    onSearchRequestHandled = { searchRequest = null },
+                    searchRequest = searchPlaceId?.let { SearchRoute(placeId = it) },
+                    onSearchRequestHandled = { searchPlaceId = null },
                     onAddMeal = dropUnlessResumed {
                         navController.navigate(MealRoute()) { launchSingleTop = true }
                     },
@@ -66,7 +67,7 @@ fun FoodJournalApp() {
             composable<MealRoute> {
                 MealScreen(
                     onClose = dropUnlessResumed { navController.popBackStack() },
-                    onOpenPlace = { placeId -> searchRequest = SearchRoute(placeId = placeId) },
+                    onOpenPlace = { placeId -> searchPlaceId = placeId },
                 )
             }
         }

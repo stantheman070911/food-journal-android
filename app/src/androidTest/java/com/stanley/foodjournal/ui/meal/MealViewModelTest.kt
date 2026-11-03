@@ -298,6 +298,26 @@ class MealViewModelTest {
     }
 
     @Test
+    fun mealsHereNeverOffersAPlaceBackWouldDrop() = runBlocking {
+        val kiosk = db.placeDao().insert(Place(name = "Kiosk"))
+        val stall = db.placeDao().insert(Place(name = "Stall"))
+        val mealId = db.mealDao().insert(Meal(eatenAt = noon, name = "Tea", price = 50, placeId = kiosk))
+        val vm = savedMeal(mealId)
+        awaitTrue { main { vm.mealsHerePlaceId } == kiosk }
+
+        // Without a price, Back keeps the saved meal, still at the kiosk.
+        main { vm.onPriceChange("") }
+        assertEquals(kiosk, main { vm.mealsHerePlaceId })
+
+        main { vm.onPlaceSelected(stall) }
+        assertNull(main { vm.mealsHerePlaceId })
+
+        // A valid meal at the stall is what Back would save.
+        main { vm.onPriceChange("60") }
+        assertEquals(stall, main { vm.mealsHerePlaceId })
+    }
+
+    @Test
     fun aNewMealOrANewPlaceHasNoMealsHere() = runBlocking {
         val placeId = db.placeDao().insert(Place(name = "Kiosk"))
         val fresh = newMeal()

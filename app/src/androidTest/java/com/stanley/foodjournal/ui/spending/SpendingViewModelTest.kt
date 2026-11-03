@@ -206,6 +206,16 @@ class SpendingViewModelTest {
     }
 
     @Test
+    fun aMealDatedLaterStretchesSearchsDatesSoTheTotalsMatch() = runBlocking {
+        db.mealDao().insert(meal(LocalDateTime.of(2026, 11, 2, 12, 0)))
+        db.mealDao().insert(meal(LocalDateTime.of(2026, 11, 20, 12, 0)))
+
+        val page = viewModel().state { it.pages.isNotEmpty() }.pages.last()
+
+        assertEquals(LocalDate.of(2026, 11, 20), page.lastDay)
+    }
+
+    @Test
     fun priciestTilesCarryTheirPhotoAndPrice() = runBlocking {
         val photo = db.mealDao().insert(meal(LocalDateTime.of(2026, 11, 2, 12, 0), price = 1_280, photo = "a.jpg"))
         val named = db.mealDao().insert(meal(LocalDateTime.of(2026, 11, 3, 12, 0), price = 90, name = "Latte"))

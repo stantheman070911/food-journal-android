@@ -11,11 +11,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -44,6 +46,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -51,8 +57,6 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -120,7 +124,8 @@ fun SearchScreen(
             onAction = actions.onAddMeal,
             modifier = modifier,
         )
-        !uiState.isLoading -> Column(modifier.fillMaxSize()) {
+        // Above the keyboard, so the last results and "No meals found" stay in view.
+        !uiState.isLoading -> Column(modifier.fillMaxSize().imePadding()) {
             SearchField(
                 query = query,
                 onQueryChange = actions.onQueryChange,
@@ -203,16 +208,25 @@ private fun SearchField(
     }
 }
 
-/** The place, as a pill on the field's grey, with × to clear it. */
+/** The place, as a pill on the field's grey, with × to clear it. A tap anywhere on it clears it. */
 @Composable
 private fun PlaceChip(name: String, onClear: () -> Unit) {
     val colors = MaterialTheme.colorScheme
+    // The whole field's height takes the tap, though the pill drawn is smaller.
     Row(
         Modifier
-            .height(32.dp)
+            .height(FieldHeight)
             .clip(CircleShape)
-            .background(colors.background)
-            .clickable(onClickLabel = stringResource(R.string.search_clear_place), onClick = onClear)
+            .clickable(onClickLabel = stringResource(R.string.search_clear_place), role = Role.Button, onClick = onClear)
+            .drawBehind {
+                val height = ChipHeight.toPx()
+                drawRoundRect(
+                    color = colors.background,
+                    topLeft = Offset(0f, (size.height - height) / 2),
+                    size = Size(size.width, height),
+                    cornerRadius = CornerRadius(height / 2),
+                )
+            }
             .padding(start = 12.dp, end = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -234,7 +248,7 @@ private fun PlaceChip(name: String, onClear: () -> Unit) {
 private fun Filters(uiState: SearchUiState, actions: SearchActions) {
     var pickingDates by rememberSaveable { mutableStateOf(false) }
     Row(
-        Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+        Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         val dates = uiState.dates
@@ -254,6 +268,7 @@ private fun Filters(uiState: SearchUiState, actions: SearchActions) {
             selected = uiState.favoritesOnly,
             icon = if (uiState.favoritesOnly) FoodJournalIcons.FavoriteOn else FoodJournalIcons.Favorite,
             onClick = actions.onToggleFavorites,
+            isSwitch = true,
         )
     }
     if (pickingDates) {
@@ -269,6 +284,10 @@ private fun Filters(uiState: SearchUiState, actions: SearchActions) {
     }
 }
 
+/**
+ * A filter pill. Its tap targets are a full 48 dp tall though the pill drawn is 36 dp. A switch,
+ * as Favorites is, says whether it is on; Dates is a button that opens the dialog, with its own ×.
+ */
 @Composable
 private fun FilterPill(
     label: String,
@@ -277,22 +296,36 @@ private fun FilterPill(
     icon: ImageVector? = null,
     onClear: (() -> Unit)? = null,
     clearLabel: String? = null,
+    isSwitch: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
     val content = if (selected) colors.onPrimary else colors.onSurface
-    val on = stringResource(R.string.search_filter_on)
+    val fill = if (selected) colors.primary else colors.surfaceContainer
     Row(
         Modifier
-            .height(PillHeight)
-            .clip(CircleShape)
-            .background(if (selected) colors.primary else colors.surfaceContainer),
+            .height(TouchHeight)
+            .drawBehind {
+                val height = PillHeight.toPx()
+                drawRoundRect(
+                    color = fill,
+                    topLeft = Offset(0f, (size.height - height) / 2),
+                    size = Size(size.width, height),
+                    cornerRadius = CornerRadius(height / 2),
+                )
+            },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(
             Modifier
-                .height(PillHeight)
-                .clickable(role = Role.Button, onClick = onClick)
-                .semantics { if (selected) stateDescription = on }
+                .height(TouchHeight)
+                .clip(CircleShape)
+                .then(
+                    if (isSwitch) {
+                        Modifier.toggleable(value = selected, role = Role.Switch, onValueChange = { onClick() })
+                    } else {
+                        Modifier.clickable(role = Role.Button, onClick = onClick)
+                    },
+                )
                 .padding(start = 14.dp, end = if (onClear != null) 4.dp else 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -310,9 +343,10 @@ private fun FilterPill(
         if (onClear != null) {
             Box(
                 Modifier
-                    .height(PillHeight)
+                    .height(TouchHeight)
+                    .clip(CircleShape)
                     .clickable(onClickLabel = clearLabel, role = Role.Button, onClick = onClear)
-                    .padding(start = 4.dp, end = 12.dp),
+                    .padding(start = 8.dp, end = 14.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(FoodJournalIcons.Close, contentDescription = clearLabel, tint = content, modifier = Modifier.size(16.dp))
@@ -490,6 +524,8 @@ private const val DAY_MILLIS = 86_400_000L
 private const val RangeAlpha = 0.12f
 private val FieldHeight = 48.dp
 private val PillHeight = 36.dp
+private val ChipHeight = 32.dp
+private val TouchHeight = 48.dp
 private val ChipMaxWidth = 160.dp
 private val ThumbWidth = 48.dp
 private val ThumbHeight = 64.dp

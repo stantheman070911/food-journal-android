@@ -82,8 +82,9 @@ data class SpendingFigures(
 )
 
 /**
- * One period's page. [figures] is null when the period has no meals. [lastDay] is the period's
- * last day so far, where a place's meals in Search end.
+ * One period's page. [figures] is null when the period has no meals. [lastDay] is where a
+ * place's meals in Search end: today, or the period's end once it is over, or a later meal's day
+ * when one is dated after today, so Search's total matches the place's.
  */
 data class SpendingPage(
     val period: Period,
@@ -182,7 +183,9 @@ class SpendingViewModel(
                 today = today,
                 knownPlaces = names.keys,
             )
-            SpendingPage(period, formatPeriodName(period, today), spending?.toFigures(names, today), minOf(period.end, today))
+            val latest = byPeriod[period.start]?.maxOfOrNull { it.eatenAt.toLocalDate() }
+            val lastDay = listOfNotNull(minOf(period.end, today), latest).max()
+            SpendingPage(period, formatPeriodName(period, today), spending?.toFigures(names, today), lastDay)
         }
     }
 

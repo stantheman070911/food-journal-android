@@ -150,13 +150,17 @@ class MealViewModel(
 
     /**
      * The place "Meals here" opens in Search: the meal's own, once the meal and the place are both
-     * saved. A new meal has none, since leaving would discard it. Read it from composition.
+     * saved. A new meal has none, since leaving would discard it. Nor does a place picked in edits
+     * that Back would drop, since the meal would stay at its saved place. Read it from composition.
      */
     val mealsHerePlaceId: Long?
-        get() = draft
-            ?.takeIf { !isNew && it.newPlaceName == null }
-            ?.placeId
-            ?.takeIf { id -> places.any { it.place.id == id } }
+        get() {
+            val current = draft ?: return null
+            val saved = original ?: return null
+            if (isNew || current.newPlaceName != null) return null
+            val kept = !current.hasChangesFrom(saved) || current.canSave || current.placeId == saved.placeId
+            return current.placeId?.takeIf { id -> kept && places.any { it.place.id == id } }
+        }
 
     init {
         viewModelScope.launch { recentNames = mealDao.recentNames(RECENT_NAME_COUNT) }

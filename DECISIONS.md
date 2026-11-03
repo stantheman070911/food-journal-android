@@ -285,14 +285,14 @@ Settled on Nov 4, 2026, before any Phase 5 code, all as recommended. These add t
 - **The place chip.** With a chip, the text filters within that place. Its × clears it. Place names in result rows aren't tappable, so a row always opens its meal.
 - **Arriving with a place** opens the Search tab with a fresh search holding only that place: no text and no other filters. Back follows the tab rule and returns to Journal.
 - **"Meals here" in the place picker** shows only for a saved meal whose place is saved, at the top of the list, before anything is typed. It closes the Meal screen as Back does, so valid edits are kept, then opens Search. A new meal never shows it, since leaving would discard the meal.
-- **From Spending,** a place's row opens Search with that place and the period on screen as the dates, up to today, so the totals match. Other isn't tappable.
+- **From Spending,** a place's row opens Search with that place and the period on screen as the dates, so the totals match. The dates run up to today, or to the period's end once it is over, or to a later meal's day when one is dated after today. Other isn't tappable.
 - **Empty results** show one line, "No meals found". With no meals at all, the tab keeps its empty state, "Nothing to search yet".
 - **Focus and memory.** The field doesn't take focus when the tab opens. A search is kept while switching tabs, but not across a cold start.
 
 **Built** on Nov 4, 2026.
 
 - **Rules in one place.** `logic/Search.kt` holds the matching, with JVM tests. A space joins a meal's name, note, and place before matching, so no word matches across two of them.
-- **The route.** `SearchRoute` carries an optional place and first and last days. A screen above the tabs, the Meal screen, hands its place to the tabs, which open Search once they show again. Opening Search this way replaces any Search showing and doesn't restore the tab's saved search.
+- **The route.** `SearchRoute` carries an optional place and first and last days. A screen above the tabs, the Meal screen, hands its place to the tabs, which open Search once they show again. Opening Search this way replaces any Search showing, and drops the tab's saved search for good, so the next tab switch brings back this search rather than the older one.
 - **Back** from a search opened with a place returns to Journal and drops that search, as Back drops any tab's state. The Search tab then shows a search without the place.
 - **The dates are one saved value,** so the first and last day always change together. Kept as two, they briefly disagreed, and results ran past the last day for a moment; a device test caught it.
 - **The date-range dialog** sets its title and headline with dialog padding, since the defaults leave room for a full-screen picker's close button. The days between the two ends get a band in the ink at 12%, because Material's default grey matched the dialog's own and vanished.
@@ -300,6 +300,17 @@ Settled on Nov 4, 2026, before any Phase 5 code, all as recommended. These add t
 - **Meals without a name** show their date and place as their only line.
 - **Spending's place rows** are buttons labelled "Show meals".
 - **Checked on the emulator** with seeded meals, in light and dark: typing, Favorites, picking a range, Spending's October place row giving the same 8 meals and 5,440 in Search, and "Meals here" from a saved meal.
+
+**Review fixes**, from an independent review of `6636cfa`, made on Nov 4, 2026.
+
+1. **A search opened with a place survives a tab switch.** Opening Search from Spending or "Meals here" used to save the replaced search, so switching to Journal and back brought the older search back and lost the place. The older one is now dropped. Checked by hand on the emulator.
+2. **Spending's dates match its totals.** A meal dated after today, which counts toward its period, fell outside the dates Search was given, so Search showed less than Spending. The last day is now the later of today (or the period's end) and the period's latest meal.
+3. **"Meals here" never offers a place Back would drop.** With edits that can't be saved, such as an empty price, Back keeps the saved meal at its saved place. A place picked in those edits no longer offers "Meals here".
+4. **Accessibility.** Spending's place rows are buttons. Favorites reads as a switch, on or off, in place of a separate "On". The filter pills and the place chip are still drawn at 36 and 32 dp, but take taps over a full 48 dp.
+5. **The keyboard no longer hides results.** The Search column sits above it, so "No meals found" and the last results stay in view.
+6. **"Meals here" survives a rotation** between the Meal screen closing and Search opening.
+
+**Left open:** tab navigation and the Meal screen's hand-off to Search have no automated test; that needs the Compose UI test or navigation-testing library, which would need an OK first.
 
 ## Design references: Retro
 
@@ -421,5 +432,5 @@ All four steps are done and committed: data layer and tests; Meal form; camera, 
 - **Rename** happens in the row. The name is selected, so typing replaces it, and Done or the check saves it. Renaming the meal's own place counts as choosing it by hand. A merge moves the meal to the surviving place, and Undo moves it back. The undo bar shows inside the sheet.
 - **A place that vanished before Save** is left off the meal instead of failing the save. This can happen when an empty place, kept for an open undo bar, is prefilled and the bar then closes.
 - **Save reads the latest draft** once the photo is ready, so gallery metadata that lands while Save is tapped is no longer lost. This was a gap from step 3.
-- **Not built yet.** The "Meals here" row at the top of the picker (decision 2) comes in Phase 5, with Search.
+- **"Meals here"** at the top of the picker (decision 2) was built in Phase 5, with Search.
 - **Photo Picker location on the phone** is still unverified. On the emulator, the photo's location arrived as 0, 0, so gallery prefill was tested only through the database and unit tests.

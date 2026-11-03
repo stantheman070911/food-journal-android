@@ -162,6 +162,24 @@ class SearchViewModelTest {
     }
 
     @Test
+    fun theChipComesBackWhenItsPlaceIsRestored() = runBlocking {
+        val noodles = db.placeDao().insert(Place(name = "林家乾麵"))
+        db.mealDao().insert(meal(LocalDateTime.of(2026, 11, 2, 12, 0), "Soup", 180, placeId = noodles))
+        db.mealDao().insert(meal(LocalDateTime.of(2026, 11, 3, 9, 0), "Latte", 140))
+        val vm = viewModel(route = SearchRoute(placeId = noodles))
+        assertEquals(1, vm.state { it.placeName != null }.count)
+
+        val place = db.placeDao().get(noodles)!!
+        val moved = db.placeDao().remove(place)
+        assertEquals(2, vm.state { it.placeName == null }.count)
+
+        db.placeDao().restore(place, moved)
+        val back = vm.state { it.placeName != null }
+        assertEquals("林家乾麵", back.placeName)
+        assertEquals(1, back.count)
+    }
+
+    @Test
     fun aSearchComesBackFromTheSavedState() = runBlocking {
         db.mealDao().insert(meal(LocalDateTime.of(2026, 11, 2, 12, 0), "Soup", 180, favorite = true))
         db.mealDao().insert(meal(LocalDateTime.of(2026, 11, 3, 9, 0), "Latte", 140, favorite = true))
