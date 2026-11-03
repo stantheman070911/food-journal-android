@@ -226,7 +226,7 @@ class BackupManager(
                     val inUse = meals.mapNotNull { it.photo }.toSet()
                     // Thumbnails of photos the phone already had stay; the rest are rebuilt.
                     photos.sweep(inUse)
-                    scope.launch { rebuildThumbs(inUse) }
+                    scope.launch { processor.rebuildMissingThumbs(inUse) }
                     prepared.file.exportDate()?.let { settings.setLastBackup(it) }
                 }
             } finally {
@@ -240,13 +240,6 @@ class BackupManager(
     /** Forgets the last failure, once it has been shown. */
     fun clearFailure() {
         _state.update { it.copy(failure = null) }
-    }
-
-    private suspend fun rebuildThumbs(names: Set<String>) {
-        for (name in names) {
-            if (photos.thumbFile(name).exists()) continue
-            if (!processor.rebuildThumb(name)) Log.w(TAG, "No thumbnail for $name")
-        }
     }
 
     /** Starts [work] unless something is already running. */

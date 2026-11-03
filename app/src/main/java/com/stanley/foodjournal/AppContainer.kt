@@ -63,14 +63,17 @@ class AppContainer(context: Context) {
     /**
      * Tidies up after an earlier run that ended mid-edit or mid-import: photos no meal uses,
      * stale pending photos, and places with no meals. Nothing is pending at launch, so nothing is
-     * kept back.
+     * kept back. Then writes any thumbnails still missing, such as those a restore cut short
+     * never rebuilt.
      */
     fun sweepOnLaunch() {
         appScope.launch {
             photoStore.ensureFolders()
             photoStore.recoverInterruptedImport()
-            photoStore.sweep(inUse = mealDao.photos().toSet())
+            val inUse = mealDao.photos().toSet()
+            photoStore.sweep(inUse = inUse)
             placeDao.deleteEmpty()
+            photoProcessor.rebuildMissingThumbs(inUse)
         }
     }
 }

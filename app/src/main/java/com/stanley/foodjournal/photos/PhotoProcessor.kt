@@ -10,6 +10,7 @@ import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.media.ExifInterface
 import android.net.Uri
+import android.util.Log
 import com.stanley.foodjournal.logic.JPEG_QUALITY
 import com.stanley.foodjournal.logic.LocationFix
 import com.stanley.foodjournal.logic.PHOTO_LONG_EDGE
@@ -19,6 +20,8 @@ import com.stanley.foodjournal.logic.fitWithin
 import com.stanley.foodjournal.logic.parseExifDateTime
 import com.stanley.foodjournal.logic.photoLocation
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
@@ -50,6 +53,9 @@ class PhotoProcessor(
     private val store: PhotoStore,
     private val resolver: ContentResolver,
 ) : PhotoProcessing {
+    /** Lets one thumbnail rebuild run at a time, so a launch's and a restore's never write one file together. */
+    private val thumbRebuild = Mutex()
+
     // Any failure, not only I/O: a photo the decoder rejects, a revoked grant, or too little
     // memory all leave the meal without that photo rather than crashing the app.
     override suspend fun fromCapture(name: String): Boolean = withContext(Dispatchers.IO) {
@@ -113,6 +119,20 @@ class PhotoProcessor(
         }
     }
 
+    /**
+     * Writes the thumbnail of each stored photo in [names] that has none, as after a restore, or
+     * a run that ended before all its thumbnails were written. A photo that can't be read is
+     * logged and skipped.
+     */
+    suspend fun rebuildMissingThumbs(names: Collection<String>) {
+        thumbRebuild.withLock {
+            for (name in names) {
+                if (store.thumbFile(name).exists()) continue
+                if (!rebuildThumb(name)) Log.w(TAG, "No thumbnail for $name")
+            }
+        }
+    }
+
     private fun discardPartial(name: String) {
         listOf(store.pendingPhotoFile(name), store.pendingThumbFile(name)).forEach { file ->
             file.delete()
@@ -152,3 +172,5 @@ class PhotoProcessor(
         if (!partial.renameTo(file)) throw IOException("Could not write ${file.name}")
     }
 }
+
+private const val TAG = "FoodJournal"
