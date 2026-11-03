@@ -17,7 +17,7 @@ The goal is a personal archive of meals that is quick to add to and pleasant to 
 
 ## Version 1
 
-- **Log a meal:** photo, name, price, favorite, note, and place. The place fills itself when exactly one saved place is within 150 m.
+- **Log a meal:** photo, name, price, favorite, note, and place. Saved places come up as you type. A gallery photo with a location fills in the one saved place within 150 m; the phone's own location is never used.
 - **Backfill from the gallery:** date, time, and location come from the photo's metadata.
 - **Journal:** one row per week (Monday to Sunday), newest first, with a horizontal filmstrip of photo tiles.
 - **Spending:** totals, averages, a bar chart, top places, time of day, and priciest meals by week, month, or year. Numbers are shown, never judged.
@@ -44,7 +44,7 @@ Monochrome and quiet, so the food photos are the only color. Black, white, and g
 | Settings | DataStore |
 | Camera / gallery | CameraX, Android Photo Picker |
 | Images | Coil 3 |
-| Location | Fused Location Provider |
+| Location | From gallery photos only (EXIF); the phone's location is not used |
 | Backup | kotlinx.serialization (JSON) + ZIP, saved via Storage Access Framework |
 | Build | Gradle (Kotlin DSL), version catalog |
 

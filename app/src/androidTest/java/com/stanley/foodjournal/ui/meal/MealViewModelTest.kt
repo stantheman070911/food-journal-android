@@ -14,19 +14,16 @@ import com.stanley.foodjournal.data.FoodJournalDatabase
 import com.stanley.foodjournal.data.Meal
 import com.stanley.foodjournal.data.Place
 import com.stanley.foodjournal.edits.UndoableEdits
-import com.stanley.foodjournal.location.LocationSource
 import com.stanley.foodjournal.logic.LocationFix
 import com.stanley.foodjournal.photos.PhotoMetadata
 import com.stanley.foodjournal.photos.PhotoProcessing
 import com.stanley.foodjournal.photos.PhotoStore
-import com.stanley.foodjournal.settings.AppSettings
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -53,13 +50,11 @@ class MealViewModelTest {
     private lateinit var scope: CoroutineScope
     private lateinit var edits: UndoableEdits
     private lateinit var processing: FakeProcessing
-    private lateinit var location: FakeLocation
-    private lateinit var settings: AppSettings
     private val store = ViewModelStore()
 
-    // One thousandth of a degree of latitude is about 111 m.
-    private val noodlesSpot = LocationFix(25.0330, 121.5297, accuracyMeters = 10f)
-    private val cafeSpot = LocationFix(25.0438, 121.5297, accuracyMeters = 10f)
+    // One thousandth of a degree of latitude is about 111 m. Photo locations have no accuracy.
+    private val noodlesSpot = LocationFix(25.0330, 121.5297)
+    private val cafeSpot = LocationFix(25.0438, 121.5297)
 
     @Before
     fun setUp() {
@@ -70,8 +65,6 @@ class MealViewModelTest {
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         edits = UndoableEdits(db.mealDao(), db.placeDao(), photos, scope, window = 1_500.milliseconds)
         processing = FakeProcessing(photos)
-        location = FakeLocation()
-        settings = AppSettings(context, "settings-test-${System.nanoTime()}")
     }
 
     @After
@@ -204,14 +197,13 @@ class MealViewModelTest {
     fun aGalleryPhotosDateAndLocationArriveLateAndPlaceTheMeal() = runBlocking {
         val noodles = db.placeDao().insert(Place(name = "Noodles", latitude = 25.0331, longitude = 121.5297))
         db.placeDao().insert(Place(name = "Cafe", latitude = cafeSpot.latitude, longitude = cafeSpot.longitude))
-        location.fix.value = cafeSpot
         val vm = newMeal()
-        awaitTrue { main { vm.uiState!!.draft.placeId } != null }
         val takenAt = LocalDateTime.of(2026, 11, 1, 19, 5)
-        processing.metadata = PhotoMetadata(takenAt, LocationFix(25.0330, 121.5297))
+        processing.metadata = PhotoMetadata(takenAt, noodlesSpot)
 
         main { vm.onPicked(Uri.parse("content://test/photo/1")) }
         val name = main { vm.uiState!!.draft.photo!! }
+        assertNull(main { vm.uiState!!.draft.placeId })
         processing.finish(name, ok = true)
 
         awaitTrue { main { vm.uiState!!.draft.eatenAt } == takenAt }
@@ -220,18 +212,30 @@ class MealViewModelTest {
     }
 
     @Test
-    fun aPlacePickedByHandIsNotReplacedByALaterFix() = runBlocking {
-        val noodles = db.placeDao().insert(Place(name = "Noodles", latitude = noodlesSpot.latitude, longitude = noodlesSpot.longitude))
-        val market = db.placeDao().insert(Place(name = "Market"))
-        db.placeDao().insert(Place(name = "Cafe", latitude = cafeSpot.latitude, longitude = cafeSpot.longitude))
+    fun aCameraMealIsNeverPlacedByLocation() = runBlocking {
+        db.placeDao().insert(Place(name = "Noodles", latitude = noodlesSpot.latitude, longitude = noodlesSpot.longitude))
         val vm = newMeal()
+        val name = capture(vm)
+        processing.finish(name, ok = true)
 
-        location.fix.value = noodlesSpot
-        awaitTrue { main { vm.uiState!!.draft.placeId } == noodles }
+        awaitTrue { !main { vm.uiState!!.photoProcessing } }
+        delay(200)
+        assertNull(main { vm.uiState!!.draft.placeId })
+    }
+
+    @Test
+    fun aPlacePickedByHandIsNotReplacedByAGalleryPhoto() = runBlocking {
+        db.placeDao().insert(Place(name = "Noodles", latitude = noodlesSpot.latitude, longitude = noodlesSpot.longitude))
+        val market = db.placeDao().insert(Place(name = "Market"))
+        val vm = newMeal()
         main { vm.onPlaceSelected(market) }
-        location.fix.value = cafeSpot
-        delay(300)
+        processing.metadata = PhotoMetadata(takenAt = null, location = noodlesSpot)
 
+        main { vm.onPicked(Uri.parse("content://test/photo/2")) }
+        processing.finish(main { vm.uiState!!.draft.photo!! }, ok = true)
+
+        awaitTrue { main { vm.uiState!!.draft.fromGallery } }
+        delay(200)
         assertEquals(market, main { vm.uiState!!.draft.placeId })
     }
 
@@ -301,8 +305,6 @@ class MealViewModelTest {
                     edits = edits,
                     photos = photos,
                     processor = processing,
-                    settings = settings,
-                    locationTracker = location,
                     appScope = scope,
                 ) as T
             }
@@ -356,13 +358,5 @@ class MealViewModelTest {
         }
 
         private fun result(name: String) = results.getOrPut(name) { CompletableDeferred() }
-    }
-
-    private class FakeLocation : LocationSource {
-        override val fix = MutableStateFlow<LocationFix?>(null)
-
-        override fun hasPermission() = true
-
-        override fun start() = Unit
     }
 }

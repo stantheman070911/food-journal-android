@@ -6,10 +6,8 @@ import com.stanley.foodjournal.data.FoodJournalDatabase
 import com.stanley.foodjournal.data.MealDao
 import com.stanley.foodjournal.data.PlaceDao
 import com.stanley.foodjournal.edits.UndoableEdits
-import com.stanley.foodjournal.location.LocationTracker
 import com.stanley.foodjournal.photos.PhotoProcessor
 import com.stanley.foodjournal.photos.PhotoStore
-import com.stanley.foodjournal.settings.AppSettings
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -39,10 +37,6 @@ class AppContainer(context: Context) {
     val photoProcessor = PhotoProcessor(photoStore, context.contentResolver)
 
     val edits: UndoableEdits by lazy { UndoableEdits(mealDao, placeDao, photoStore, appScope) }
-
-    val settings: AppSettings by lazy { AppSettings(context) }
-
-    val locationTracker: LocationTracker by lazy { LocationTracker(context) }
 
     /**
      * Tidies up after an earlier run that ended mid-edit: photos no meal uses, stale pending

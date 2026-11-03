@@ -24,8 +24,10 @@ data class PlacePickerContent(
 )
 
 /**
- * The picker's rows. Saved places matching [query] in [orderForPicker] order, with distances
- * from [location]. A typed name that no saved or pending place has is offered as a new place.
+ * The picker's rows. Saved places matching [query], with distances from [location]. While
+ * typing, names that start with the query come first, then names that contain it, so typing
+ * 林 lists 林家乾麵 before 小林拉麵; each group keeps [orderForPicker] order. A typed name that
+ * no saved or pending place has is offered as a new place.
  */
 fun placePickerContent(
     places: List<PlaceSummary>,
@@ -41,6 +43,7 @@ fun placePickerContent(
     val usable = location?.takeIf { it.isUsable() }
     val rows = orderForPicker(places, usable)
         .filter { matchesQuery(it.place.name, typed) }
+        .sortedBy { if (typed.isEmpty() || startsWithQuery(it.place.name, typed)) 0 else 1 }
         .map { summary ->
             PickerPlace(
                 place = summary.place,

@@ -160,20 +160,19 @@ class DatabaseTest {
     }
 
     @Test
-    fun aNewPlaceTypedForACameraMealIsSavedAtThePhonesFix() = runBlocking {
+    fun aNewPlaceTypedForACameraMealIsSavedWithoutALocation() = runBlocking {
         val draft = MealDraft(eatenAt = noon, photo = "a.jpg", priceText = "280", newPlaceName = "Lin Dong Fang")
-        val fix = LocationFix(25.0526, 121.5395, accuracyMeters = 12f)
 
-        val id = saveNew(draft, deviceFix = fix)
+        val id = saveNew(draft)
 
         val place = places.all().single()
         assertEquals(place.id, meals.get(id)?.placeId)
-        assertEquals(25.0526, place.latitude!!, 0.0)
-        assertEquals(121.5395, place.longitude!!, 0.0)
+        assertNull(place.latitude)
+        assertNull(place.longitude)
     }
 
     @Test
-    fun aNewPlaceForAGalleryMealIsSavedAtThePhotosLocationOnly() = runBlocking {
+    fun aNewPlaceForAGalleryMealIsSavedAtThePhotosLocation() = runBlocking {
         val draft = MealDraft(
             eatenAt = noon,
             photo = "a.jpg",
@@ -183,23 +182,14 @@ class DatabaseTest {
             photoLatitude = 25.0478,
             photoLongitude = 121.5170,
         )
-        val elsewhere = LocationFix(24.15, 120.67, accuracyMeters = 5f)
 
-        saveNew(draft, deviceFix = elsewhere)
-        saveNew(draft.copy(newPlaceName = "No location", photoLatitude = null, photoLongitude = null), elsewhere)
+        saveNew(draft)
+        saveNew(draft.copy(newPlaceName = "No location", photoLatitude = null, photoLongitude = null))
 
         val saved = places.all().associateBy { it.name }
         assertEquals(25.0478, saved.getValue("Night market").latitude!!, 0.0)
+        assertEquals(121.5170, saved.getValue("Night market").longitude!!, 0.0)
         assertNull(saved.getValue("No location").latitude)
-    }
-
-    @Test
-    fun aNewPlaceFromAVagueFixIsSavedWithoutALocation() = runBlocking {
-        val draft = MealDraft(eatenAt = noon, name = "Dumplings", priceText = "90", newPlaceName = "Dumplings")
-
-        saveNew(draft, deviceFix = LocationFix(25.05, 121.53, accuracyMeters = 2_000f))
-
-        assertNull(places.all().single().latitude)
     }
 
     @Test
@@ -226,8 +216,8 @@ class DatabaseTest {
         assertNull(meals.get(id)?.placeId)
     }
 
-    private suspend fun saveNew(draft: MealDraft, deviceFix: LocationFix?): Long {
-        val location = mealLocation(isNew = true, draft.fromGallery, draft.photoLocation, deviceFix)
+    private suspend fun saveNew(draft: MealDraft): Long {
+        val location = mealLocation(isNew = true, draft.fromGallery, draft.photoLocation)
         return meals.save(draft.toMeal(0), newPlace = draft.newPlace(location))
     }
 

@@ -21,4 +21,7 @@ fun matchesQuery(name: String, query: String): Boolean {
     return key.isEmpty() || nameKey(name).contains(key)
 }
 
+/** Whether [name] begins with what the user has typed, ignoring case and width. */
+fun startsWithQuery(name: String, query: String): Boolean = nameKey(name).startsWith(nameKey(query))
+
 private fun nameKey(name: String): String = normalizePlaceName(name).lowercase(Locale.ROOT)

@@ -20,20 +20,16 @@ import com.stanley.foodjournal.data.PlaceDao
 import com.stanley.foodjournal.data.PlaceSummary
 import com.stanley.foodjournal.edits.RenameResult
 import com.stanley.foodjournal.edits.UndoableEdits
-import com.stanley.foodjournal.location.LocationSource
 import com.stanley.foodjournal.logic.LocationFix
-import com.stanley.foodjournal.logic.PermissionRequest
 import com.stanley.foodjournal.logic.PlacePickerContent
 import com.stanley.foodjournal.logic.cleanPriceInput
 import com.stanley.foodjournal.logic.mealLocation
 import com.stanley.foodjournal.logic.normalizePlaceName
-import com.stanley.foodjournal.logic.permissionsToRequest
 import com.stanley.foodjournal.logic.placePickerContent
 import com.stanley.foodjournal.logic.prefillPlace
 import com.stanley.foodjournal.logic.suggestNames
 import com.stanley.foodjournal.photos.PhotoProcessing
 import com.stanley.foodjournal.photos.PhotoStore
-import com.stanley.foodjournal.settings.AppSettings
 import com.stanley.foodjournal.ui.navigation.MealRoute
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -92,15 +88,12 @@ class MealViewModel(
     private val edits: UndoableEdits,
     private val photos: PhotoStore,
     private val processor: PhotoProcessing,
-    private val settings: AppSettings,
-    private val locationTracker: LocationSource,
     private val appScope: CoroutineScope,
 ) : ViewModel() {
     private val isNew = mealId == null
     private var original by mutableStateOf<Meal?>(null)
     private var recentNames by mutableStateOf<List<String>>(emptyList())
     private var places by mutableStateOf<List<PlaceSummary>>(emptyList())
-    private var deviceFix by mutableStateOf<LocationFix?>(null)
 
     /** The last merge that moved the draft to its survivor, so an undo can move it back. */
     private var mergedAway: Pair<Long, Long>? = null
@@ -158,14 +151,6 @@ class MealViewModel(
                 places = it
                 followUndoneMerge()
                 prefill()
-            }
-        }
-        if (isNew) {
-            viewModelScope.launch {
-                locationTracker.fix.collect {
-                    deviceFix = it
-                    prefill()
-                }
             }
         }
         if (mealId != null) {
@@ -234,25 +219,6 @@ class MealViewModel(
         }
     }
 
-    /**
-     * What to ask for as the camera opens. Location is asked once ever, so asking marks it.
-     * Call [startLocation] once the answer is in, or right away when nothing is asked.
-     */
-    suspend fun permissionsToRequest(cameraGranted: Boolean): PermissionRequest {
-        val request = permissionsToRequest(
-            cameraGranted = cameraGranted,
-            locationGranted = locationTracker.hasPermission(),
-            locationAsked = settings.locationAsked(),
-        )
-        if (request.location) settings.markLocationAsked()
-        return request
-    }
-
-    /** Starts finding the phone's location for a new meal, if permission allows. */
-    fun startLocation() {
-        if (isNew) locationTracker.start()
-    }
-
     /** A name and file for the next camera capture. */
     fun newCaptureFile(): Pair<String, File> {
         photos.ensureFolders()
@@ -266,7 +232,7 @@ class MealViewModel(
             appScope.launch { photos.discardPending(name) }
             return
         }
-        // A photo taken now is located by the phone, even if it replaces a gallery photo.
+        // A photo taken in the app carries no location, even if it replaces a gallery photo.
         if (isNew) update { it.copy(fromGallery = false, photoLatitude = null, photoLongitude = null) }
         attachPhoto(name)
         prefill()
@@ -467,7 +433,7 @@ class MealViewModel(
         appScope.launch {
             pendingWork?.join()
             var toSave = withContext(Dispatchers.Main) { this@MealViewModel.draft } ?: draft
-            val location = mealLocation(isNew, toSave.fromGallery, toSave.photoLocation, locationTracker.fix.value)
+            val location = mealLocation(isNew, toSave.fromGallery, toSave.photoLocation)
             val photo = toSave.photo
             if (photo != null && toSave.photoIsPending) {
                 if (photos.pendingPhotoFile(photo).exists()) {
@@ -498,11 +464,11 @@ class MealViewModel(
     }
 
     private fun location(draft: MealDraft): LocationFix? =
-        mealLocation(isNew, draft.fromGallery, draft.photoLocation, deviceFix)
+        mealLocation(isNew, draft.fromGallery, draft.photoLocation)
 
     /**
-     * Fills the place of a new meal from where it is, until a place is chosen by hand. It runs
-     * again whenever the places, the fix, or the photo change, so a late fix still fills it.
+     * Fills the place of a new gallery meal from its photo's location, until a place is chosen
+     * by hand. It runs again whenever the places or the photo change.
      */
     private fun prefill() {
         val current = draft ?: return
@@ -543,8 +509,6 @@ class MealViewModel(
                     edits = container.edits,
                     photos = container.photoStore,
                     processor = container.photoProcessor,
-                    settings = container.settings,
-                    locationTracker = container.locationTracker,
                     appScope = container.appScope,
                 )
             }

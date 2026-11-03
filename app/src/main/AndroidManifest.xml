@@ -13,16 +13,6 @@
         android:name="android.hardware.camera.any"
         android:required="false" />
 
-    <!--
-        Fills and creates places from where the meal is. Asked once, on the first Add, with the
-        camera. Without it, places are picked from the saved list.
-    -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-feature
-        android:name="android.hardware.location.gps"
-        android:required="false" />
-
     <application
         android:name=".FoodJournalApplication"
         android:allowBackup="false"

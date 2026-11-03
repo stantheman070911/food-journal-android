@@ -117,6 +117,32 @@ class PlacePickerTest {
         assertEquals(PickerSubmit.Nothing, pickerSubmit(content(query = "  "), "  "))
     }
 
+    @Test
+    fun `typing lists names that start with it first, then names that contain it`() {
+        val saved = listOf(
+            summary(Place(11, "小林拉麵"), 1),
+            summary(Place(12, "林家乾麵"), 5),
+            summary(Place(13, "Simple Kaffa"), 2),
+        )
+        val typing = placePickerContent(saved, "林", location = null, selectedPlaceId = null, newPlaceName = null)
+
+        assertEquals(listOf("林家乾麵", "小林拉麵"), typing.places.map { it.place.name })
+        assertEquals("林", typing.addName)
+        assertEquals(
+            listOf("小林拉麵", "Simple Kaffa", "林家乾麵"),
+            placePickerContent(saved, "", location = null, selectedPlaceId = null, newPlaceName = null).places.map { it.place.name },
+        )
+    }
+
+    @Test
+    fun `starting matches ignore case and width`() {
+        val saved = listOf(summary(Place(21, "Old Kaffa"), 1), summary(Place(22, "Kaffa Bar"), 2))
+        assertEquals(
+            listOf("Kaffa Bar", "Old Kaffa"),
+            placePickerContent(saved, "ｋａｆ", location = null, selectedPlaceId = null, newPlaceName = null).places.map { it.place.name },
+        )
+    }
+
     private fun content(
         query: String = "",
         location: LocationFix? = here,

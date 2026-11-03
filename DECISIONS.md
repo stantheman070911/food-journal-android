@@ -44,7 +44,7 @@ The latest stable version of each library on Nov 3, 2026, from Google Maven and 
 | DataStore | 1.3.0 | Phase 6 |
 | JUnit 4 (tests only) | 4.13.2 | Phase 1 |
 
-Location uses Android's built-in fused provider, so there is no location library (decision 6 under Phase 2 plan).
+The app does not use the phone's location (see "Places without phone location" below), so there is no location library. DataStore is declared in the catalog but not used until Phase 6.
 
 ## Document review
 
@@ -199,6 +199,21 @@ Built on Nov 3, 2026, after the Phase 2 review fixes.
   - A separate photo viewer: the Meal screen is one screen to add, read, and edit.
 - **Release build.** With the personal key in place, the shrunk release build was installed and run on the emulator: logging, the Journal, and opening a meal work, with no crashes.
 
+## Places without phone location
+
+Requested on Nov 3, 2026, after Phase 3. This overrides the product document in three places. Quick logging no longer says "Place is filled when exactly one saved place is within 150 m" or "Typing a new place name creates the place at the current location", nor "Location permission is asked on first use only". The Tech stack's Fused Location Provider is no longer used.
+
+- **Why.** The phone's position is wherever the meal is logged, not where it was eaten. A lunch logged that evening at home pinned the restaurant to home, and since a place keeps its first coordinates, it stayed wrong.
+- **What is gone.** The location tracker, both location permissions, the "location asked" setting, and with it DataStore until Phase 6. The first Add asks for the camera only.
+- **What stays.**
+  - **Gallery photos.** A gallery photo whose location the Photo Picker shares still places the meal. A new place takes the photo's coordinates, and the one saved place within 150 m of the photo, if there is exactly one, is filled in. The photo's own location is where the meal was eaten.
+  - **Coordinates are still stored** on places, for future use.
+- **What follows.**
+  - **Camera and Skip meals carry no location.** The in-app camera can't tag a photo with GPS without location permission. Their places are saved by name alone and are never filled in automatically.
+  - **The picker lists places by most recent visit,** except for a gallery photo with a location, where it lists them nearest first, with distances.
+  - **Places saved earlier keep the coordinates they have,** including any taken from the phone.
+- **Autocomplete.** Typing in the picker already filtered saved places by any part of the name. Now names that start with what is typed come first, then names that contain it. Typing 林 lists 林家乾麵 before 小林拉麵. Matching ignores case and full-width letters, as before.
+
 ## Design references: Retro
 
 Added on Nov 3, 2026, during the Phase 2 review. Screenshots of [Retro](https://retro.app/), the weekly photo journal the product document already names, are in `UI inspo(retro-screenshots)/`. They are a standing visual reference for every phase. Ideas are adapted to Food Journal's monochrome, photo-first identity, never copied: no Retro branding, art, or layouts are reproduced, and nothing they show is added unless the product document names it.
@@ -276,7 +291,7 @@ Settled on Nov 3, 2026, all as recommended.
 | 3 | Back after editing a saved meal | Saves automatically if the meal is still valid. Otherwise the last saved version stays. |
 | 4 | Which place survives a rename that merges | The existing one. It keeps its name and coordinates; it takes the other's coordinates only if it has none. |
 | 5 | Back from the Meal screen after the camera | Returns to the tabs, not the camera |
-| 6 | Location provider | Android's built-in fused provider (`LocationManager.FUSED_PROVIDER`). No dependency, and on a Pixel it uses the same location source as Play services. Play Services Location is removed from the catalog. |
+| 6 | Location provider | Android's built-in fused provider (`LocationManager.FUSED_PROVIDER`). No dependency, and on a Pixel it uses the same location source as Play services. Play Services Location is removed from the catalog. *Superseded on Nov 3, 2026: the phone's location is no longer used.* |
 | 7 | Database tests | AndroidX Test, test-only, run on the emulator. Added in step 1 of Phase 2. |
 | 8 | Size of Phase 2 | Four steps, each building, running, and committed: data layer and tests; Meal form; camera, gallery, and photos; location and places. One report at the end. |
 

@@ -35,4 +35,11 @@ class PlaceNamesTest {
         assertTrue(matchesQuery("林東芳牛肉麵", "牛肉"))
         assertFalse(matchesQuery("Lin Dong Fang", "noodle"))
     }
+
+    @Test
+    fun `a name starts with what was typed, ignoring case and width`() {
+        assertTrue(startsWithQuery("林家乾麵", "林"))
+        assertTrue(startsWithQuery("Simple Kaffa", " ｓｉｍ"))
+        assertFalse(startsWithQuery("小林拉麵", "林"))
+    }
 }

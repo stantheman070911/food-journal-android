@@ -7,8 +7,6 @@ import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.minutes
 
 /** A position, from the phone or from a photo. A photo's position has no [accuracyMeters]. */
 data class LocationFix(
@@ -44,20 +42,6 @@ fun photoLocation(latitude: Double, longitude: Double): LocationFix? = when {
     latitude !in -90.0..90.0 || longitude !in -180.0..180.0 -> null
     else -> LocationFix(latitude, longitude)
 }
-
-/** A phone fix older than this may be from somewhere the phone has since left. */
-val MAX_FIX_AGE: Duration = 2.minutes
-
-/** Whether a phone fix taken at [fixElapsedNanos] is recent enough to use at [nowElapsedNanos]. */
-fun isRecentFix(fixElapsedNanos: Long, nowElapsedNanos: Long): Boolean =
-    nowElapsedNanos - fixElapsedNanos < MAX_FIX_AGE.inWholeNanoseconds
-
-/**
- * The phone's position as a fix. One without an accuracy can't be trusted to pick a place
- * 150 m away, so it counts as vague; only a photo's position is trusted without one.
- */
-fun deviceFix(latitude: Double, longitude: Double, accuracyMeters: Float?): LocationFix =
-    LocationFix(latitude, longitude, accuracyMeters ?: Float.POSITIVE_INFINITY)
 
 /** Whether [fix] is precise enough to match or create places. */
 fun LocationFix.isUsable(): Boolean = accuracyMeters == null || accuracyMeters <= USABLE_ACCURACY_METERS
@@ -130,17 +114,9 @@ fun mergedPlace(survivor: Place, mergedAway: Place): Place =
     }
 
 /**
- * Where a meal is, for matching and creating places. A meal from the camera or Skip uses the
- * phone's fix, when it is precise enough. A gallery meal uses only its photo's location, and
- * none without one. A saved meal has none: the phone is no longer where the meal was eaten.
+ * Where a meal is, for matching and creating places: only a new gallery meal's photo location,
+ * and none without one. The phone's own location is never used, since a meal is often logged
+ * away from where it was eaten. A saved meal has none either.
  */
-fun mealLocation(
-    isNew: Boolean,
-    fromGallery: Boolean,
-    photoLocation: LocationFix?,
-    deviceFix: LocationFix?,
-): LocationFix? = when {
-    !isNew -> null
-    fromGallery -> photoLocation
-    else -> deviceFix?.takeIf { it.isUsable() }
-}
+fun mealLocation(isNew: Boolean, fromGallery: Boolean, photoLocation: LocationFix?): LocationFix? =
+    if (isNew && fromGallery) photoLocation else null

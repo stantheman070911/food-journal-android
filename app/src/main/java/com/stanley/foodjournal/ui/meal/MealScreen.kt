@@ -116,31 +116,15 @@ fun MealScreen(
     }
     var pickingPlace by rememberSaveable { mutableStateOf(false) }
 
-    // Opening the camera asks for the camera, and on the first Add for location too. Finding
-    // the location starts here, so it is usually ready by the time the form shows.
+    // Opening the camera asks for it while it is off; Android limits how often it shows.
     val context = LocalContext.current
     var hasCamera by remember { mutableStateOf(context.isGranted(Manifest.permission.CAMERA)) }
-    val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-        hasCamera = context.isGranted(Manifest.permission.CAMERA)
-        viewModel.startLocation()
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        hasCamera = it
     }
     val stage = uiState?.stage
     LaunchedEffect(stage) {
-        if (stage != MealStage.Camera) return@LaunchedEffect
-        val request = viewModel.permissionsToRequest(cameraGranted = hasCamera)
-        if (request.isEmpty) {
-            viewModel.startLocation()
-        } else {
-            permissions.launch(
-                buildList {
-                    if (request.camera) add(Manifest.permission.CAMERA)
-                    if (request.location) {
-                        add(Manifest.permission.ACCESS_FINE_LOCATION)
-                        add(Manifest.permission.ACCESS_COARSE_LOCATION)
-                    }
-                }.toTypedArray(),
-            )
-        }
+        if (stage == MealStage.Camera && !hasCamera) permission.launch(Manifest.permission.CAMERA)
     }
     // Camera access may have been turned on in Settings.
     LifecycleResumeEffect(Unit) {
