@@ -1,67 +1,116 @@
 # Food Journal
 
-A personal Android app for recording what I eat, where, and what I spend. It is a diary, not a diet tracker: no calories, no goals, no scores.
+**English** · [繁體中文](README.zh-TW.md)
 
-The goal is a personal archive of meals that is quick to add to and pleasant to look back on.
+A quiet Android app for remembering what you ate, where you ate it, and what it cost. Take a photo, type the price, and save. Logging a meal is meant to take under 15 seconds, and looking back is one week at a time.
 
-> **Status:** All six phases (foundation; meal and logging; journal; spending; search; backup and restore) are built. The product is specified in [Food Journal — Product Document](<Food Journal — Product Document.md>); open points and decisions are in [Development Notes](DECISIONS.md).
+It's a diary, not a diet tracker. There are no calories, goals, streaks, or scores, and nothing leaves your phone unless you export a backup yourself.
 
-## Principles
+> **Version 1.00.00** · Android 17 or later · English interface · Prices in New Taiwan dollars (NTD)
 
-- Less is more. Every screen, field, and dependency must earn its place.
-- Logging a meal takes under 15 seconds: Add, shutter, price, Save.
-- Only a photo or a name, and the price, are required.
-- Photos lead. Numbers support them.
-- Data stays on the phone. No account, no sign-in, no internet permission.
-- One currency, NTD, stored as whole dollars.
+## Features
 
-## Version 1
+### Log a meal in three taps
 
-- **Log a meal:** photo, name, price, favorite, note, and place. Saved places come up as you type, and can be renamed, merged, or deleted. A gallery photo with a location fills in the one saved place within 150 m; the phone's own location is never used.
-- **Backfill from the gallery:** date, time, and location come from the photo's metadata.
-- **Journal:** one row per week (Monday to Sunday), newest first, with a horizontal filmstrip of photo tiles.
-- **Spending:** totals, averages, a bar chart, top places, time of day, and priciest meals by week, month, or year. Numbers are shown, never judged.
-- **Search:** text search on name, note, and place, with date-range and favorite filters.
-- **Backup and restore:** one ZIP holding a versioned JSON file of all records plus the original photos, saved and opened through Android's file dialogs. A quiet line on the Journal offers a backup once the last one is over 30 days old.
-- **Settings:** the theme (System, Light, or Dark), Export and Import, the version, and the open-source licenses.
+- Tap Add and the camera opens. Take the photo, type the price, and tap Save.
+- A meal needs only a photo or a name, plus its price. A name, note, place, and favorite star are there whenever you want them.
+- Names you've used before and your saved places come up as you type.
 
-Out of scope: calories, nutrition, diet goals, social sharing, multiple currencies, maps, and cloud sync. Further features are decided after four weeks of use.
+### Backfill from the gallery
 
-## Design
+- Forgot to log lunch? Pick the photo from your gallery, and the meal takes the date and time the photo was taken.
+- If Android's photo picker shares the photo's location, and exactly one of your saved places is within 150 m of it, the meal is placed there. The phone's own location is never used.
 
-Monochrome and quiet, so the food photos are the only color. Black, white, and greys only, in full light and dark themes, with Material 3 dynamic color off. One sans-serif family, tabular figures for prices, outlined icons, and an icon-only bottom bar with three tabs: Journal, Spending, Search.
+### Journal
 
-## Tech stack
+- One row per week, Monday to Sunday, newest first, with the week's total.
+- Each week is a filmstrip of photo tiles. Swipe sideways through a week, and scroll down through earlier ones.
+- A meal without a photo shows as a plain tile with its name.
 
-| Layer | Choice |
-| --- | --- |
-| Language | Kotlin |
-| UI | Jetpack Compose, Material 3 (custom monochrome scheme) |
-| Navigation | Navigation Compose |
-| Architecture | Screen → ViewModel → DAO, with a manual app container (no Hilt) |
-| Async | Kotlin Coroutines and Flow |
-| Database | Room (SQLite) |
-| Charts | Compose Canvas |
-| Settings | DataStore (theme, last backup day) |
-| Camera / gallery | CameraX, Android Photo Picker |
-| Images | Coil 3 |
-| Location | From gallery photos only (EXIF); the phone's location is not used |
-| Backup | kotlinx.serialization (JSON) + ZIP, saved via Storage Access Framework |
-| Build | Gradle (Kotlin DSL), version catalog |
+### Spending
 
-Photos are stored in the app's private folder, resized to 1600 px on the long edge at JPEG quality 85, with a 400 px thumbnail for tiles. Android Auto Backup is off; the exported ZIP is the backup.
+- See a week, a month, or a year, and swipe back through earlier ones.
+- The total, the change from the period before, and the average per day and per meal.
+- A bar chart, your top five places, spending by time of day (morning, midday, evening, and late), and the three priciest meals.
+- Numbers are shown, never judged: no budgets, targets, or warnings.
 
-## Roadmap
+### Search
 
-1. Mock up Journal, Meal, Spending, and Search in monochrome.
-2. Set up the project: Gradle, Room schema, navigation, app container.
-3. Build Meal and Journal first, then Spending, then Search.
-4. Add backup and restore.
-5. Use it for four weeks, then decide what comes next.
+- Search meal names, notes, and places, and filter by dates or favorites.
+- Results show how many meals were found and what they cost in total.
+- Tap a place in Spending to see its meals in that period, or tap Meals here in a meal's place picker to see every meal eaten there.
 
-Device tests run only on an emulator, so they can never uninstall the app from a phone: `ANDROID_SERIAL=emulator-5560 ./gradlew :app:connectedDebugAndroidTest`.
+### Places
 
-See the [product document](<Food Journal — Product Document.md>) for the full data model, screen details, and spending rules.
+- Rename a place, merge two by giving one the other's name, or delete one.
+- Deleting or merging a place, like deleting a meal, shows an Undo bar for a few seconds.
+
+### Backup and restore
+
+- Export everything to one ZIP file, saved wherever you choose: your records as JSON, plus your photos.
+- Importing checks the whole file before anything changes, asks before replacing your meals, then replaces them in one step. If an import fails, your meals stay as they were.
+- A quiet reminder appears on the Journal once your last backup is over 30 days old.
+
+### Design
+
+- Black, white, and greys only, so the food photos are the only color.
+- Light and dark themes, or follow the system setting.
+
+## Privacy
+
+- No account and no sign-in. The app works fully offline.
+- The app has no internet permission, so it can't send anything anywhere. It contains no analytics or ads.
+- The only permission it asks for is the camera, the first time you add a meal. Gallery photos come through Android's photo picker, which needs no storage permission, and the app never asks for your location.
+- Photos are stored resized, without their original metadata.
+- Android's cloud backup and device-to-device transfer are turned off for this app. The backup you export is the only copy of your meals off the phone.
+
+> [!WARNING]
+> **Back up before you uninstall.** Uninstalling the app deletes every meal and photo in it. Export a backup first and keep it somewhere safe.
+
+## Install
+
+1. On your Android phone, download [food-journal-1.00.00.apk](release/food-journal-1.00.00.apk).
+2. Open it, and allow installs from that source when Android asks.
+
+The app needs Android 17 or later, and it was built and tested on a Pixel 8a. A newer version signed with the same key installs over the old one and keeps your meals.
+
+## Out of scope
+
+Calories, nutrition, diet goals, social sharing, multiple currencies, maps, and cloud sync. The app stays small on purpose.
+
+## For developers
+
+### Building
+
+You need Android Studio 2026.2 or later, with the Android 17 (API 37) SDK.
+
+```bash
+./gradlew :app:assembleDebug        # app/build/outputs/apk/debug/app-debug.apk
+./gradlew :app:testDebugUnitTest    # JVM tests
+./gradlew :app:lintDebug
+```
+
+On the command line, set `JAVA_HOME` to the JDK bundled with Android Studio. On a Mac, that is `/Applications/Android Studio.app/Contents/jbr/Contents/Home`.
+
+Device tests install the app, then uninstall it, which would delete the meals on a real phone. They refuse to run unless `ANDROID_SERIAL` names an emulator:
+
+```bash
+ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest
+```
+
+Release builds are shrunk with R8, and they are signed only when four properties are set in `~/.gradle/gradle.properties`: `foodJournal.signing.storeFile`, `.storePassword`, `.keyAlias`, and `.keyPassword`. Without them, release builds come out unsigned.
+
+> [!CAUTION]
+> A build signed with a different key can't update the published APK. Android would make you uninstall first, which deletes your meals. Export a backup before you switch.
+
+### Built with
+
+Kotlin, Jetpack Compose with Material 3, Navigation Compose, Room, DataStore, CameraX, Coil, and kotlinx.serialization. The charts are drawn with Compose Canvas, and big numbers and headings are set in [Fraunces](https://fonts.google.com/specimen/Fraunces).
+
+### Documentation
+
+- [Product document](<Food Journal — Product Document.md>): what the app does, its data model, and its spending rules.
+- [Development notes](DECISIONS.md): how each open question was settled while building it.
 
 ## License
 
