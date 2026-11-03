@@ -85,7 +85,7 @@ The latest stable version of each library on Nov 3, 2026, from Google Maven and 
 - **Approximate location.** If only approximate location is granted, a 150 m match is unreliable. Phase 2 will skip the prefill in that case.
 - **Photo Picker location option.** The exact API, and whether it needs `ACCESS_MEDIA_LOCATION`, must be confirmed in Phase 2 before anything is added.
 - **Orphaned photos.** If the app is killed while an undo bar is open, the photo is never deleted. Phase 2 will remove unreferenced photos on start.
-- **Font.** No family is named. The system sans-serif (Roboto) is used, with no bundled font.
+- **Font.** No family is named. The interface uses the system sans-serif (Roboto). Fraunces was added after Phase 1 for big numbers and headings (see Type below).
 - **Light and dark.** No switch is specified. The app follows the system setting.
 - **Number format.** "2,340" uses English grouping on every device, since the app is English only.
 - **App icon.** Not specified. Phase 1 uses a monochrome plate: two thin rings, white on black, with a themed-icon layer.
@@ -111,5 +111,22 @@ The latest stable version of each library on Nov 3, 2026, from Google Maven and 
 - **Motion.** Tabs crossfade in 150 ms. The Meal screen fades in with a slight rise over 220 ms.
 - **Meal screen in Phase 1** is a shell with Back only. Add opens it directly until the camera arrives in Phase 2.
 - **Version catalog** declares the whole stack. The app module only uses what each phase needs.
-- **Typography.** The Material 3 type scale in the system sans-serif, with tabular figures on every style, so prices line up wherever they appear.
+- **Typography.** The Material 3 type scale. The sans-serif styles use tabular figures, so prices line up wherever they appear. Changed after Phase 1; see Type below.
 - **Window and splash** backgrounds are white, or black in dark, so there is no colored flash at launch.
+
+### Type: Fraunces for big numbers and headings
+
+Requested on Nov 3, 2026, after Phase 1. This overrides "One sans-serif family" in the product document's Design direction.
+
+- **The split.** The interface stays in the system sans-serif. Fraunces, a soft serif, sets only Material's display styles (big numbers) and headline styles (headings). Title, body, and label styles stay sans.
+- **Where it appears.** A few places only, each confirmed in its phase:
+  - Spending: the period total (display) and the period name (headline). Phase 4.
+  - Journal: each week's date range (headline). The week total beside it stays sans, in grey. Phase 3.
+  - Meal screen: the price as it is typed (display), if it reads well at that size. Phase 2.
+- **Axis settings.** Fraunces is a variable font with four axes.
+  - Display: weight 300, optical size 144, softness 100, wonky 0. Light numerals with high contrast.
+  - Headline: weight 500, optical size 32, softness 100, wonky 0. Heavier, so headings hold their own beside the sans.
+- **No tabular figures.** Fraunces only has proportional figures. Neither the Google Fonts build nor the designers' own build includes `tnum`. So Fraunces sets only standalone numbers. Numbers that line up stay in the sans with tabular figures: lists, tiles, chart labels, the total beside a heading, and the search total.
+- **Latin only.** Fraunces has no Chinese characters. Headings are dates and month names, so this doesn't come up. Any Chinese text in a Fraunces style falls back to the system font.
+- **File.** The Google Fonts build of the variable font, `Fraunces[SOFT,WONK,opsz,wght].ttf`: 360 KB, SHA-256 `177ff6c0f14e5550a3c624247cd1189611d4eb65d000b14944c63d967958abbb`. It is bundled as `app/src/main/res/font/fraunces.ttf`, so nothing is downloaded when the app runs. Its license, the SIL Open Font License 1.1, is in `licenses/Fraunces-OFL.txt`.
+- **Preview.** `ui/preview/TypePreview.kt` shows the styles together, in light and dark. The axis settings were checked on the API 37 emulator.
