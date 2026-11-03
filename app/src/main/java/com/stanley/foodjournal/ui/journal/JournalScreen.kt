@@ -1,9 +1,6 @@
 package com.stanley.foodjournal.ui.journal
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -12,13 +9,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -26,34 +21,20 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.intl.Locale
-import androidx.compose.ui.text.intl.LocaleList
-import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.text.style.Hyphens
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil3.compose.AsyncImage
 import com.stanley.foodjournal.R
-import com.stanley.foodjournal.logic.unbreakableWords
 import com.stanley.foodjournal.ui.components.EmptyState
+import com.stanley.foodjournal.ui.components.MealTile
+import com.stanley.foodjournal.ui.components.MealTileGap
+import com.stanley.foodjournal.ui.components.stripShape
 import com.stanley.foodjournal.ui.icons.FoodJournalIcons
 import com.stanley.foodjournal.ui.preview.PreviewSurface
 import com.stanley.foodjournal.ui.preview.ThemePreviews
@@ -153,11 +134,14 @@ private fun WeekRow(week: JournalWeek, onOpenMeal: (Long) -> Unit) {
         LazyRow(
             state = strip,
             contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(TileGap),
+            horizontalArrangement = Arrangement.spacedBy(MealTileGap),
         ) {
             itemsIndexed(week.tiles, key = { _, tile -> tile.mealId }) { index, tile ->
-                Tile(
-                    tile = tile,
+                MealTile(
+                    thumb = tile.thumb,
+                    photo = tile.photo,
+                    name = tile.name,
+                    label = tile.weekday,
                     shape = stripShape(first = index == 0, last = index == week.tiles.lastIndex),
                     onClick = { onOpenMeal(tile.mealId) },
                 )
@@ -165,108 +149,6 @@ private fun WeekRow(week: JournalWeek, onOpenMeal: (Long) -> Unit) {
         }
     }
 }
-
-/**
- * One meal: its photo, or a plain grey tile with its name. The weekday sits in the lower left,
- * in white over a photo and grey on the plain tile.
- *
- * A thumbnail that can't be read, such as one not yet rebuilt after a restore, gives way to the
- * full photo, and if that fails too, to the plain tile.
- */
-@Composable
-private fun Tile(tile: JournalTile, shape: Shape, onClick: () -> Unit) {
-    val colors = MaterialTheme.colorScheme
-    var failures by remember(tile.thumb, tile.photo) { mutableIntStateOf(0) }
-    val image = listOfNotNull(tile.thumb, tile.photo).getOrNull(failures)
-    Box(
-        Modifier
-            .size(TileWidth, TileHeight)
-            .clip(shape)
-            .background(colors.surfaceContainer)
-            .clickable(onClickLabel = stringResource(R.string.journal_open_meal), onClick = onClick),
-    ) {
-        if (image != null) {
-            AsyncImage(
-                model = image,
-                contentDescription = tile.name,
-                contentScale = ContentScale.Crop,
-                onError = { failures++ },
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else {
-            val name = tile.name.orEmpty()
-            Text(
-                text = name,
-                style = tileNameStyle(name),
-                color = colors.onSurface,
-                maxLines = 4,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(NamePadding),
-            )
-        }
-        Text(
-            text = tile.weekday,
-            style = MaterialTheme.typography.labelMedium.copy(
-                fontWeight = FontWeight.SemiBold,
-                shadow = if (image != null) WeekdayShadow else null,
-            ),
-            color = if (image != null) Color.White else colors.onSurfaceVariant,
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(start = 8.dp, bottom = 6.dp),
-        )
-    }
-}
-
-/**
- * A plain tile's name, set so a word too long for the tile, as at a large font size, rarely breaks
- * just anywhere. The name first shrinks, by up to a fifth, until its longest word fits; past that,
- * words break with a hyphen. English patterns come first, as the interface is English; the phone's
- * own locales follow, so Chinese names keep their glyphs.
- */
-@Composable
-private fun tileNameStyle(name: String): TextStyle {
-    val base = MaterialTheme.typography.labelLarge.copy(
-        hyphens = Hyphens.Auto,
-        localeList = LocaleList(listOf(Locale("en")) + LocaleList.current.localeList),
-    )
-    val measurer = rememberTextMeasurer()
-    val density = LocalDensity.current
-    val scale = remember(name, base, density) {
-        val room = with(density) { (TileWidth - NamePadding * 2).toPx() }
-        val widest = unbreakableWords(name).maxOfOrNull { word ->
-            measurer.measure(word, base, softWrap = false, maxLines = 1).size.width
-        } ?: 0
-        // A little to spare, so a word sized to fit exactly isn't broken after all.
-        if (widest <= room) 1f else (room * FitSlack / widest).coerceAtLeast(MinNameScale)
-    }
-    return if (scale == 1f) {
-        base
-    } else {
-        base.copy(
-            fontSize = base.fontSize * scale,
-            lineHeight = base.lineHeight * scale,
-            letterSpacing = base.letterSpacing * scale,
-        )
-    }
-}
-
-/** The strip reads as one rounded band: only its two ends are rounded. */
-private fun stripShape(first: Boolean, last: Boolean): Shape {
-    val start = if (first) StripCorner else 0.dp
-    val end = if (last) StripCorner else 0.dp
-    return RoundedCornerShape(topStart = start, bottomStart = start, topEnd = end, bottomEnd = end)
-}
-
-// Portrait tiles, like the photos; about four and a half fit across, so the strip invites a swipe.
-private val TileWidth = 88.dp
-private val TileHeight = 117.dp
-private val TileGap = 2.dp
-private val StripCorner = 12.dp
-private val NamePadding = 10.dp
-private const val MinNameScale = 0.8f
-private const val FitSlack = 0.97f
-private val WeekdayShadow = Shadow(color = Color.Black.copy(alpha = 0.45f), blurRadius = 6f)
 
 private fun sampleWeeks(): List<JournalWeek> = listOf(
     JournalWeek(

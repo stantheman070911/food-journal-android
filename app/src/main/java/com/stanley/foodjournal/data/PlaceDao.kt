@@ -22,6 +22,9 @@ abstract class PlaceDao {
     abstract fun observeSummaries(): Flow<List<PlaceSummary>>
 
     @Query("SELECT * FROM place")
+    abstract fun observeAll(): Flow<List<Place>>
+
+    @Query("SELECT * FROM place")
     abstract suspend fun all(): List<Place>
 
     @Query("SELECT * FROM place WHERE id = :id")

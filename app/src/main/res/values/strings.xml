@@ -45,7 +45,32 @@
     <string name="undo_merged">Merged</string>
 
     <string name="settings">Settings</string>
-    <string name="journal_open_meal">Open meal</string>
+    <string name="open_meal">Open meal</string>
+
+    <string name="spending_week">Week</string>
+    <string name="spending_month">Month</string>
+    <string name="spending_year">Year</string>
+    <string name="spending_vs_last_week">%1$s vs last week</string>
+    <string name="spending_vs_previous_week">%1$s vs previous week</string>
+    <string name="spending_vs">%1$s vs %2$s</string>
+    <string name="spending_averages">%1$s a day  ·  %2$s a meal</string>
+    <string name="spending_over_time">Over time</string>
+    <string name="spending_by_place">By place</string>
+    <string name="spending_by_time">By time of day</string>
+    <string name="spending_priciest">Priciest</string>
+    <string name="spending_other">Other</string>
+    <string name="spending_morning">Morning</string>
+    <string name="spending_midday">Midday</string>
+    <string name="spending_evening">Evening</string>
+    <string name="spending_late">Late</string>
+    <plurals name="spending_visits">
+        <item quantity="one">%d visit</item>
+        <item quantity="other">%d visits</item>
+    </plurals>
+    <plurals name="spending_meals">
+        <item quantity="one">%d meal</item>
+        <item quantity="other">%d meals</item>
+    </plurals>
 
     <string name="empty_journal">No meals yet</string>
     <string name="empty_search">Nothing to search yet</string>

@@ -253,6 +253,15 @@ Settled on Nov 4, 2026, before any Phase 4 code, all as recommended. These add t
   - Fewer tiles show when there are fewer meals. Meals priced 0 are left out, since they are not pricey, and the section is hidden when no meal costs anything.
   - Ties go to the most recent meal.
 
+**Built** on Nov 4, 2026.
+
+- **Layout, top to bottom.** The switch, then the period name, the total, the change line, and the averages. Then four sections under small grey labels: Over time, By place, By time of day, and Priciest. Sections sit on the plain background rather than grey cards, so the bars have room. An empty period shows its name above "No meals".
+- **Rules in one place.** `logic/Spending.kt` holds periods, comparisons, averages, bars, places, bands, and labels, with JVM tests. The ViewModel groups meals by period once and builds every page for the chosen kind off the main thread.
+- **The Journal's tile is shared.** It moved to `ui/components/MealTile.kt`, taking its label and size as parameters. The Journal looks as before.
+- **Place names** come from a new `PlaceDao.observeAll()`. No schema change.
+- **Swiping** uses Compose Foundation's `HorizontalPager`, keyed by period, so a backfilled older meal doesn't shift the period in view.
+- **Checked on the emulator** with seeded meals, in light and dark: each kind, swiping, switching kinds mid-browse, a tapped bar, an empty week, and a Priciest tile opening its meal.
+
 ## Design references: Retro
 
 Added on Nov 3, 2026, during the Phase 2 review. Screenshots of [Retro](https://retro.app/), the weekly photo journal the product document already names, are in `UI inspo(retro-screenshots)/`. They are a standing visual reference for every phase. Ideas are adapted to Food Journal's monochrome, photo-first identity, never copied: no Retro branding, art, or layouts are reproduced, and nothing they show is added unless the product document names it.
@@ -271,7 +280,7 @@ Added on Nov 3, 2026, during the Phase 2 review. Screenshots of [Retro](https://
 **For later phases**
 
 - **Phase 3, Journal.** A big serif heading. Week rows as rounded filmstrips. Empty days as pale grey tiles with the month, date, and weekday stacked in grey. Day names set in white over the photo's lower-left corner. Opening a meal can borrow Retro's photo viewer: the photo first, then the place in bold and the date in grey below it.
-- **Phase 4, Spending.** The Week, Month, Year switch as a segmented pill, with the selected segment filled.
+- **Phase 4, Spending.** The Week, Month, Year switch as a segmented pill, with the selected segment filled. Applied in Phase 4.
 - **Phase 6, Settings menu.** Rows grouped on rounded grey cards, with grey section labels.
 - **Sheets.** Action sheets can float inset from the screen edges, rounded on all corners.
 

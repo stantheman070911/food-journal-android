@@ -67,7 +67,7 @@ fun HomeScreen(
             exitTransition = { fadeOut(tween(TAB_FADE_MILLIS)) },
         ) {
             composable<JournalRoute> { JournalScreen(onAddMeal = onAddMeal, onOpenMeal = onOpenMeal) }
-            composable<SpendingRoute> { SpendingScreen() }
+            composable<SpendingRoute> { SpendingScreen(onOpenMeal = onOpenMeal) }
             composable<SearchRoute> { SearchScreen(onAddMeal = onAddMeal) }
         }
     }
