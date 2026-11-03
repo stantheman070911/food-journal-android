@@ -17,6 +17,7 @@ import com.stanley.foodjournal.logic.PixelSize
 import com.stanley.foodjournal.logic.THUMB_LONG_EDGE
 import com.stanley.foodjournal.logic.fitWithin
 import com.stanley.foodjournal.logic.parseExifDateTime
+import com.stanley.foodjournal.logic.photoLocation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -70,11 +71,7 @@ class PhotoProcessor(
         val takenAt = parseExifDateTime(exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL))
             ?: parseExifDateTime(exif.getAttribute(ExifInterface.TAG_DATETIME))
         val latLong = FloatArray(2)
-        val location = if (exif.getLatLong(latLong)) {
-            LocationFix(latitude = latLong[0].toDouble(), longitude = latLong[1].toDouble())
-        } else {
-            null
-        }
+        val location = if (exif.getLatLong(latLong)) photoLocation(latLong[0].toDouble(), latLong[1].toDouble()) else null
         return PhotoMetadata(takenAt, location)
     }
 

@@ -1,6 +1,8 @@
 package com.stanley.foodjournal.ui.meal
 
 import com.stanley.foodjournal.data.Meal
+import com.stanley.foodjournal.data.Place
+import com.stanley.foodjournal.logic.LocationFix
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -64,5 +66,20 @@ class MealDraftTest {
         assertFalse(empty.copy(priceText = "280").canSave)
         assertTrue(empty.copy(priceText = "280", name = "Dumplings").canSave)
         assertTrue(empty.copy(priceText = "0", photo = "a.jpg").canSave)
+    }
+
+    @Test
+    fun `a new place is created where the meal is`() {
+        val draft = MealDraft(eatenAt = meal.eatenAt, newPlaceName = "Lin Dong Fang")
+        assertEquals(Place(name = "Lin Dong Fang", latitude = 25.05, longitude = 121.53), draft.newPlace(LocationFix(25.05, 121.53, 8f)))
+        assertEquals(Place(name = "Lin Dong Fang"), draft.newPlace(null))
+        assertNull(MealDraft(eatenAt = meal.eatenAt).newPlace(LocationFix(25.05, 121.53)))
+    }
+
+    @Test
+    fun `a photo's location needs both coordinates`() {
+        val draft = MealDraft(eatenAt = meal.eatenAt, fromGallery = true, photoLatitude = 25.05, photoLongitude = 121.53)
+        assertEquals(LocationFix(25.05, 121.53), draft.photoLocation)
+        assertNull(draft.copy(photoLongitude = null).photoLocation)
     }
 }

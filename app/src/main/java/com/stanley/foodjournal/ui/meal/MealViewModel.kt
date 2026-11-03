@@ -15,11 +15,25 @@ import androidx.navigation.toRoute
 import com.stanley.foodjournal.appContainer
 import com.stanley.foodjournal.data.Meal
 import com.stanley.foodjournal.data.MealDao
+import com.stanley.foodjournal.data.Place
+import com.stanley.foodjournal.data.PlaceDao
+import com.stanley.foodjournal.data.PlaceSummary
+import com.stanley.foodjournal.edits.RenameResult
 import com.stanley.foodjournal.edits.UndoableEdits
+import com.stanley.foodjournal.location.LocationTracker
+import com.stanley.foodjournal.logic.LocationFix
+import com.stanley.foodjournal.logic.PermissionRequest
+import com.stanley.foodjournal.logic.PlacePickerContent
 import com.stanley.foodjournal.logic.cleanPriceInput
+import com.stanley.foodjournal.logic.mealLocation
+import com.stanley.foodjournal.logic.normalizePlaceName
+import com.stanley.foodjournal.logic.permissionsToRequest
+import com.stanley.foodjournal.logic.placePickerContent
+import com.stanley.foodjournal.logic.prefillPlace
 import com.stanley.foodjournal.logic.suggestNames
 import com.stanley.foodjournal.photos.PhotoProcessor
 import com.stanley.foodjournal.photos.PhotoStore
+import com.stanley.foodjournal.settings.AppSettings
 import com.stanley.foodjournal.ui.navigation.MealRoute
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,6 +58,8 @@ data class MealUiState(
     /** The photo is still being resized; its file isn't ready to show yet. */
     val photoProcessing: Boolean,
     val nameSuggestions: List<String>,
+    /** The chosen place's name, or a new one typed in the picker. Null without a place. */
+    val placeName: String?,
     /** A new meal always shows Save. A saved meal shows it once something has changed. */
     val showSave: Boolean,
 )
@@ -51,15 +67,23 @@ data class MealUiState(
 class MealViewModel(
     private val savedState: SavedStateHandle,
     private val mealDao: MealDao,
+    private val placeDao: PlaceDao,
     private val edits: UndoableEdits,
     private val photos: PhotoStore,
     private val processor: PhotoProcessor,
+    private val settings: AppSettings,
+    private val locationTracker: LocationTracker,
     private val appScope: CoroutineScope,
 ) : ViewModel() {
     private val mealId: Long? = savedState.toRoute<MealRoute>().mealId
     private val isNew = mealId == null
     private var original by mutableStateOf<Meal?>(null)
     private var recentNames by mutableStateOf<List<String>>(emptyList())
+    private var places by mutableStateOf<List<PlaceSummary>>(emptyList())
+    private var deviceFix by mutableStateOf<LocationFix?>(null)
+
+    /** The last merge that moved the draft to its survivor, so an undo can move it back. */
+    private var mergedAway: Pair<Long, Long>? = null
 
     // Snapshot state rather than a flow, so text fields see every keystroke at once and typing
     // never races the keyboard. Each change is copied to the saved state for process death.
@@ -87,6 +111,8 @@ class MealViewModel(
                 photoFile = current.photo?.let { photoFile(it, current.photoIsPending) },
                 photoProcessing = photoProcessing,
                 nameSuggestions = suggestNames(recentNames, current.name),
+                placeName = current.newPlaceName
+                    ?: current.placeId?.let { id -> places.firstOrNull { it.place.id == id }?.place?.name },
                 showSave = isNew || (saved != null && current.hasChangesFrom(saved)),
             )
         }
@@ -96,6 +122,21 @@ class MealViewModel(
 
     init {
         viewModelScope.launch { recentNames = mealDao.recentNames(RECENT_NAME_COUNT) }
+        viewModelScope.launch {
+            placeDao.observeSummaries().collect {
+                places = it
+                followUndoneMerge()
+                prefill()
+            }
+        }
+        if (isNew) {
+            viewModelScope.launch {
+                locationTracker.fix.collect {
+                    deviceFix = it
+                    prefill()
+                }
+            }
+        }
         if (mealId != null) {
             viewModelScope.launch {
                 val meal = mealDao.get(mealId)
@@ -119,6 +160,65 @@ class MealViewModel(
 
     fun onToggleFavorite() = update { it.copy(isFavorite = !it.isFavorite) }
 
+    /** A saved place picked in the picker, or null for "No place". */
+    fun onPlaceSelected(placeId: Long?) =
+        update { it.copy(placeId = placeId, newPlaceName = null, placeTouched = true) }
+
+    /** A new place typed in the picker. It is created when the meal is saved. */
+    fun onNewPlace(typed: String) {
+        val name = normalizePlaceName(typed)
+        if (name.isEmpty()) return
+        update { it.copy(placeId = null, newPlaceName = name, placeTouched = true) }
+    }
+
+    /** The picker's rows for what has been typed. Read it from composition. */
+    fun placePicker(query: String): PlacePickerContent {
+        val current = draft
+        return placePickerContent(
+            places = places,
+            query = query,
+            location = current?.let { location(it) },
+            selectedPlaceId = current?.placeId,
+            newPlaceName = current?.newPlaceName,
+        )
+    }
+
+    /**
+     * Renames a place from the picker. Renaming it to another place's name merges the two, and
+     * a draft that pointed at the merged-away place moves to the survivor.
+     */
+    fun renamePlace(place: Place, typed: String) {
+        // Renaming the draft's place keeps it, so a prefill can't clear it while it merges away.
+        val isDraftPlace = draft?.placeId == place.id
+        if (isDraftPlace) update { it.copy(placeTouched = true) }
+        viewModelScope.launch {
+            val result = edits.renamePlace(place, typed)
+            if (result is RenameResult.Merged && isDraftPlace && draft?.placeId == place.id) {
+                update { it.copy(placeId = result.survivor.id) }
+                mergedAway = place.id to result.survivor.id
+            }
+        }
+    }
+
+    /**
+     * What to ask for as the camera opens. Location is asked once ever, so asking marks it.
+     * Call [startLocation] once the answer is in, or right away when nothing is asked.
+     */
+    suspend fun permissionsToRequest(cameraGranted: Boolean): PermissionRequest {
+        val request = permissionsToRequest(
+            cameraGranted = cameraGranted,
+            locationGranted = locationTracker.hasPermission(),
+            locationAsked = settings.locationAsked(),
+        )
+        if (request.location) settings.markLocationAsked()
+        return request
+    }
+
+    /** Starts finding the phone's location for a new meal, if permission allows. */
+    fun startLocation() {
+        if (isNew) locationTracker.start()
+    }
+
     /** A name and file for the next camera capture. */
     fun newCaptureFile(): Pair<String, File> {
         photos.ensureFolders()
@@ -127,7 +227,10 @@ class MealViewModel(
     }
 
     fun onCaptured(name: String) {
+        // A photo taken now is located by the phone, even if it replaces a gallery photo.
+        if (isNew) update { it.copy(fromGallery = false, photoLatitude = null, photoLongitude = null) }
         attachPhoto(name)
+        prefill()
         processPhoto(name) { processor.fromCapture(name) }
     }
 
@@ -150,6 +253,7 @@ class MealViewModel(
                             photoLongitude = metadata.location?.longitude,
                         )
                     }
+                    prefill()
                 }
             }
             true
@@ -255,7 +359,9 @@ class MealViewModel(
         val pendingWork = photoJob
         appScope.launch {
             pendingWork?.join()
-            var toSave = draft
+            // The photo's metadata may have arrived while it was being resized.
+            var toSave = withContext(Dispatchers.Main) { this@MealViewModel.draft } ?: draft
+            val location = mealLocation(isNew, toSave.fromGallery, toSave.photoLocation, locationTracker.fix.value)
             if (draft.photo != null && draft.photoIsPending) {
                 if (photos.pendingPhotoFile(draft.photo).exists()) {
                     photos.commit(draft.photo)
@@ -264,7 +370,7 @@ class MealViewModel(
                 }
             }
             if (!toSave.canSave) return@launch
-            mealDao.save(toSave.toMeal(mealId ?: 0))
+            mealDao.save(toSave.toMeal(mealId ?: 0), newPlace = toSave.newPlace(location))
             replacedPhoto?.let { photos.delete(it) }
             edits.removeEmptyPlaces()
         }
@@ -279,6 +385,28 @@ class MealViewModel(
                 photos.discardPending(draft.photo)
             }
         }
+    }
+
+    private fun location(draft: MealDraft): LocationFix? =
+        mealLocation(isNew, draft.fromGallery, draft.photoLocation, deviceFix)
+
+    /**
+     * Fills the place of a new meal from where it is, until a place is chosen by hand. It runs
+     * again whenever the places, the fix, or the photo change, so a late fix still fills it.
+     */
+    private fun prefill() {
+        val current = draft ?: return
+        if (!isNew || current.placeTouched) return
+        val placeId = prefillPlace(places.map { it.place }, location(current))?.id
+        if (placeId != current.placeId) update { it.copy(placeId = placeId) }
+    }
+
+    /** An undone merge brings the merged-away place back; a draft moved off it moves back too. */
+    private fun followUndoneMerge() {
+        val (awayId, survivorId) = mergedAway ?: return
+        if (places.none { it.place.id == awayId }) return
+        mergedAway = null
+        if (draft?.placeId == survivorId) update { it.copy(placeId = awayId) }
     }
 
     private fun photoFile(name: String, isPending: Boolean): File =
@@ -298,9 +426,12 @@ class MealViewModel(
                 MealViewModel(
                     savedState = createSavedStateHandle(),
                     mealDao = container.mealDao,
+                    placeDao = container.placeDao,
                     edits = container.edits,
                     photos = container.photoStore,
                     processor = container.photoProcessor,
+                    settings = container.settings,
+                    locationTracker = container.locationTracker,
                     appScope = container.appScope,
                 )
             }

@@ -1,5 +1,8 @@
 package com.stanley.foodjournal.ui.meal
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -72,7 +75,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.stanley.foodjournal.R
@@ -102,6 +108,39 @@ fun MealScreen(
     val picker = rememberLauncherForActivityResult(PickPhotoWithLocation()) { uri ->
         if (uri != null) viewModel.onPicked(uri)
     }
+    var pickingPlace by rememberSaveable { mutableStateOf(false) }
+
+    // Opening the camera asks for the camera, and on the first Add for location too. Finding
+    // the location starts here, so it is usually ready by the time the form shows.
+    val context = LocalContext.current
+    var hasCamera by remember { mutableStateOf(context.isGranted(Manifest.permission.CAMERA)) }
+    val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        hasCamera = context.isGranted(Manifest.permission.CAMERA)
+        viewModel.startLocation()
+    }
+    val stage = uiState?.stage
+    LaunchedEffect(stage) {
+        if (stage != MealStage.Camera) return@LaunchedEffect
+        val request = viewModel.permissionsToRequest(cameraGranted = hasCamera)
+        if (request.isEmpty) {
+            viewModel.startLocation()
+        } else {
+            permissions.launch(
+                buildList {
+                    if (request.camera) add(Manifest.permission.CAMERA)
+                    if (request.location) {
+                        add(Manifest.permission.ACCESS_FINE_LOCATION)
+                        add(Manifest.permission.ACCESS_COARSE_LOCATION)
+                    }
+                }.toTypedArray(),
+            )
+        }
+    }
+    // Camera access may have been turned on in Settings.
+    LifecycleResumeEffect(Unit) {
+        hasCamera = context.isGranted(Manifest.permission.CAMERA)
+        onPauseOrDispose {}
+    }
 
     Surface(color = MaterialTheme.colorScheme.background, modifier = modifier.fillMaxSize()) {
         uiState?.let { state ->
@@ -112,6 +151,7 @@ fun MealScreen(
             ) { stage ->
                 when (stage) {
                     MealStage.Camera -> CameraStage(
+                        hasCamera = hasCamera,
                         newCaptureFile = viewModel::newCaptureFile,
                         onCaptured = viewModel::onCaptured,
                         onPickFromGallery = {
@@ -131,14 +171,26 @@ fun MealScreen(
                             onNameChange = viewModel::onNameChange,
                             onNoteChange = viewModel::onNoteChange,
                             onEatenAtChange = viewModel::onEatenAtChange,
+                            onPickPlace = { pickingPlace = true },
                             onSave = viewModel::save,
                         ),
                     )
                 }
             }
+            if (pickingPlace && state.stage == MealStage.Form) {
+                PlacePickerSheet(
+                    content = viewModel::placePicker,
+                    onSelect = viewModel::onPlaceSelected,
+                    onAdd = viewModel::onNewPlace,
+                    onRename = viewModel::renamePlace,
+                    onDismiss = { pickingPlace = false },
+                )
+            }
         }
     }
 }
+
+private fun Context.isGranted(permission: String) = checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
 
 private const val STAGE_FADE_MILLIS = 150
 
@@ -152,6 +204,7 @@ class MealActions(
     val onNameChange: (String) -> Unit = {},
     val onNoteChange: (String) -> Unit = {},
     val onEatenAtChange: (LocalDateTime) -> Unit = {},
+    val onPickPlace: () -> Unit = {},
     val onSave: () -> Unit = {},
 )
 
@@ -200,6 +253,18 @@ fun MealScreen(
                 suggestions = uiState.nameSuggestions,
                 onNameChange = actions.onNameChange,
             )
+            Divider()
+            FieldRow(
+                label = stringResource(R.string.meal_place),
+                modifier = Modifier.clickable(onClick = actions.onPickPlace),
+            ) {
+                Text(
+                    text = uiState.placeName.orEmpty(),
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             Divider()
             FieldRow(
                 label = stringResource(R.string.meal_time),
@@ -467,6 +532,7 @@ private fun MealNewPreview() {
                 photoFile = null,
                 photoProcessing = true,
                 nameSuggestions = emptyList(),
+                placeName = "Lin Dong Fang",
                 showSave = true,
             ),
             actions = MealActions(),
@@ -493,6 +559,7 @@ private fun MealSavedPreview() {
                 photoFile = null,
                 photoProcessing = false,
                 nameSuggestions = emptyList(),
+                placeName = "Yongkang Beef Noodles",
                 showSave = false,
             ),
             actions = MealActions(),

@@ -4,6 +4,10 @@ import android.database.sqlite.SQLiteConstraintException
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.stanley.foodjournal.logic.LocationFix
+import com.stanley.foodjournal.logic.mealLocation
+import com.stanley.foodjournal.logic.prefillPlace
+import com.stanley.foodjournal.ui.meal.MealDraft
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -153,6 +157,78 @@ class DatabaseTest {
 
         assertEquals(noon, summaries.getValue("Visited").lastVisit)
         assertNull(summaries.getValue("Never").lastVisit)
+    }
+
+    @Test
+    fun aNewPlaceTypedForACameraMealIsSavedAtThePhonesFix() = runBlocking {
+        val draft = MealDraft(eatenAt = noon, photo = "a.jpg", priceText = "280", newPlaceName = "Lin Dong Fang")
+        val fix = LocationFix(25.0526, 121.5395, accuracyMeters = 12f)
+
+        val id = saveNew(draft, deviceFix = fix)
+
+        val place = places.all().single()
+        assertEquals(place.id, meals.get(id)?.placeId)
+        assertEquals(25.0526, place.latitude!!, 0.0)
+        assertEquals(121.5395, place.longitude!!, 0.0)
+    }
+
+    @Test
+    fun aNewPlaceForAGalleryMealIsSavedAtThePhotosLocationOnly() = runBlocking {
+        val draft = MealDraft(
+            eatenAt = noon,
+            photo = "a.jpg",
+            priceText = "280",
+            newPlaceName = "Night market",
+            fromGallery = true,
+            photoLatitude = 25.0478,
+            photoLongitude = 121.5170,
+        )
+        val elsewhere = LocationFix(24.15, 120.67, accuracyMeters = 5f)
+
+        saveNew(draft, deviceFix = elsewhere)
+        saveNew(draft.copy(newPlaceName = "No location", photoLatitude = null, photoLongitude = null), elsewhere)
+
+        val saved = places.all().associateBy { it.name }
+        assertEquals(25.0478, saved.getValue("Night market").latitude!!, 0.0)
+        assertNull(saved.getValue("No location").latitude)
+    }
+
+    @Test
+    fun aNewPlaceFromAVagueFixIsSavedWithoutALocation() = runBlocking {
+        val draft = MealDraft(eatenAt = noon, name = "Dumplings", priceText = "90", newPlaceName = "Dumplings")
+
+        saveNew(draft, deviceFix = LocationFix(25.05, 121.53, accuracyMeters = 2_000f))
+
+        assertNull(places.all().single().latitude)
+    }
+
+    @Test
+    fun prefillFindsTheOnlySavedPlaceNearby() = runBlocking {
+        // One thousandth of a degree of latitude is about 111 m.
+        val near = places.insert(Place(name = "Noodles", latitude = 25.0337, longitude = 121.5654))
+        places.insert(Place(name = "Coffee", latitude = 25.0370, longitude = 121.5654))
+        places.insert(Place(name = "Market"))
+        val here = LocationFix(25.0330, 121.5654, accuracyMeters = 10f)
+
+        assertEquals(near, prefillPlace(places.all(), here)?.id)
+
+        places.insert(Place(name = "Dumplings", latitude = 25.0325, longitude = 121.5654))
+        assertNull(prefillPlace(places.all(), here))
+    }
+
+    @Test
+    fun aMealWhosePlaceWasRemovedIsSavedWithoutOne() = runBlocking {
+        val gone = places.insert(Place(name = "Gone"))
+        places.deleteEmpty()
+
+        val id = meals.save(meal(placeId = gone))
+
+        assertNull(meals.get(id)?.placeId)
+    }
+
+    private suspend fun saveNew(draft: MealDraft, deviceFix: LocationFix?): Long {
+        val location = mealLocation(isNew = true, draft.fromGallery, draft.photoLocation, deviceFix)
+        return meals.save(draft.toMeal(0), newPlace = draft.newPlace(location))
     }
 
     private fun meal(

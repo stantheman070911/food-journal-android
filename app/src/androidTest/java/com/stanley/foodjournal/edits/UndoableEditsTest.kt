@@ -66,10 +66,10 @@ class UndoableEditsTest {
         assertTrue(photos.photoFile(photo).exists())
 
         awaitPending { it == null }
+        // The bar hides first; the files and the empty place go just after.
+        awaitTrue { !photos.photoFile(photo).exists() && db.placeDao().get(placeId) == null }
 
-        assertFalse(photos.photoFile(photo).exists())
         assertFalse(photos.thumbFile(photo).exists())
-        assertNull(db.placeDao().get(placeId))
     }
 
     @Test
@@ -128,9 +128,11 @@ class UndoableEditsTest {
         return Triple(db.mealDao().get(id)!!, photo, placeId)
     }
 
-    private suspend fun awaitPending(condition: (PendingEdit?) -> Boolean) {
+    private suspend fun awaitPending(condition: (PendingEdit?) -> Boolean) = awaitTrue { condition(edits.pending.value) }
+
+    private suspend fun awaitTrue(condition: suspend () -> Boolean) {
         withTimeout(3_000) {
-            while (!condition(edits.pending.value)) delay(20)
+            while (!condition()) delay(20)
         }
     }
 

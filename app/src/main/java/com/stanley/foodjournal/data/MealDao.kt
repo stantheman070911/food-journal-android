@@ -49,16 +49,20 @@ abstract class MealDao {
     @Insert
     protected abstract suspend fun insertPlace(place: Place): Long
 
+    @Query("SELECT EXISTS (SELECT 1 FROM place WHERE id = :id)")
+    protected abstract suspend fun placeExists(id: Long): Boolean
+
     /**
      * Saves [meal] in one step. With [newPlace], the meal goes to the saved place of that name,
-     * or to [newPlace] itself when no place has the name yet. Returns the meal's id.
+     * or to [newPlace] itself when no place has the name yet. A place removed while the meal was
+     * open, such as an empty one whose undo bar closed, is left off. Returns the meal's id.
      */
     @Transaction
     open suspend fun save(meal: Meal, newPlace: Place? = null): Long {
         val placeId = if (newPlace != null) {
             places().firstOrNull { sameName(it.name, newPlace.name) }?.id ?: insertPlace(newPlace)
         } else {
-            meal.placeId
+            meal.placeId?.takeIf { placeExists(it) }
         }
         val saved = meal.copy(placeId = placeId)
         return if (saved.id == 0L) {

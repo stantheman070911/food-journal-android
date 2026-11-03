@@ -32,6 +32,17 @@ fun distanceMeters(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Doub
     return 2 * EARTH_RADIUS_METERS * asin(sqrt(a.coerceIn(0.0, 1.0)))
 }
 
+/**
+ * A photo's location from its metadata, or null when it has none worth using. A picker that
+ * withholds the location may zero the coordinates instead of removing them, and no meal is
+ * eaten at exactly 0°, 0°.
+ */
+fun photoLocation(latitude: Double, longitude: Double): LocationFix? = when {
+    latitude == 0.0 && longitude == 0.0 -> null
+    latitude !in -90.0..90.0 || longitude !in -180.0..180.0 -> null
+    else -> LocationFix(latitude, longitude)
+}
+
 /** Whether [fix] is precise enough to match or create places. */
 fun LocationFix.isUsable(): Boolean = accuracyMeters == null || accuracyMeters <= USABLE_ACCURACY_METERS
 
@@ -64,11 +75,11 @@ fun orderForPicker(places: List<PlaceSummary>, fix: LocationFix?): List<PlaceSum
     )
 }
 
-/** A distance as the picker shows it: "80 m", "1.2 km", "15 km". */
+/** A distance as the picker shows it: "80 m", "1.2 km", "15 km", "1,240 km". */
 fun formatDistance(meters: Double): String = when {
     meters < 1_000 -> "${(meters / 10).roundToInt() * 10} m"
     meters < 10_000 -> "%.1f km".format(java.util.Locale.ROOT, meters / 1_000)
-    else -> "${(meters / 1_000).roundToInt()} km"
+    else -> "%,d km".format(java.util.Locale.ENGLISH, (meters / 1_000).roundToInt())
 }
 
 /** What renaming a place to a typed name does. */
@@ -101,3 +112,19 @@ fun mergedPlace(survivor: Place, mergedAway: Place): Place =
     } else {
         survivor.copy(latitude = mergedAway.latitude, longitude = mergedAway.longitude)
     }
+
+/**
+ * Where a meal is, for matching and creating places. A meal from the camera or Skip uses the
+ * phone's fix, when it is precise enough. A gallery meal uses only its photo's location, and
+ * none without one. A saved meal has none: the phone is no longer where the meal was eaten.
+ */
+fun mealLocation(
+    isNew: Boolean,
+    fromGallery: Boolean,
+    photoLocation: LocationFix?,
+    deviceFix: LocationFix?,
+): LocationFix? = when {
+    !isNew -> null
+    fromGallery -> photoLocation
+    else -> deviceFix?.takeIf { it.isUsable() }
+}

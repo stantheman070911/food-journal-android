@@ -203,7 +203,7 @@ Settled on Nov 3, 2026, all as recommended.
 
 ### Phase 2 progress
 
-Steps 1 to 3 of 4 are done and committed. Step 4 (location, place picker, rename and merge) is next, then the Phase 2 report.
+All four steps are done and committed: data layer and tests; Meal form; camera, gallery, and photos; location and places.
 
 - **The camera is the first stage of the new-meal Meal screen**, not a separate destination. One ViewModel holds the photo, its metadata, and the draft. Back from the form returns to the tabs (decision 5). Replacing a photo opens the camera stage, and Back returns to the form.
 - **Favorite sits at the top**, as the Screens table says, though Quick logging lists it "below the price".
@@ -217,3 +217,19 @@ Steps 1 to 3 of 4 are done and committed. Step 4 (location, place picker, rename
 - **Photo Picker location.** The picker gets `MediaStore.EXTRA_REQUEST_LOCATION_METADATA_ACCESS = true`. The constant is behind a feature flag and missing from the public API 37 jar, so its documented value `"android.provider.extra.REQUEST_LOCATION_METADATA_ACCESS"` is used. For apps targeting above Android 16 it is the only control, so `ACCESS_MEDIA_LOCATION` is not needed. On the emulator (picker version 17), there was no location prompt and picking needs a Done tap. Whether location arrives on the phone is still unverified.
 - **Known nit.** The date picker starts weeks on Sunday, following the locale, while the app's weeks run Monday to Sunday.
 - **Saved meals can't be reopened from the UI** until the Journal arrives in Phase 3. Editing was tested with a throwaway build.
+
+#### Step 4: location, place picker, rename and merge
+
+- **Permissions.** The Meal screen asks as the camera opens, in one request: the camera whenever it is off, and both location permissions on the first Add only. A DataStore flag records that location was asked, set as the request goes out, so it is never asked again whatever the answer. Camera access is checked again on resume, so turning it on in Settings works on return.
+- **DataStore** is in the app from now, for that flag. `AppSettings` in the container will hold the last backup date in Phase 6.
+- **Finding the location.** `LocationTracker` uses `LocationManager.FUSED_PROVIDER`. It offers a fix under two minutes old at once, then asks for a current one at high accuracy, for up to 30 seconds. The default balanced quality returned nothing within 30 seconds on the emulator. Android may answer with a fix it cached in the last 30 seconds or so. A phone fix without an accuracy is treated as vague.
+- **Where a meal is.** Camera and Skip meals use the phone's fix when it is within 100 m accuracy. Gallery meals use only the photo's location, and none without one. A saved meal has none, since the phone is no longer where it was eaten: its picker lists recent places first, and a new place typed for it is saved without coordinates. Taking a photo to replace a gallery photo switches the meal back to the phone's fix; the time stays as it was.
+- **Prefill** applies to new meals until a place is chosen by hand. It runs again whenever the places, the fix, or the photo change, so a late fix still fills the place.
+- **A zeroed photo location counts as none.** The emulator's picker withholds location by setting the coordinates to 0, 0 rather than removing them, which first saved a place in the Gulf of Guinea. Coordinates of exactly 0, 0, or out of range, are now ignored.
+- **The place row** sits between Name and Time and opens the picker. An empty place shows nothing, like an empty name.
+- **The picker** is a full-height sheet. The field has focus when it opens, since a place with no saved match is usually a new one; the nearest places stay in view above the keyboard. A narrow column on the left holds the icons (search, add, check), so the names line up. "No place" shows only before anything is typed. A new place chosen but not yet saved is listed first, marked "New". Distances show only when the meal has a usable location. Long distances are grouped: "1,240 km".
+- **Rename** happens in the row. The name is selected, so typing replaces it, and Done or the check saves it. Renaming the meal's own place counts as choosing it by hand. A merge moves the meal to the surviving place, and Undo moves it back. The undo bar shows inside the sheet.
+- **A place that vanished before Save** is left off the meal instead of failing the save. This can happen when an empty place, kept for an open undo bar, is prefilled and the bar then closes.
+- **Save reads the latest draft** once the photo is ready, so gallery metadata that lands while Save is tapped is no longer lost. This was a gap from step 3.
+- **Not built yet.** The "Meals here" row at the top of the picker (decision 2) comes in Phase 5, with Search.
+- **Photo Picker location on the phone** is still unverified. On the emulator, the photo's location arrived as 0, 0, so gallery prefill was tested only through the database and unit tests.

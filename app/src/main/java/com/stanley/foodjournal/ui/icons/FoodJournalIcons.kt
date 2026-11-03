@@ -63,6 +63,16 @@ object FoodJournalIcons {
         )
     }
 
+    val Edit: ImageVector by lazy {
+        strokeIcon(
+            "Edit",
+            "M4.5,19.5L5.25,15.75L15.5,5.5A2.12,2.12 0 0 1 18.5,8.5L8.25,18.75Z",
+            "M14,7L17,10",
+        )
+    }
+
+    val Check: ImageVector by lazy { strokeIcon("Check", "M5,12.5L9.5,17L19,7.5") }
+
     val Delete: ImageVector by lazy {
         strokeIcon(
             "Delete",

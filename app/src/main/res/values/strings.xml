@@ -29,6 +29,14 @@
     <string name="meal_favorite">Favorite</string>
     <string name="meal_unfavorite">Remove from favorites</string>
     <string name="meal_delete">Delete</string>
+    <string name="meal_place">Place</string>
+
+    <string name="place_search">Search or add a place</string>
+    <string name="place_add">Add “%1$s”</string>
+    <string name="place_none">No place</string>
+    <string name="place_new">New</string>
+    <string name="place_rename">Rename %1$s</string>
+    <string name="place_rename_done">Save name</string>
 
     <string name="undo">Undo</string>
     <string name="undo_deleted">Deleted</string>

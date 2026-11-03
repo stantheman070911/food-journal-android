@@ -1,16 +1,12 @@
 package com.stanley.foodjournal.ui.meal
 
-import android.Manifest
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
 import android.util.Size
 import android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
 import android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
 import androidx.activity.compose.LocalActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.compose.CameraXViewfinder
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
@@ -85,10 +81,12 @@ private val CaptureResolution = ResolutionSelector.Builder()
 
 /**
  * The first step of logging: a 3:4 viewfinder with the shutter, a gallery button beside it,
- * and Skip. A capture goes straight to the form, with no confirm step.
+ * and Skip. A capture goes straight to the form, with no confirm step. The Meal screen asks
+ * for the camera; without it, gallery and Skip still work.
  */
 @Composable
 fun CameraStage(
+    hasCamera: Boolean,
     newCaptureFile: () -> Pair<String, File>,
     onCaptured: (name: String) -> Unit,
     onPickFromGallery: () -> Unit,
@@ -97,13 +95,6 @@ fun CameraStage(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    var hasCamera by remember {
-        mutableStateOf(context.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
-    }
-    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        hasCamera = it
-    }
-    LaunchedEffect(Unit) { if (!hasCamera) permission.launch(Manifest.permission.CAMERA) }
     LightSystemBarIcons()
 
     val imageCapture = remember {

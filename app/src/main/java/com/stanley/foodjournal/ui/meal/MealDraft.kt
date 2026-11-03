@@ -1,6 +1,8 @@
 package com.stanley.foodjournal.ui.meal
 
 import com.stanley.foodjournal.data.Meal
+import com.stanley.foodjournal.data.Place
+import com.stanley.foodjournal.logic.LocationFix
 import com.stanley.foodjournal.logic.canSave
 import com.stanley.foodjournal.logic.parsePrice
 import java.io.Serializable
@@ -35,6 +37,15 @@ data class MealDraft(
     val photoLongitude: Double? = null,
 ) : Serializable {
     val canSave: Boolean get() = canSave(hasPhoto = photo != null, name = name, priceText = priceText)
+
+    /** The photo's location, for a gallery meal whose photo had one. */
+    val photoLocation: LocationFix?
+        get() = if (photoLatitude != null && photoLongitude != null) LocationFix(photoLatitude, photoLongitude) else null
+
+    /** The place to create on save for a [newPlaceName], at [location] when there is one. */
+    fun newPlace(location: LocationFix?): Place? = newPlaceName?.let { name ->
+        Place(name = name, latitude = location?.latitude, longitude = location?.longitude)
+    }
 
     /** The meal this draft saves as. A [newPlaceName] is resolved separately, on save. */
     fun toMeal(id: Long): Meal = Meal(

@@ -71,6 +71,7 @@ class PlacesTest {
         assertEquals("80 m", formatDistance(78.0))
         assertEquals("1.2 km", formatDistance(1_240.0))
         assertEquals("15 km", formatDistance(15_400.0))
+        assertEquals("1,240 km", formatDistance(1_240_000.0))
     }
 
     @Test
@@ -106,6 +107,42 @@ class PlacesTest {
     fun `the survivor takes the other's coordinates when it has none`() {
         val merged = mergedPlace(survivor = noLocation, mergedAway = at80m)
         assertEquals(Place(4, "Market", at80m.latitude, at80m.longitude), merged)
+    }
+
+    @Test
+    fun `a camera meal uses the phone's fix`() {
+        assertEquals(here, mealLocation(isNew = true, fromGallery = false, photoLocation = null, deviceFix = here))
+    }
+
+    @Test
+    fun `a camera meal ignores a vague fix`() {
+        val vague = here.copy(accuracyMeters = 900f)
+        assertNull(mealLocation(isNew = true, fromGallery = false, photoLocation = null, deviceFix = vague))
+    }
+
+    @Test
+    fun `a gallery meal uses only its photo's location`() {
+        val photo = LocationFix(25.04, 121.55)
+        assertEquals(photo, mealLocation(isNew = true, fromGallery = true, photoLocation = photo, deviceFix = here))
+        assertNull(mealLocation(isNew = true, fromGallery = true, photoLocation = null, deviceFix = here))
+    }
+
+    @Test
+    fun `a saved meal has no location`() {
+        assertNull(mealLocation(isNew = false, fromGallery = false, photoLocation = null, deviceFix = here))
+    }
+
+    @Test
+    fun `a photo's location is used as it is`() {
+        assertEquals(LocationFix(25.0331, 121.5297), photoLocation(25.0331, 121.5297))
+        assertEquals(LocationFix(-33.86, 0.0), photoLocation(-33.86, 0.0))
+    }
+
+    @Test
+    fun `a zeroed or impossible photo location counts as none`() {
+        assertNull(photoLocation(0.0, 0.0))
+        assertNull(photoLocation(91.0, 121.5))
+        assertNull(photoLocation(25.0, Double.NaN))
     }
 
     private fun summary(place: Place, daysAgo: Long?) = PlaceSummary(
