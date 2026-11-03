@@ -6,6 +6,17 @@ plugins {
     alias(libs.plugins.room)
 }
 
+// The personal signing key lives outside the repo, in ~/.gradle/gradle.properties as
+// foodJournal.signing.storeFile, .storePassword, .keyAlias, and .keyPassword (see DECISIONS.md).
+// Without all four, release builds come out unsigned, so no build signed with another key can
+// ever replace the installed app and its data.
+val signingProperties: Map<String, String> =
+    listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+        .mapNotNull { name ->
+            providers.gradleProperty("foodJournal.signing.$name").orNull?.let { name to it }
+        }
+        .toMap()
+
 android {
     namespace = "com.stanley.foodjournal"
     compileSdk = 37
@@ -18,9 +29,27 @@ android {
         versionName = "0.1"
     }
 
+    signingConfigs {
+        if (signingProperties.size == 4) {
+            create("personal") {
+                storeFile = file(signingProperties.getValue("storeFile"))
+                storePassword = signingProperties.getValue("storePassword")
+                keyAlias = signingProperties.getValue("keyAlias")
+                keyPassword = signingProperties.getValue("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
+        // Debug and release share the key, so either can be installed over the other.
+        debug {
+            signingConfigs.findByName("personal")?.let { signingConfig = it }
+        }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            signingConfig = signingConfigs.findByName("personal")
         }
     }
 

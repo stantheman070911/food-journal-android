@@ -41,9 +41,10 @@ The latest stable version of each library on Nov 3, 2026, from Google Maven and 
 | kotlinx.serialization | 1.12.0 | Core: Phase 1 (routes). JSON: Phase 6 (backup). |
 | CameraX | 1.6.2 | Phase 2 |
 | Coil 3 | 3.6.3 | Phase 2 |
-| Play Services Location | 21.4.0 | Phase 2 |
 | DataStore | 1.3.0 | Phase 6 |
 | JUnit 4 (tests only) | 4.13.2 | Phase 1 |
+
+Location uses Android's built-in fused provider, so there is no location library (decision 6 under Phase 2 plan).
 
 ## Document review
 
@@ -176,15 +177,26 @@ Settled after the Phase 1 review, before any Phase 2 code.
 
 - The Search route takes an optional place. The Meal and Spending screens pass the place explicitly, so the tab's saved state can never bring back an older search in its place.
 
-### Decisions waiting on you
+### Decisions
 
-| # | Question | Recommendation |
+Settled on Nov 3, 2026, all as recommended.
+
+| # | Question | Decision |
 | --- | --- | --- |
-| 1 | Signing | One personal key, kept outside the repo and backed up, signs both debug and release builds. You create it; Gradle reads it from outside the repo. Daily use and timing the 15-second target happen on release builds. Must be settled before the first real meal. |
+| 1 | Signing | One personal key, kept outside the repo and backed up, signs both debug and release builds. Daily use and timing the 15-second target happen on release builds. Must be in place before the first real meal. See Signing below. |
 | 2 | Tapping the place on the Meal screen | Opens the place picker. A "Meals here" row at its top opens Search. |
 | 3 | Back after editing a saved meal | Saves automatically if the meal is still valid. Otherwise the last saved version stays. |
-| 4 | Which place survives a rename that merges | The existing one |
+| 4 | Which place survives a rename that merges | The existing one. It keeps its name and coordinates; it takes the other's coordinates only if it has none. |
 | 5 | Back from the Meal screen after the camera | Returns to the tabs, not the camera |
-| 6 | Location provider | Android's built-in fused provider: no dependency, and on a Pixel it uses the same location source as Play services |
-| 7 | Database tests | AndroidX Test, test-only, run on the emulator |
-| 8 | Size of Phase 2 | Four steps, each committed: data layer and tests, Meal form, camera and gallery and photos, location and places. One report at the end. |
+| 6 | Location provider | Android's built-in fused provider (`LocationManager.FUSED_PROVIDER`). No dependency, and on a Pixel it uses the same location source as Play services. Play Services Location is removed from the catalog. |
+| 7 | Database tests | AndroidX Test, test-only, run on the emulator. Added in step 1 of Phase 2. |
+| 8 | Size of Phase 2 | Four steps, each building, running, and committed: data layer and tests; Meal form; camera, gallery, and photos; location and places. One report at the end. |
+
+### Signing
+
+- Gradle reads the key from four properties in `~/.gradle/gradle.properties`, outside the repo: `foodJournal.signing.storeFile`, `.storePassword`, `.keyAlias`, and `.keyPassword`.
+- With the key set, debug and release builds are both signed with it. Either can be installed over the other without losing data, and debug builds can still be inspected in Android Studio.
+- Without the key, release builds come out unsigned and cannot be installed. A release build signed with any other key can never reach the phone.
+- Release builds are shrunk and optimized with R8.
+- Switching the phone from today's debug-key build to the personal key needs one uninstall. That is free now, since no meals exist yet.
+- Losing the key means never updating the installed app again without uninstalling it, which deletes every meal. Keep a copy of the key file and its password somewhere safe besides this Mac.
