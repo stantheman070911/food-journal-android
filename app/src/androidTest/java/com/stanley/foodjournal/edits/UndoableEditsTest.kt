@@ -139,6 +139,24 @@ class UndoableEditsTest {
     }
 
     @Test
+    fun undoingADeleteAfterAMergePutsTheMealBackAtTheSurvivor() = runBlocking {
+        val awayId = db.placeDao().insert(Place(name = "Lin Dong Fang"))
+        val survivorId = db.placeDao().insert(Place(name = "Beef Noodles"))
+        val mealId = db.mealDao().insert(meal(placeId = awayId))
+        // The Meal screen loaded the meal before its place merged away.
+        val stale = db.mealDao().get(mealId)!!
+        edits.renamePlace(db.placeDao().get(awayId)!!, "beef noodles")
+
+        edits.deleteMeal(stale)
+        awaitPending { it is PendingEdit.MealDeleted }
+        edits.undo()
+        awaitTrue { db.mealDao().get(mealId) != null }
+
+        assertEquals(stale.copy(placeId = survivorId), db.mealDao().get(mealId))
+        assertNull(db.placeDao().get(awayId))
+    }
+
+    @Test
     fun aSecondDeleteClosesTheFirstBar() = runBlocking {
         val (first, firstPhoto, _) = savedMealWithPhotoAndPlace(placeName = "First")
         val (second, secondPhoto, _) = savedMealWithPhotoAndPlace(placeName = "Second")

@@ -74,12 +74,17 @@ class UndoableEdits(
     /** Each edit that was undone, once its data is back, so an open screen can follow it. */
     val undone: SharedFlow<PendingEdit> = _undone.asSharedFlow()
 
+    /**
+     * Deletes [meal], with undo. The row is read again first, so undo puts back the meal as it
+     * was, even if a merge or a place deletion moved it after [meal] was loaded.
+     */
     fun deleteMeal(meal: Meal) {
         scope.launch {
             mutex.withLock {
                 closeLocked()
-                mealDao.delete(meal)
-                openLocked(PendingEdit.MealDeleted(meal))
+                val current = mealDao.get(meal.id) ?: return@withLock
+                mealDao.delete(current)
+                openLocked(PendingEdit.MealDeleted(current))
             }
         }
     }
