@@ -80,6 +80,10 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.compose)
+    implementation(libs.coil.compose)
     implementation(libs.kotlinx.serialization.core)
     ksp(libs.androidx.room.compiler)
 

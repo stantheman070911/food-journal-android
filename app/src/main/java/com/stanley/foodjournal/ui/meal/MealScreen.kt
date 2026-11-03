@@ -1,6 +1,23 @@
 package com.stanley.foodjournal.ui.meal
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
+import coil3.compose.LocalPlatformContext
+import coil3.request.ImageRequest
+import coil3.request.crossfade
+import com.stanley.foodjournal.photos.PickPhotoWithLocation
+import java.io.File
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -79,32 +96,58 @@ fun MealScreen(
     val uiState = viewModel.uiState
     val finished by viewModel.finished.collectAsStateWithLifecycle()
     LaunchedEffect(finished) { if (finished) onClose() }
-    BackHandler(enabled = !finished) { viewModel.onBack() }
+    BackHandler(enabled = !finished) {
+        if (uiState?.stage == MealStage.Camera) viewModel.onCameraBack() else viewModel.onBack()
+    }
+    val picker = rememberLauncherForActivityResult(PickPhotoWithLocation()) { uri ->
+        if (uri != null) viewModel.onPicked(uri)
+    }
 
     Surface(color = MaterialTheme.colorScheme.background, modifier = modifier.fillMaxSize()) {
         uiState?.let { state ->
-            MealScreen(
-                uiState = state,
-                actions = MealActions(
-                    onBack = viewModel::onBack,
-                    onToggleFavorite = viewModel::onToggleFavorite,
-                    onDelete = viewModel::delete,
-                    onPriceChange = viewModel::onPriceChange,
-                    onNameChange = viewModel::onNameChange,
-                    onNoteChange = viewModel::onNoteChange,
-                    onEatenAtChange = viewModel::onEatenAtChange,
-                    onSave = viewModel::save,
-                ),
-            )
+            AnimatedContent(
+                targetState = state.stage,
+                transitionSpec = { fadeIn(tween(STAGE_FADE_MILLIS)) togetherWith fadeOut(tween(STAGE_FADE_MILLIS)) },
+                label = "stage",
+            ) { stage ->
+                when (stage) {
+                    MealStage.Camera -> CameraStage(
+                        newCaptureFile = viewModel::newCaptureFile,
+                        onCaptured = viewModel::onCaptured,
+                        onPickFromGallery = {
+                            picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        },
+                        onSkip = viewModel::onSkipPhoto,
+                        onClose = viewModel::onCameraBack,
+                    )
+                    MealStage.Form -> MealScreen(
+                        uiState = state,
+                        actions = MealActions(
+                            onBack = viewModel::onBack,
+                            onToggleFavorite = viewModel::onToggleFavorite,
+                            onDelete = viewModel::delete,
+                            onReplacePhoto = viewModel::onRetakePhoto,
+                            onPriceChange = viewModel::onPriceChange,
+                            onNameChange = viewModel::onNameChange,
+                            onNoteChange = viewModel::onNoteChange,
+                            onEatenAtChange = viewModel::onEatenAtChange,
+                            onSave = viewModel::save,
+                        ),
+                    )
+                }
+            }
         }
     }
 }
+
+private const val STAGE_FADE_MILLIS = 150
 
 /** Everything the Meal screen can ask its ViewModel to do. */
 class MealActions(
     val onBack: () -> Unit = {},
     val onToggleFavorite: () -> Unit = {},
     val onDelete: () -> Unit = {},
+    val onReplacePhoto: () -> Unit = {},
     val onPriceChange: (String) -> Unit = {},
     val onNameChange: (String) -> Unit = {},
     val onNoteChange: (String) -> Unit = {},
@@ -140,6 +183,11 @@ fun MealScreen(
                 .weight(1f)
                 .verticalScroll(rememberScrollState()),
         ) {
+            PhotoArea(
+                photoFile = uiState.photoFile,
+                processing = uiState.photoProcessing,
+                onClick = actions.onReplacePhoto,
+            )
             PriceField(
                 priceText = draft.priceText,
                 onPriceChange = actions.onPriceChange,
@@ -218,6 +266,44 @@ private fun MealTopBar(
         }
         IconButton(onClick = onDelete) {
             Icon(FoodJournalIcons.Delete, contentDescription = stringResource(R.string.meal_delete))
+        }
+    }
+}
+
+/**
+ * The photo on top, cropped to 4:3 so the price stays in view above the number pad. Tapping it
+ * retakes or picks another. Without a photo, one quiet row offers to add one.
+ */
+@Composable
+private fun PhotoArea(photoFile: File?, processing: Boolean, onClick: () -> Unit) {
+    if (photoFile == null && !processing) {
+        FieldRow(label = stringResource(R.string.meal_photo), modifier = Modifier.clickable(onClick = onClick)) {
+            Text(
+                text = stringResource(R.string.meal_add_photo),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Divider()
+        return
+    }
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .aspectRatio(4f / 3f)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clickable(onClickLabel = stringResource(R.string.meal_change_photo), onClick = onClick),
+    ) {
+        if (!processing && photoFile != null) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalPlatformContext.current)
+                    .data(photoFile)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = stringResource(R.string.meal_photo),
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 }
@@ -377,7 +463,9 @@ private fun MealNewPreview() {
             uiState = MealUiState(
                 isNew = true,
                 draft = MealDraft(eatenAt = LocalDateTime.of(2026, 11, 3, 12, 40), priceText = "280"),
+                stage = MealStage.Form,
                 photoFile = null,
+                photoProcessing = true,
                 nameSuggestions = emptyList(),
                 showSave = true,
             ),
@@ -401,7 +489,9 @@ private fun MealSavedPreview() {
                     isFavorite = true,
                     note = "Extra spicy, with pickled greens",
                 ),
+                stage = MealStage.Form,
                 photoFile = null,
+                photoProcessing = false,
                 nameSuggestions = emptyList(),
                 showSave = false,
             ),

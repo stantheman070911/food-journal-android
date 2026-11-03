@@ -10,7 +10,17 @@
     <string name="next">Next</string>
     <string name="done">Done</string>
     <string name="cancel">Cancel</string>
+    <string name="close">Close</string>
 
+    <string name="camera_gallery">Choose from gallery</string>
+    <string name="camera_skip">Skip</string>
+    <string name="camera_shutter">Take photo</string>
+    <string name="camera_off">Camera access is off</string>
+    <string name="camera_open_settings">Open settings</string>
+
+    <string name="meal_photo">Photo</string>
+    <string name="meal_add_photo">Add photo</string>
+    <string name="meal_change_photo">Change photo</string>
     <string name="meal_price">Price</string>
     <string name="meal_name">Name</string>
     <string name="meal_time">Time</string>

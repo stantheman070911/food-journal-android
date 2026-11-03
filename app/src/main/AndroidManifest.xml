@@ -7,6 +7,12 @@
         android:name="android.permission.INTERNET"
         tools:node="remove" />
 
+    <!-- In-app capture. Asked for the first time Add is tapped. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature
+        android:name="android.hardware.camera.any"
+        android:required="false" />
+
     <application
         android:name=".FoodJournalApplication"
         android:allowBackup="false"

@@ -52,6 +52,17 @@ object FoodJournalIcons {
     /** The favorite star, filled in. The only filled icon, so a favorite reads at a glance. */
     val FavoriteOn: ImageVector by lazy { strokeIcon("FavoriteOn", STAR, filled = true) }
 
+    val Close: ImageVector by lazy { strokeIcon("Close", "M6,6L18,18", "M18,6L6,18") }
+
+    val Gallery: ImageVector by lazy {
+        strokeIcon(
+            "Gallery",
+            "M5.5,4.5H18.5A1.5,1.5 0 0 1 20,6V18A1.5,1.5 0 0 1 18.5,19.5H5.5A1.5,1.5 0 0 1 4,18V6A1.5,1.5 0 0 1 5.5,4.5Z",
+            "M4,16L9,11L13.5,15.5L16,13L20,17",
+            "M17,8.5A1.5,1.5 0 1 1 14,8.5A1.5,1.5 0 1 1 17,8.5Z",
+        )
+    }
+
     val Delete: ImageVector by lazy {
         strokeIcon(
             "Delete",

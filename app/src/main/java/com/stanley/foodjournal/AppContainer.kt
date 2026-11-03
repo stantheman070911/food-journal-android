@@ -5,6 +5,7 @@ import com.stanley.foodjournal.data.FoodJournalDatabase
 import com.stanley.foodjournal.data.MealDao
 import com.stanley.foodjournal.data.PlaceDao
 import com.stanley.foodjournal.edits.UndoableEdits
+import com.stanley.foodjournal.photos.PhotoProcessor
 import com.stanley.foodjournal.photos.PhotoStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -23,6 +24,8 @@ class AppContainer(context: Context) {
     val placeDao: PlaceDao get() = database.placeDao()
 
     val photoStore = PhotoStore(context.filesDir)
+
+    val photoProcessor = PhotoProcessor(photoStore, context.contentResolver)
 
     val edits: UndoableEdits by lazy { UndoableEdits(mealDao, placeDao, photoStore, appScope) }
 

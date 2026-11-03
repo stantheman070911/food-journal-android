@@ -26,6 +26,13 @@ data class MealDraft(
     val newPlaceName: String? = null,
     /** Set once the place is chosen by hand, so a late location fix never overwrites it. */
     val placeTouched: Boolean = false,
+    /**
+     * Set for a meal backfilled from the gallery. Its place comes only from the photo's
+     * location, [photoLatitude] and [photoLongitude], which are null when the photo had none.
+     */
+    val fromGallery: Boolean = false,
+    val photoLatitude: Double? = null,
+    val photoLongitude: Double? = null,
 ) : Serializable {
     val canSave: Boolean get() = canSave(hasPhoto = photo != null, name = name, priceText = priceText)
 

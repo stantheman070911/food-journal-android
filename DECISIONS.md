@@ -200,3 +200,20 @@ Settled on Nov 3, 2026, all as recommended.
 - Release builds are shrunk and optimized with R8.
 - Switching the phone from today's debug-key build to the personal key needs one uninstall. That is free now, since no meals exist yet.
 - Losing the key means never updating the installed app again without uninstalling it, which deletes every meal. Keep a copy of the key file and its password somewhere safe besides this Mac.
+
+### Phase 2 progress
+
+Steps 1 to 3 of 4 are done and committed. Step 4 (location, place picker, rename and merge) is next, then the Phase 2 report.
+
+- **The camera is the first stage of the new-meal Meal screen**, not a separate destination. One ViewModel holds the photo, its metadata, and the draft. Back from the form returns to the tabs (decision 5). Replacing a photo opens the camera stage, and Back returns to the form.
+- **Favorite sits at the top**, as the Screens table says, though Quick logging lists it "below the price".
+- **The draft is Compose snapshot state, copied to saved state on each change.** A flow-based draft lost keystrokes when typing fast.
+- **Save** shows for a new meal, and for a saved meal once something changes. The number pad's Done saves a valid new meal. Deleting a new meal discards it with no undo bar. The undo window is 4 seconds.
+- **Camera permission** is asked when the camera stage opens, and again on later Adds while it is refused; Android limits how often. Refused, the stage shows "Camera access is off" with "Open settings", and gallery and Skip still work.
+- **Capture** aims for 2048 × 1536 at 4:3 with minimum latency. The form appears as soon as the capture file is written (under a second on the emulator), and resizing finishes in the app scope; Save waits for it.
+- **Processing.** `ImageDecoder` applies the EXIF rotation and reports the rotated size, which was checked with a sideways 3000 × 2000 photo. Photos are stored at up to 1600 px with a 400 px thumbnail, JPEG 85, and no metadata.
+- **The form crops the photo to 4:3**, so photo, price, and Save fit above the number pad.
+- **Gallery backfill** reads `DateTimeOriginal` (falling back to `DateTime`) and GPS with the framework `ExifInterface`. A photo without a date keeps the time Add was tapped.
+- **Photo Picker location.** The picker gets `MediaStore.EXTRA_REQUEST_LOCATION_METADATA_ACCESS = true`. The constant is behind a feature flag and missing from the public API 37 jar, so its documented value `"android.provider.extra.REQUEST_LOCATION_METADATA_ACCESS"` is used. For apps targeting above Android 16 it is the only control, so `ACCESS_MEDIA_LOCATION` is not needed. On the emulator (picker version 17), there was no location prompt and picking needs a Done tap. Whether location arrives on the phone is still unverified.
+- **Known nit.** The date picker starts weeks on Sunday, following the locale, while the app's weeks run Monday to Sunday.
+- **Saved meals can't be reopened from the UI** until the Journal arrives in Phase 3. Editing was tested with a throwaway build.
