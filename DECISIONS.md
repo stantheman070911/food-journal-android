@@ -91,7 +91,7 @@ The app does not use the phone's location (see "Places without phone location" b
 - **Font.** No family is named. The interface uses the system sans-serif (Roboto). Fraunces was added after Phase 1 for big numbers and headings (see Type below).
 - **Light and dark.** No switch is specified. The app follows the system setting.
 - **Number format.** "2,340" uses English grouping on every device, since the app is English only.
-- **App icon.** Not specified. Phase 1 uses a monochrome plate: two thin rings, white on black, with a themed-icon layer.
+- **App icon.** Not specified. Phase 1 used a monochrome plate: two thin rings, white on black. On Nov 4, 2026, the user chose a filmstrip instead: three white portrait tiles on black, rounded only at the strip's ends, like a week in the Journal. The same drawing is the themed-icon layer; its solid shapes hold up at small sizes better than thin rings.
 - **Test libraries.** Unit tests need JUnit 4. It is test-only and never ships in the app.
 
 ## Decisions
@@ -226,6 +226,32 @@ Requested on Nov 3, 2026, after the change above, for a clean start: saved place
 - **Meals are kept**, without a place. A meal open on the Meal screen loses the place too.
 - **Undo** brings the place back with its id and coordinates, and puts it back on its meals, except any given another place meanwhile. If a place with its name was created meanwhile, the meals join that one instead, which takes the coordinates if it has none. The open meal gets its place back if it has none.
 - **How the open meal follows an undo.** `UndoableEdits` announces each undo once its data is back, and the Meal screen follows that, for merges as well as deletions. It used to infer the undo from the place list showing the place gone and then back, which a quick undo could skip, leaving the meal on the survivor or without a place.
+
+## Phase 4: Spending
+
+Settled on Nov 4, 2026, before any Phase 4 code, all as recommended. These add to the Phase 4 rows of the Ambiguities table above.
+
+- **The switch.** Week, Month, and Year sit in a full-width segmented pill above the periods, after Retro's Recap screen: a grey track with the selected segment filled in ink. It stays put while the periods swipe beneath it.
+- **Swiping.** Back to the period of the earliest meal, forward to the current period. With no meals at all, the tab shows only "No meals", with no switch.
+- **Switching Week, Month, or Year** keeps the date in view: the new period is the one holding the shown period's last day, or today if that comes sooner. The tab opens on the current month at launch and keeps its selection while switching tabs. The selection is not kept across a cold start.
+- **"Today" is read again on resume.** If the current period was in view, the new current period comes into view. An older period stays put.
+- **Meals dated in the future,** such as later today, a camera with a wrong clock, or a flight west, count toward the period they fall in. Elapsed days still end at today. A meal in a later period than today's shows in the Journal but not in Spending.
+- **Period names.** Week "Nov 2 – 8", as in the Journal. Month "November", with the year only outside the current year: "November 2025". Year "2026". The name is set in the serif headline, the total in the serif display.
+- **Change line.** A whole percent with a true minus: "−12%", "+4%", "0%". Anything that rounds to zero shows "0%" with no sign, and halves round away from zero. Week: "vs last week" for the current week, "vs previous week" for older ones. Month: "vs Oct", and "vs Dec" in January, with no year. Year: "vs 2025".
+- **Unfinished periods** compare whole days counted from the start, so a year's comparison counts days from Jan 1 rather than matching dates, and Feb 29 never shifts it. The period's own total is the one shown, including any meal later today.
+- **Averages line.** "312 a day · 156 a meal", grey sans, each rounded to whole dollars, halves up.
+- **Bars.**
+  - Grey bars on a hairline baseline. A tap shows a small sans amount above the bar and turns it ink. A second tap clears it, and changing period resets it.
+  - Days with nothing spent can be tapped and show "0". Future days have no bar and can't be tapped.
+  - No y-axis. The axis labels are "M T W T F S S" for a week, "1 8 15 22 29" for a month, and month initials for a year.
+  - Each bar is one tap target the full height of the chart, and reads aloud as, for example, "Nov 12, 340".
+- **By place.** Not tappable until Phase 5, which opens Search. Each place shows its total, its visits ("4 visits", the number of its meals in the period), and a share bar. Other shows its total, its meals ("6 meals"), and a share bar, and is hidden only when it holds no meals.
+- **By time of day.** All four bands always show, with a total and a share bar.
+- **Share bars** are measured against the period total, so every bar is on one scale. They are empty when the total is 0. No percent text.
+- **Priciest.**
+  - Three tiles fill the row, in the Journal's tile style, and a tap opens the meal. Each tile shows its price in the lower left where the Journal shows the weekday, since the price is why it's there.
+  - Fewer tiles show when there are fewer meals. Meals priced 0 are left out, since they are not pricey, and the section is hidden when no meal costs anything.
+  - Ties go to the most recent meal.
 
 ## Design references: Retro
 
