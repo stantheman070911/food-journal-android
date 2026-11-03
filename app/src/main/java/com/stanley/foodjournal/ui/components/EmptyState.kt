@@ -17,7 +17,8 @@ private val ActionGap = 20.dp
  * One short line, and optionally one button below it.
  *
  * The line is always centered in the available space, with or without a button, so it sits at
- * the same height on every tab.
+ * the same height on every tab. Inside a scrolling container, where there is no height to center
+ * in, the line and button simply stack from the top.
  */
 @Composable
 fun EmptyState(
@@ -47,13 +48,23 @@ fun EmptyState(
         val loose = constraints.copy(minWidth = 0, minHeight = 0)
         val line = measurables[0].measure(loose)
         val action = measurables.getOrNull(1)?.measure(loose)
-        layout(constraints.maxWidth, constraints.maxHeight) {
-            val lineY = (constraints.maxHeight - line.height) / 2
-            line.place((constraints.maxWidth - line.width) / 2, lineY)
-            action?.place(
-                x = (constraints.maxWidth - action.width) / 2,
-                y = lineY + line.height + ActionGap.roundToPx(),
-            )
+        val gap = ActionGap.roundToPx()
+
+        val width = if (constraints.hasBoundedWidth) {
+            constraints.maxWidth
+        } else {
+            maxOf(line.width, action?.width ?: 0)
+        }
+        val height = if (constraints.hasBoundedHeight) {
+            constraints.maxHeight
+        } else {
+            line.height + (action?.let { gap + it.height } ?: 0)
+        }
+        val lineY = if (constraints.hasBoundedHeight) (height - line.height) / 2 else 0
+
+        layout(width, height) {
+            line.place((width - line.width) / 2, lineY)
+            action?.place(x = (width - action.width) / 2, y = lineY + line.height + gap)
         }
     }
 }

@@ -25,7 +25,7 @@ fun SpendingScreen(
     uiState: SpendingUiState,
     modifier: Modifier = Modifier,
 ) {
-    // A period with no meals shows one line and nothing else.
+    // No meal has been logged yet.
     if (!uiState.isLoading && uiState.isEmpty) {
         EmptyState(message = stringResource(R.string.empty_spending), modifier = modifier)
     }

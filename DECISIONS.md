@@ -38,7 +38,7 @@ The latest stable version of each library on Nov 3, 2026, from Google Maven and 
 | Lifecycle | 2.11.0 | Phase 1 |
 | Navigation Compose | 2.10.2 | Phase 1 |
 | Room | 2.8.5 | Phase 1 |
-| kotlinx.serialization | 1.12.0 | Phase 1 (routes), Phase 6 (backup) |
+| kotlinx.serialization | 1.12.0 | Core: Phase 1 (routes). JSON: Phase 6 (backup). |
 | CameraX | 1.6.2 | Phase 2 |
 | Coil 3 | 3.6.3 | Phase 2 |
 | Play Services Location | 21.4.0 | Phase 2 |
@@ -65,6 +65,7 @@ The latest stable version of each library on Nov 3, 2026, from Google Maven and 
 | Place-name matching | Trimmed, ignoring case. Typing an existing name picks that place. | 2 |
 | Coordinates after a merge | The surviving place keeps its own; it takes the other's only if it has none | 2 |
 | Largest price | Six digits (999,999) | 2 |
+| Gallery photo with no date (screenshots, images saved from LINE) | The time it is added, editable like any other | 2 |
 | Year in week headers | Shown only for weeks outside the current year: "Dec 29, 2025 – Jan 4" | 3 |
 | Weeks with no meals | Left out | 3 |
 | Tile order in a week | Monday to Sunday, left to right | 3 |
@@ -73,6 +74,7 @@ The latest stable version of each library on Nov 3, 2026, from Google Maven and 
 | Previous period with meals but a total of 0 | Change line omitted, as when it has no meals | 4 |
 | Unfinished period longer than the previous one | Compare up to the previous period's last day | 4 |
 | Swiping to future periods | Stops at the current period | 4 |
+| An empty period once other meals exist | Keeps the period switch and swiping, with "No meals" in place of the figures, so an empty month never strands you | 4 |
 | Ties in top places and priciest meals | Most recent first | 4 |
 | Search before typing | All meals, newest first, with their total | 5 |
 | What "original photos" means in the backup | The stored 1600 px photos. Camera originals are never kept. | 6 |
@@ -81,10 +83,10 @@ The latest stable version of each library on Nov 3, 2026, from Google Maven and 
 
 ### Gaps
 
-- **Speed of the 15-second target.** A first GPS fix can take several seconds. Phase 2 will show the Meal screen at once and fill the place when the fix arrives, never blocking Save.
-- **Approximate location.** If only approximate location is granted, a 150 m match is unreliable. Phase 2 will skip the prefill in that case.
+- **Speed of the 15-second target.** A first GPS fix can take several seconds. Phase 2 starts finding the location when the camera opens, shows the Meal screen at once, and fills the place when the fix arrives. It never blocks Save.
+- **Imprecise location.** A 150 m match needs a precise fix. Phase 2 skips the prefill whenever the fix is less accurate than about 100 m, which also covers approximate-only permission.
 - **Photo Picker location option.** The exact API, and whether it needs `ACCESS_MEDIA_LOCATION`, must be confirmed in Phase 2 before anything is added.
-- **Orphaned photos.** If the app is killed while an undo bar is open, the photo is never deleted. Phase 2 will remove unreferenced photos on start.
+- **Orphaned files.** If the app is killed mid-flow, photos and empty places can be left behind. See the Phase 2 plan for how they are cleaned up without touching unsaved work.
 - **Font.** No family is named. The interface uses the system sans-serif (Roboto). Fraunces was added after Phase 1 for big numbers and headings (see Type below).
 - **Light and dark.** No switch is specified. The app follows the system setting.
 - **Number format.** "2,340" uses English grouping on every device, since the app is English only.
@@ -113,6 +115,9 @@ The latest stable version of each library on Nov 3, 2026, from Google Maven and 
 - **Version catalog** declares the whole stack. The app module only uses what each phase needs.
 - **Typography.** The Material 3 type scale. The sans-serif styles use tabular figures, so prices line up wherever they appear. Changed after Phase 1; see Type below.
 - **Window and splash** backgrounds are white, or black in dark, so there is no colored flash at launch.
+- **Dark theme parent.** In dark mode the window theme has a dark parent, so Android knows the app is already dark. On the Android 17 emulator, force-dark had no visible effect with or without it, so this is a safeguard.
+- **Android Studio files** (`.idea/`) are not committed. Studio regenerates them from Gradle.
+- **Empty states inside scrolling content** stack from the top instead of centering, so they can never crash for want of a height.
 
 ### Type: Fraunces for big numbers and headings
 
@@ -130,3 +135,56 @@ Requested on Nov 3, 2026, after Phase 1. This overrides "One sans-serif family" 
 - **Latin only.** Fraunces has no Chinese characters. Headings are dates and month names, so this doesn't come up. Any Chinese text in a Fraunces style falls back to the system font.
 - **File.** The Google Fonts build of the variable font, `Fraunces[SOFT,WONK,opsz,wght].ttf`: 360 KB, SHA-256 `177ff6c0f14e5550a3c624247cd1189611d4eb65d000b14944c63d967958abbb`. It is bundled as `app/src/main/res/font/fraunces.ttf`, so nothing is downloaded when the app runs. Its license, the SIL Open Font License 1.1, is in `licenses/Fraunces-OFL.txt`.
 - **Preview.** `ui/preview/TypePreview.kt` shows the styles together, in light and dark. The axis settings were checked on the API 37 emulator.
+
+## Phase 2 plan
+
+Settled after the Phase 1 review, before any Phase 2 code.
+
+### Photos
+
+- One class owns every photo file. There are three folders in the app's private storage: `photos/` (1600 px), `thumbs/` (400 px tiles), and `pending/` (taken or picked, not yet saved).
+- Every photo gets a random file name. Replacing a photo writes a new file under a new name, so the image loader can never show a stale cached copy.
+- A new photo lands in `pending/` and moves to `photos/` only when its meal is saved. Discarding a new meal deletes its pending photo.
+- The startup sweep removes files in `photos/` and `thumbs/` that no meal references. It leaves recent files in `pending/` alone, so a Meal screen restored after Android closed the app keeps its photo. Pending files older than seven days are removed.
+
+### Delete and undo
+
+- Undo lives at app level, in the app container, so it keeps running after the Meal screen closes.
+- Deleting a meal removes its row at once. Its photo, and any place left with no meals, stay until the undo bar closes.
+- Undo puts the same meal row back with its original id. Its place still exists, so the foreign key holds.
+- When the bar closes, the photo is deleted and empty places are removed. If the app is killed with a bar open, the startup sweep finishes the job.
+- Undoing a merge recreates the merged-away place under its original id and moves its meals back. The bar keeps both until it closes.
+
+### Places
+
+- One function cleans every place name before it is saved or compared. It applies Unicode NFKC, which turns full-width letters into plain ones, trims the ends, and collapses runs of spaces. Comparison ignores case in Kotlin, so `Café` and `CAFÉ` match. The database's case-insensitive unique index stays as a backstop.
+- A rename checks for the name among the other places only, so changing only the capitalization never merges a place with itself.
+- Empty places are found with `NOT EXISTS (SELECT 1 FROM meal WHERE meal.placeId = place.id)`. `NOT IN` matches nothing once any meal has no place.
+
+### Location
+
+- Precise and approximate location are requested together, as Android requires, on the first Add.
+- Finding the location starts when the camera opens, so it is usually ready by the Meal screen.
+- The 150 m prefill is skipped when the fix is less accurate than about 100 m.
+
+### Gallery
+
+- Date and time come from the photo's metadata, read with Android's built-in `ExifInterface`. No library is needed.
+- Before using the Photo Picker's location option, confirm whether it needs `ACCESS_MEDIA_LOCATION`. If it does, ask first, since the document doesn't name that permission.
+
+### Opening Search with a place (Phase 5)
+
+- The Search route takes an optional place. The Meal and Spending screens pass the place explicitly, so the tab's saved state can never bring back an older search in its place.
+
+### Decisions waiting on you
+
+| # | Question | Recommendation |
+| --- | --- | --- |
+| 1 | Signing | One personal key, kept outside the repo and backed up, signs both debug and release builds. You create it; Gradle reads it from outside the repo. Daily use and timing the 15-second target happen on release builds. Must be settled before the first real meal. |
+| 2 | Tapping the place on the Meal screen | Opens the place picker. A "Meals here" row at its top opens Search. |
+| 3 | Back after editing a saved meal | Saves automatically if the meal is still valid. Otherwise the last saved version stays. |
+| 4 | Which place survives a rename that merges | The existing one |
+| 5 | Back from the Meal screen after the camera | Returns to the tabs, not the camera |
+| 6 | Location provider | Android's built-in fused provider: no dependency, and on a Pixel it uses the same location source as Play services |
+| 7 | Database tests | AndroidX Test, test-only, run on the emulator |
+| 8 | Size of Phase 2 | Four steps, each committed: data layer and tests, Meal form, camera and gallery and photos, location and places. One report at the end. |

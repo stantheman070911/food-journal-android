@@ -1,0 +1,10 @@
+<resources>
+    <!--
+        A dark parent in dark mode tells Android the app is already dark, so system options that
+        force-darken light apps leave it alone.
+    -->
+    <style name="Theme.FoodJournal" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+        <item name="android:windowSplashScreenBackground">@color/window_background</item>
+    </style>
+</resources>

@@ -49,7 +49,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.room.runtime)
-    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.kotlinx.serialization.core)
     ksp(libs.androidx.room.compiler)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
