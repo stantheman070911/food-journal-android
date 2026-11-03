@@ -151,7 +151,7 @@ From the review of commit `02e208e`, fixed on Nov 3, 2026, in the order given.
    - Photo processing catches every error, including running out of memory, and removes half-written files.
    - Undoing a merge, when a place with the old name was created during the undo window, moves the meals to that place instead of failing on the unique name.
 5. **Leftover pending files.** A capture that lands after the screen closed is deleted. So is a photo replaced while it was still being resized, and a pending fallback when a new meal is discarded.
-6. **Device tests never touch the phone.** `connected…AndroidTest` tasks refuse to run unless `ANDROID_SERIAL` names an emulator, before anything is installed. Run them as `ANDROID_SERIAL=emulator-5560 ./gradlew :app:connectedDebugAndroidTest`.
+6. **Device tests never touch the phone.** `connected…AndroidTest` tasks refuse to run unless `ANDROID_SERIAL` names an emulator, before anything is installed. Run them as `ANDROID_SERIAL=emulator-5560 ./gradlew :app:connectedDebugAndroidTest`. Since the Phase 3 review, the whole value must be one emulator serial: a comma-separated list such as `emulator-5560,<phone>` is refused, since it would reach the phone too.
 7. **Deviations.**
    - **The photo shows at 3:4**, the camera's frame, so none of the shot is cut away. With the number pad up, the form scrolls so the price and Save stay above it; the photo's top scrolls out of view while typing.
    - **The price field's ✓ always closes the keyboard**, and still saves a new meal that is ready.

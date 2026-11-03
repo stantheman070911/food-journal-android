@@ -70,12 +70,14 @@ room {
 }
 
 // Device tests install the app on every connected device and uninstall it afterwards, which
-// would delete real meals on the phone. They run only when ANDROID_SERIAL names an emulator:
+// would delete real meals on the phone. They run only when ANDROID_SERIAL names one emulator:
 //   ANDROID_SERIAL=emulator-5560 ./gradlew :app:connectedDebugAndroidTest
+// The whole value must match, since a comma-separated list such as "emulator-5560,<phone>"
+// would also reach the phone.
 tasks.matching { it.name.startsWith("connected") && it.name.endsWith("AndroidTest") }.configureEach {
     doFirst {
         val serial = System.getenv("ANDROID_SERIAL").orEmpty()
-        check(serial.startsWith("emulator-")) {
+        check(Regex("emulator-\\d+").matches(serial)) {
             "Device tests run only on an emulator. Set ANDROID_SERIAL, e.g. ANDROID_SERIAL=emulator-5560."
         }
     }
