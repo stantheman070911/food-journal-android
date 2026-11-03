@@ -9,6 +9,7 @@ import com.stanley.foodjournal.data.PlaceDao
 import com.stanley.foodjournal.edits.UndoableEdits
 import com.stanley.foodjournal.photos.PhotoProcessor
 import com.stanley.foodjournal.photos.PhotoStore
+import com.stanley.foodjournal.recap.RecapImages
 import com.stanley.foodjournal.settings.AppSettings
 import com.stanley.foodjournal.settings.ThemeChoice
 import com.stanley.foodjournal.settings.applyNightMode
@@ -40,6 +41,9 @@ class AppContainer(context: Context) {
     val photoStore = PhotoStore(context.filesDir)
 
     val photoProcessor = PhotoProcessor(photoStore, context.contentResolver)
+
+    /** Draws the Spending tab's recap images. */
+    val recaps = RecapImages(context, photoStore)
 
     val edits: UndoableEdits by lazy { UndoableEdits(mealDao, placeDao, photoStore, appScope) }
 

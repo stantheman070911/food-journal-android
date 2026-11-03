@@ -1,5 +1,6 @@
 package com.stanley.foodjournal.ui.spending
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -24,17 +25,26 @@ import com.stanley.foodjournal.logic.formatPrice
 import com.stanley.foodjournal.logic.periodOf
 import com.stanley.foodjournal.logic.periodSpending
 import com.stanley.foodjournal.logic.periodsThrough
+import com.stanley.foodjournal.logic.recapMeals
+import com.stanley.foodjournal.logic.recapText
 import com.stanley.foodjournal.photos.PhotoStore
+import com.stanley.foodjournal.recap.RecapDrawing
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import java.io.File
 import java.time.LocalDate
 
@@ -102,6 +112,8 @@ data class SpendingUiState(
     val kind: PeriodKind = PeriodKind.Month,
     val pages: List<SpendingPage> = emptyList(),
     val selectedIndex: Int = 0,
+    /** The period whose recap is being drawn, if any. Its Share button waits meanwhile. */
+    val recapping: Period? = null,
 ) {
     val isEmpty: Boolean get() = !isLoading && pages.isEmpty()
 }
@@ -116,13 +128,19 @@ private data class Pages(val kind: PeriodKind, val pages: List<SpendingPage>)
  * on [refreshToday], so a tab left open overnight moves on to the new day.
  */
 class SpendingViewModel(
-    mealDao: MealDao,
+    private val mealDao: MealDao,
     placeDao: PlaceDao,
     private val photos: PhotoStore,
+    private val recapDrawing: RecapDrawing,
     private val clock: () -> LocalDate = LocalDate::now,
 ) : ViewModel() {
     private val today = MutableStateFlow(clock())
     private val selection = MutableStateFlow(Selection(PeriodKind.Month, today.value))
+    private val recapping = MutableStateFlow<Period?>(null)
+    private val recapFiles = Channel<File>(Channel.BUFFERED)
+
+    /** Each recap image once it is drawn, for the screen to hand to the share sheet. */
+    val recaps: Flow<File> = recapFiles.receiveAsFlow()
 
     private val pages = combine(
         mealDao.observeAll(),
@@ -132,14 +150,39 @@ class SpendingViewModel(
     ) { meals, places, today, kind -> Pages(kind, pages(meals, places, today, kind)) }
         .flowOn(Dispatchers.Default)
 
-    val uiState: StateFlow<SpendingUiState> = combine(pages, selection) { built, selection ->
+    val uiState: StateFlow<SpendingUiState> = combine(pages, selection, recapping) { built, selection, recapping ->
         SpendingUiState(
             isLoading = false,
             kind = built.kind,
             pages = built.pages,
             selectedIndex = indexOf(periodOf(built.kind, selection.anchor), built.pages),
+            recapping = recapping,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SpendingUiState())
+
+    /**
+     * Draws the recap of [period]: a collage of its meals, favorites first past the cap, above the
+     * period, its figures, and the change from the period before. One recap at a time. A recap
+     * that can't be drawn is logged, and the button simply comes back.
+     */
+    fun shareRecap(period: Period, dark: Boolean) {
+        if (!recapping.compareAndSet(null, period)) return
+        viewModelScope.launch {
+            try {
+                val meals = mealDao.observeAll().first()
+                val previous = period.plus(-1)
+                val inPeriod = meals.filter { it.eatenAt.toLocalDate() in period }
+                val text = recapText(period, inPeriod, meals.filter { it.eatenAt.toLocalDate() in previous }, today.value)
+                recapFiles.send(recapDrawing.draw(recapMeals(inPeriod), text, dark))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Recap failed", e)
+            } finally {
+                recapping.value = null
+            }
+        }
+    }
 
     /**
      * Shows periods of [kind], starting with the one holding the last day of the period in view,
@@ -223,7 +266,7 @@ class SpendingViewModel(
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
-                SpendingViewModel(appContainer.mealDao, appContainer.placeDao, appContainer.photoStore)
+                SpendingViewModel(appContainer.mealDao, appContainer.placeDao, appContainer.photoStore, appContainer.recaps)
             }
         }
     }
@@ -239,3 +282,5 @@ private fun indexOf(period: Period, pages: List<SpendingPage>): Int {
         else -> pages.lastIndex
     }
 }
+
+private const val TAG = "FoodJournal"

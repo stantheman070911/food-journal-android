@@ -233,7 +233,7 @@ class SpendingViewModelTest {
 
     private suspend fun viewModel(): SpendingViewModel {
         val factory = viewModelFactory {
-            initializer { SpendingViewModel(db.mealDao(), db.placeDao(), photos, clock = { today }) }
+            initializer { SpendingViewModel(db.mealDao(), db.placeDao(), photos, recapDrawing = { _, _, _ -> File("/spending-test/recap.png") }, clock = { today }) }
         }
         return withContext(Dispatchers.Main) {
             ViewModelProvider.create(store, factory)["spending-${System.nanoTime()}", SpendingViewModel::class]

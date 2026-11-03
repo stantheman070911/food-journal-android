@@ -98,6 +98,9 @@
     <string name="spending_by_time">By time of day</string>
     <string name="spending_priciest">Priciest</string>
     <string name="spending_other">Other</string>
+    <string name="recap_share">Share</string>
+    <string name="recap_making">Making…</string>
+    <string name="recap_share_label">Share a recap of %1$s</string>
     <string name="spending_show_amount">Show amount</string>
     <string name="spending_show_meals">Show meals</string>
     <string name="spending_morning">Morning</string>

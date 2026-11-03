@@ -159,12 +159,20 @@ fun periodSpending(
  * is compared with the same number of days from the start of the previous one, or all of it when
  * that is shorter. Null when the compared days have no meals or cost nothing.
  */
-private fun change(period: Period, total: Int, previousMeals: List<Meal>, today: LocalDate): Int? {
+private fun change(period: Period, total: Int, previousMeals: List<Meal>, today: LocalDate): Int? =
+    comparedTotal(period, previousMeals, today)?.let { before -> percentChange(total, before) }
+
+/**
+ * What [previousMeals], the period before [period], cost over the days [period] is compared
+ * with, by the rules of [change]. Null when those days have no meals or cost nothing, so no
+ * comparison is shown.
+ */
+fun comparedTotal(period: Period, previousMeals: List<Meal>, today: LocalDate): Int? {
     val previous = period.plus(-1)
     val compared = if (today > period.end) previous.days else minOf(elapsedDays(period, today), previous.days)
     val cutoff = previous.start.plusDays(compared.toLong())
     val before = previousMeals.filter { it.eatenAt.toLocalDate() < cutoff }.sumOf { it.price }
-    return if (before == 0) null else percentChange(total, before)
+    return before.takeIf { it != 0 }
 }
 
 /**

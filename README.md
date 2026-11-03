@@ -4,7 +4,7 @@
 
 A quiet Android app for remembering what you ate, where you ate it, and what it cost. Take a photo, type the price, and save. Logging a meal is meant to take under 15 seconds, and looking back is one week at a time.
 
-It's a diary, not a diet tracker. There are no calories, goals, streaks, or scores, and nothing leaves your phone unless you export a backup yourself.
+It's a diary, not a diet tracker. There are no calories, goals, streaks, or scores, and nothing leaves your phone unless you export a backup or share a recap yourself.
 
 > **Version 1.00.01** · Android 16 or later · English interface · Prices in New Taiwan dollars (NTD)
 
@@ -51,6 +51,12 @@ It's a diary, not a diet tracker. There are no calories, goals, streaks, or scor
 - Importing checks the whole file before anything changes, asks before replacing your meals, then replaces them in one step. If an import fails, your meals stay as they were.
 - A quiet reminder appears on the Journal once your last backup is over 30 days old.
 
+### Share a recap
+
+- Tap Share in Spending to turn the week, month, or year in view into one image: a collage of every meal in it, with the period, the number of meals and places, the total, and how it compares with the period before.
+- The image is a high-resolution PNG, sized for Instagram Stories, and goes to Android's share sheet, so you can post it, send it to a friend, or save it.
+- Meals without a photo appear as plain tiles with their name, as in the Journal.
+
 ### Design
 
 - Black, white, and greys only, so the food photos are the only color.
@@ -76,7 +82,7 @@ The app needs Android 16 or later. It was built and tested on a Pixel 8a with An
 
 ## Out of scope
 
-Calories, nutrition, diet goals, social sharing, multiple currencies, maps, and cloud sync. The app stays small on purpose.
+Calories, nutrition, diet goals, social feeds, multiple currencies, maps, and cloud sync. The app stays small on purpose.
 
 ## For developers
 

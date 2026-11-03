@@ -1,6 +1,13 @@
 package com.stanley.foodjournal.ui.spending
 
 import androidx.compose.animation.core.tween
+import com.stanley.foodjournal.recap.shareRecap
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -76,6 +83,10 @@ fun SpendingScreen(
     viewModel: SpendingViewModel = viewModel(factory = SpendingViewModel.Factory),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    LaunchedEffect(viewModel) { viewModel.recaps.collect { context.shareRecap(it) } }
+    // The recap's band follows the app's theme: white in light, black in dark.
+    val dark = isSystemInDarkTheme()
     // A tab left open overnight moves on to the new day.
     LifecycleResumeEffect(Unit) {
         viewModel.refreshToday()
@@ -87,6 +98,7 @@ fun SpendingScreen(
         onShowPeriod = viewModel::showPeriod,
         onOpenMeal = onOpenMeal,
         onOpenPlace = onOpenPlace,
+        onShareRecap = { viewModel.shareRecap(it, dark) },
         modifier = modifier,
     )
 }
@@ -104,6 +116,7 @@ fun SpendingScreen(
     onOpenMeal: (Long) -> Unit,
     modifier: Modifier = Modifier,
     onOpenPlace: (placeId: Long, from: LocalDate, to: LocalDate) -> Unit = { _, _, _ -> },
+    onShareRecap: (Period) -> Unit = {},
 ) {
     when {
         // No meal has been logged yet.
@@ -117,6 +130,7 @@ fun SpendingScreen(
                     onShowPeriod = onShowPeriod,
                     onOpenMeal = onOpenMeal,
                     onOpenPlace = onOpenPlace,
+                    onShareRecap = onShareRecap,
                 )
             }
         }
@@ -149,6 +163,7 @@ private fun PeriodPager(
     onShowPeriod: (Period) -> Unit,
     onOpenMeal: (Long) -> Unit,
     onOpenPlace: (placeId: Long, from: LocalDate, to: LocalDate) -> Unit,
+    onShareRecap: (Period) -> Unit,
 ) {
     val pages = uiState.pages
     val currentPages by rememberUpdatedState(pages)
@@ -170,7 +185,15 @@ private fun PeriodPager(
         verticalAlignment = Alignment.Top,
         modifier = Modifier.fillMaxSize(),
     ) { index ->
-        PeriodPage(page = pages[index], onOpenMeal = onOpenMeal, onOpenPlace = onOpenPlace)
+        val page = pages[index]
+        PeriodPage(
+            page = page,
+            onOpenMeal = onOpenMeal,
+            onOpenPlace = onOpenPlace,
+            recapping = uiState.recapping == page.period,
+            canRecap = uiState.recapping == null,
+            onShareRecap = { onShareRecap(page.period) },
+        )
     }
 }
 
@@ -179,6 +202,9 @@ private fun PeriodPage(
     page: SpendingPage,
     onOpenMeal: (Long) -> Unit,
     onOpenPlace: (placeId: Long, from: LocalDate, to: LocalDate) -> Unit,
+    recapping: Boolean = false,
+    canRecap: Boolean = true,
+    onShareRecap: () -> Unit = {},
 ) {
     val figures = page.figures
     if (figures == null) {
@@ -197,12 +223,23 @@ private fun PeriodPage(
             // Room below the last section for the Add button.
             .padding(bottom = 96.dp),
     ) {
-        PeriodName(page.name)
-        Text(
-            text = figures.total,
-            style = MaterialTheme.typography.displayLarge,
-            modifier = Modifier.padding(horizontal = 16.dp),
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                PeriodName(page.name)
+                Text(
+                    text = figures.total,
+                    style = MaterialTheme.typography.displayLarge,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+            }
+            ShareRecapButton(
+                recapping = recapping,
+                enabled = canRecap,
+                periodName = page.name,
+                onClick = onShareRecap,
+                modifier = Modifier.padding(top = 16.dp, end = 16.dp),
+            )
+        }
         figures.change?.let { change ->
             Text(
                 text = change.text(),
@@ -253,6 +290,43 @@ private fun PeriodPage(
         }
     }
 }
+
+/**
+ * "Share", a small outlined pill that makes a recap image of the period and opens the share
+ * sheet. It reads "Making…" while the image is drawn, and waits while another recap is.
+ */
+@Composable
+private fun ShareRecapButton(
+    recapping: Boolean,
+    enabled: Boolean,
+    periodName: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = MaterialTheme.colorScheme
+    val description = stringResource(R.string.recap_share_label, periodName)
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        shape = CircleShape,
+        border = BorderStroke(1.dp, if (enabled || recapping) colors.onSurface else colors.outline),
+        colors = ButtonDefaults.outlinedButtonColors(
+            contentColor = colors.onSurface,
+            disabledContentColor = if (recapping) colors.onSurface else colors.outline,
+        ),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        modifier = modifier
+            .height(ShareHeight)
+            .semantics { contentDescription = description },
+    ) {
+        Text(
+            text = stringResource(if (recapping) R.string.recap_making else R.string.recap_share),
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+        )
+    }
+}
+
+private val ShareHeight = 36.dp
 
 @Composable
 private fun PeriodName(name: String) {
