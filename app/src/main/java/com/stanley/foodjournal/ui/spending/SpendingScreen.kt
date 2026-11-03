@@ -17,7 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -61,6 +61,7 @@ import com.stanley.foodjournal.logic.ComparedWith
 import com.stanley.foodjournal.logic.Period
 import com.stanley.foodjournal.logic.PeriodKind
 import com.stanley.foodjournal.logic.TimeBand
+import com.stanley.foodjournal.logic.formatPrice
 import com.stanley.foodjournal.ui.components.EmptyState
 import com.stanley.foodjournal.ui.components.MealTile
 import com.stanley.foodjournal.ui.components.MealTileGap
@@ -163,6 +164,10 @@ private fun PeriodSwitch(selected: PeriodKind, onSelect: (PeriodKind) -> Unit) {
 /**
  * The periods, oldest first, opening on [SpendingUiState.selectedIndex]. The period swiped to is
  * reported back, and the pager follows when the view model moves on, as it does after midnight.
+ *
+ * The pager's page is not saved. The view model holds the selection, so a page restored on its
+ * own, after Android closed the app or while another tab was showing, could disagree with it and
+ * be reported as one swiped to.
  */
 @Composable
 private fun PeriodPager(
@@ -171,8 +176,8 @@ private fun PeriodPager(
     onOpenMeal: (Long) -> Unit,
 ) {
     val pages = uiState.pages
-    val pager = rememberPagerState(initialPage = uiState.selectedIndex) { pages.size }
     val currentPages by rememberUpdatedState(pages)
+    val pager = remember { PagerState(currentPage = uiState.selectedIndex) { currentPages.size } }
     val currentOnShowPeriod by rememberUpdatedState(onShowPeriod)
     LaunchedEffect(pager) {
         snapshotFlow { pager.settledPage }.collect { page ->
@@ -242,14 +247,14 @@ private fun PeriodPage(page: SpendingPage, onOpenMeal: (Long) -> Unit) {
             figures.places.forEach { place ->
                 ShareLine(
                     name = place.name,
-                    detail = pluralStringResource(R.plurals.spending_visits, place.visits, place.visits),
+                    detail = pluralStringResource(R.plurals.spending_visits, place.visits, formatPrice(place.visits)),
                     row = place.row,
                 )
             }
             figures.other?.let { other ->
                 ShareLine(
                     name = stringResource(R.string.spending_other),
-                    detail = pluralStringResource(R.plurals.spending_meals, other.meals, other.meals),
+                    detail = pluralStringResource(R.plurals.spending_meals, other.meals, formatPrice(other.meals)),
                     row = other.row,
                 )
             }
@@ -303,6 +308,9 @@ private fun Section(title: String, content: @Composable () -> Unit) {
  * Grey bars on a hairline baseline, scaled to the period's dearest bar. Tapping a bar turns it
  * ink and shows its amount above it; a second tap clears it. Each bar is a tap target the full
  * height of the chart. Future bars are empty and can't be tapped.
+ *
+ * The room above the bars and below the baseline is measured from the label text, so the amount
+ * and the axis stay inside the chart at any font size.
  */
 @Composable
 private fun BarChart(bars: List<ChartBar>) {
@@ -321,8 +329,10 @@ private fun BarChart(bars: List<ChartBar>) {
         Canvas(Modifier.matchParentSize()) {
             val slot = size.width / bars.size
             val barWidth = minOf(slot * BarFill, MaxBarWidth.toPx())
-            val baseline = size.height - AxisRoom.toPx()
-            val room = baseline - AmountRoom.toPx()
+            val amountRoom = measurer.measure("0", amountStyle).size.height + AmountGap.toPx()
+            val axisRoom = measurer.measure("0", axisStyle).size.height + AxisGap.toPx()
+            val baseline = size.height - axisRoom
+            val room = baseline - amountRoom
             val corner = CornerRadius(minOf(barWidth / 2, BarCorner.toPx()))
             fun heightOf(bar: ChartBar) =
                 if (bar.amount == 0) 0f else maxOf(room * bar.amount / max, MinBarHeight.toPx())
@@ -361,12 +371,18 @@ private fun BarChart(bars: List<ChartBar>) {
                 val target = Modifier
                     .weight(1f)
                     .fillMaxHeight()
+                val showAmount = stringResource(R.string.spending_show_amount)
                 Box(
                     if (bar.isFuture) {
                         target.clearAndSetSemantics {}
                     } else {
                         target
-                            .clickable(interactionSource = null, indication = null) {
+                            .clickable(
+                                interactionSource = null,
+                                indication = null,
+                                onClickLabel = showAmount,
+                                role = Role.Button,
+                            ) {
                                 selected = if (selected == index) null else index
                             }
                             .semantics {
@@ -472,9 +488,7 @@ private val TimeBand.label: Int
 private const val SWITCH_FADE_MILLIS = 150
 
 private val ChartHeight = 180.dp
-private val AmountRoom = 24.dp
 private val AmountGap = 4.dp
-private val AxisRoom = 20.dp
 private val AxisGap = 4.dp
 private val MaxBarWidth = 28.dp
 private val MinBarHeight = 2.dp

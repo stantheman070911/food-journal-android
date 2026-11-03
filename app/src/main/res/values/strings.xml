@@ -59,17 +59,18 @@
     <string name="spending_by_time">By time of day</string>
     <string name="spending_priciest">Priciest</string>
     <string name="spending_other">Other</string>
+    <string name="spending_show_amount">Show amount</string>
     <string name="spending_morning">Morning</string>
     <string name="spending_midday">Midday</string>
     <string name="spending_evening">Evening</string>
     <string name="spending_late">Late</string>
     <plurals name="spending_visits">
-        <item quantity="one">%d visit</item>
-        <item quantity="other">%d visits</item>
+        <item quantity="one">%1$s visit</item>
+        <item quantity="other">%1$s visits</item>
     </plurals>
     <plurals name="spending_meals">
-        <item quantity="one">%d meal</item>
-        <item quantity="other">%d meals</item>
+        <item quantity="one">%1$s meal</item>
+        <item quantity="other">%1$s meals</item>
     </plurals>
 
     <string name="empty_journal">No meals yet</string>

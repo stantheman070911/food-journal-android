@@ -108,6 +108,43 @@ class SpendingViewModelTest {
     }
 
     @Test
+    fun switchingKindUsesThePeriodShownWhenTheChosenOneIsGone() = runBlocking {
+        val september = db.mealDao().insert(meal(LocalDateTime.of(2026, 9, 10, 12, 0)))
+        db.mealDao().insert(meal(LocalDateTime.of(2026, 10, 5, 12, 0)))
+        val vm = viewModel()
+        vm.state { it.pages.size == 3 }
+        withContext(Dispatchers.Main) { vm.showPeriod(Period(PeriodKind.Month, LocalDate.of(2026, 9, 1))) }
+        vm.state { it.selectedIndex == 0 }
+
+        // September's only meal goes, so October is the first period and the one shown.
+        db.mealDao().delete(db.mealDao().get(september)!!)
+        val shown = vm.state { it.pages.size == 2 }
+        assertEquals("October", shown.pages[shown.selectedIndex].name)
+
+        withContext(Dispatchers.Main) { vm.selectKind(PeriodKind.Week) }
+
+        // October's last day, not September's.
+        val weeks = vm.state { it.kind == PeriodKind.Week }
+        assertEquals("Oct 26 – Nov 1", weeks.pages[weeks.selectedIndex].name)
+    }
+
+    @Test
+    fun aSwipeReportedForTheOldKindIsIgnored() = runBlocking {
+        db.mealDao().insert(meal(LocalDateTime.of(2026, 9, 20, 12, 0)))
+        val vm = viewModel()
+        vm.state { it.pages.isNotEmpty() }
+
+        withContext(Dispatchers.Main) {
+            vm.selectKind(PeriodKind.Week)
+            // The month pager settles once more before the week pager replaces it.
+            vm.showPeriod(Period(PeriodKind.Month, LocalDate.of(2026, 9, 1)))
+        }
+
+        val weeks = vm.state { it.kind == PeriodKind.Week }
+        assertEquals("Nov 2 – 8", weeks.pages[weeks.selectedIndex].name)
+    }
+
+    @Test
     fun switchingFromTheCurrentPeriodLandsOnToday() = runBlocking {
         db.mealDao().insert(meal(LocalDateTime.of(2026, 9, 20, 12, 0)))
         val vm = viewModel()

@@ -262,6 +262,18 @@ Settled on Nov 4, 2026, before any Phase 4 code, all as recommended. These add t
 - **Swiping** uses Compose Foundation's `HorizontalPager`, keyed by period, so a backfilled older meal doesn't shift the period in view.
 - **Checked on the emulator** with seeded meals, in light and dark: each kind, swiping, switching kinds mid-browse, a tapped bar, an empty week, and a Priciest tile opening its meal.
 
+**Review fixes**, from an independent review of `af5bc77`, made on Nov 4, 2026.
+
+1. **The pager's page is no longer saved.** The view model holds the selection. A page restored on its own, after Android closed the app in the background, could disagree with it and be reported as one swiped to. The tab now always opens on the view model's period: the current month after Android closes the app, and the period you were on after a tab switch. Both were checked on the emulator.
+2. **A period's last day is still unfinished.** On Nov 30, November is compared with Oct 1 – 30, not all of October. All of October counts from Dec 1. The product document says "the same number of days" for an unfinished period, and its last day is not yet over.
+3. **Future bars carry no amount,** so a meal dated later, such as one from a camera with a wrong clock, no longer sets the chart's scale and shrinks the bars that show.
+4. **Visit and meal counts are grouped,** as every other number: "1,043 meals".
+5. **The percent can't overflow.** A change too large for an Int, from a tiny previous total, is held at the largest one. Only absurd totals reach it.
+6. **The chart measures its labels,** so at large font sizes the tapped amount and the axis stay inside the chart, and the bars give up the room. Checked at twice the default size.
+7. **Bars say what a tap does:** "Show amount", as a button. Each month bar is still only about 12 dp wide, one target per bar as settled; the slots cover the chart with no gaps, so every tap lands on a bar.
+
+**Left open:** one stray old date, such as a camera's default of 1980, would add thousands of empty weeks to swipe through. That is a product question for later, not a bug.
+
 ## Design references: Retro
 
 Added on Nov 3, 2026, during the Phase 2 review. Screenshots of [Retro](https://retro.app/), the weekly photo journal the product document already names, are in `UI inspo(retro-screenshots)/`. They are a standing visual reference for every phase. Ideas are adapted to Food Journal's monochrome, photo-first identity, never copied: no Retro branding, art, or layouts are reproduced, and nothing they show is added unless the product document names it.

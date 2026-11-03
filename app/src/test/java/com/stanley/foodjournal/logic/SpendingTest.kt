@@ -127,6 +127,20 @@ class SpendingTest {
     }
 
     @Test
+    fun `a period's last day still compares the same number of days`() {
+        // October's last day falls outside November's 30.
+        val previous = listOf(meal(1, day(10, 5), 1_000), meal(2, day(10, 31), 1_000))
+        val now = listOf(meal(3, day(11, 2), 1_000))
+
+        fun changeOn(date: LocalDate) = periodSpending(november, now, previous, date, emptySet())!!.change
+
+        assertEquals(0, changeOn(LocalDate.of(2026, 11, 29)))
+        assertEquals(0, changeOn(LocalDate.of(2026, 11, 30)))
+        // Once November is over, all of October counts.
+        assertEquals(-50, changeOn(LocalDate.of(2026, 12, 1)))
+    }
+
+    @Test
     fun `a year compares days counted from Jan 1, so Feb 29 shifts nothing`() {
         val year = Period(PeriodKind.Year, LocalDate.of(2029, 1, 1))
         // In 2028, day 60 is Feb 29, so Mar 1 is day 61 and falls outside.
@@ -169,6 +183,12 @@ class SpendingTest {
     }
 
     @Test
+    fun `a change too large for an Int is held at the largest`() {
+        assertEquals(Int.MAX_VALUE, percentChange(21_999_978, 1))
+        assertEquals(-100, percentChange(0, Int.MAX_VALUE))
+    }
+
+    @Test
     fun `changes show a sign, with a true minus`() {
         assertEquals("−12%", formatChange(-12))
         assertEquals("+4%", formatChange(4))
@@ -189,15 +209,28 @@ class SpendingTest {
 
     @Test
     fun `a week has seven bars and a year twelve`() {
-        val week = spend(periodOf(PeriodKind.Week, today), listOf(meal(1, day(11, 8), 100)))
+        val week = spend(periodOf(PeriodKind.Week, today), listOf(meal(1, day(11, 3), 100)))
         assertEquals(7, week.bars.size)
-        assertEquals(100, week.bars[6].amount)
+        assertEquals(100, week.bars[1].amount)
 
         val year = spend(periodOf(PeriodKind.Year, today), listOf(meal(1, day(10, 3), 300), meal(2, day(10, 30), 200)))
         assertEquals(12, year.bars.size)
         assertEquals(500, year.bars[9].amount)
         assertFalse(year.bars[10].isFuture)
         assertTrue(year.bars[11].isFuture)
+    }
+
+    @Test
+    fun `a meal dated later has no bar, so it never sets the chart's scale`() {
+        val spending = spend(november, listOf(meal(1, day(11, 2), 100), meal(2, day(11, 20), 5_000)))
+
+        assertEquals(100, spending.bars.maxOf { it.amount })
+        assertEquals(0, spending.bars[19].amount)
+        assertTrue(spending.bars[19].isFuture)
+
+        val year = spend(periodOf(PeriodKind.Year, today), listOf(meal(3, day(12, 24), 900), meal(4, day(10, 1), 200)))
+        assertEquals(0, year.bars[11].amount)
+        assertEquals(200, year.bars.maxOf { it.amount })
     }
 
     @Test

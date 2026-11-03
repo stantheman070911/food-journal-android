@@ -73,7 +73,10 @@ fun timeBand(time: LocalTime): TimeBand = when (time.hour) {
     else -> TimeBand.Late
 }
 
-/** One bar: a day of a week or month, or a month of a year. A future bar has nothing to show. */
+/**
+ * One bar: a day of a week or month, or a month of a year. A future bar has no amount, so a meal
+ * dated later never sets the chart's scale.
+ */
 data class SpendingBar(val start: LocalDate, val amount: Int, val isFuture: Boolean)
 
 /** A place's spend in a period. [visits] counts its meals. [lastVisit] breaks ties. */
@@ -151,24 +154,27 @@ fun periodSpending(
 }
 
 /**
- * The change from the period before, in whole percent. A finished period is compared with all of
- * the previous one. An unfinished period is compared with the same number of days from the start
- * of the previous one, or all of it when that is shorter. Null when the compared days have no
- * meals or cost nothing.
+ * The change from the period before, in whole percent. A finished period, one that ended before
+ * [today], is compared with all of the previous one. An unfinished period, its last day included,
+ * is compared with the same number of days from the start of the previous one, or all of it when
+ * that is shorter. Null when the compared days have no meals or cost nothing.
  */
 private fun change(period: Period, total: Int, previousMeals: List<Meal>, today: LocalDate): Int? {
     val previous = period.plus(-1)
-    val compared = if (today >= period.end) previous.days else minOf(elapsedDays(period, today), previous.days)
+    val compared = if (today > period.end) previous.days else minOf(elapsedDays(period, today), previous.days)
     val cutoff = previous.start.plusDays(compared.toLong())
     val before = previousMeals.filter { it.eatenAt.toLocalDate() < cutoff }.sumOf { it.price }
     return if (before == 0) null else percentChange(total, before)
 }
 
-/** The change from [before] to [now] in whole percent, halves rounded away from zero. */
+/**
+ * The change from [before] to [now] in whole percent, halves rounded away from zero. A change too
+ * large for an Int, from a tiny previous total, is held at the largest one.
+ */
 fun percentChange(now: Int, before: Int): Int {
-    val scaled = (now - before).toLong() * 100
+    val scaled = (now.toLong() - before) * 100
     val magnitude = (Math.abs(scaled) * 2 + before) / (2L * before)
-    return (if (scaled < 0) -magnitude else magnitude).toInt()
+    return (if (scaled < 0) -magnitude else magnitude).coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt()
 }
 
 /** [total] ÷ [count] to the nearest whole dollar, halves up. */
@@ -179,13 +185,15 @@ private fun bars(period: Period, meals: List<Meal>, today: LocalDate): List<Spen
         val byMonth = meals.groupBy { it.eatenAt.monthValue }
         (1..12).map { month ->
             val start = period.start.withMonth(month)
-            SpendingBar(start, byMonth[month].orEmpty().sumOf { it.price }, isFuture = start > today)
+            val isFuture = start > today
+            SpendingBar(start, if (isFuture) 0 else byMonth[month].orEmpty().sumOf { it.price }, isFuture)
         }
     } else {
         val byDay = meals.groupBy { it.eatenAt.toLocalDate() }
         (0 until period.days).map { offset ->
             val day = period.start.plusDays(offset.toLong())
-            SpendingBar(day, byDay[day].orEmpty().sumOf { it.price }, isFuture = day > today)
+            val isFuture = day > today
+            SpendingBar(day, if (isFuture) 0 else byDay[day].orEmpty().sumOf { it.price }, isFuture)
         }
     }
 
