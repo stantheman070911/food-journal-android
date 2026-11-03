@@ -4,7 +4,7 @@ A personal Android app for recording what I eat, where, and what I spend. It is 
 
 The goal is a personal archive of meals that is quick to add to and pleasant to look back on.
 
-> **Status:** Phases 1 and 2 of 6 (foundation; meal and logging) are built. The product is specified in [Food Journal — Product Document](<Food Journal — Product Document.md>); open points and decisions are in [Development Notes](DECISIONS.md).
+> **Status:** Phases 1 to 3 of 6 (foundation; meal and logging; journal) are built. The product is specified in [Food Journal — Product Document](<Food Journal — Product Document.md>); open points and decisions are in [Development Notes](DECISIONS.md).
 
 ## Principles
 
@@ -57,5 +57,7 @@ Photos are stored in the app's private folder, resized to 1600 px on the long ed
 3. Build Meal and Journal first, then Spending, then Search.
 4. Add backup and restore.
 5. Use it for four weeks, then decide what comes next.
+
+Device tests run only on an emulator, so they can never uninstall the app from a phone: `ANDROID_SERIAL=emulator-5560 ./gradlew :app:connectedDebugAndroidTest`.
 
 See the [product document](<Food Journal — Product Document.md>) for the full data model, screen details, and spending rules.

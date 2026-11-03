@@ -10,6 +10,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -40,10 +41,16 @@ fun FoodJournalApp() {
                     slideOutVertically(tween(SCREEN_MOTION_MILLIS)) { height -> height / 12 }
             },
         ) {
-            composable<HomeRoute> {
+            composable<HomeRoute> { entry ->
                 HomeScreen(
                     onAddMeal = dropUnlessResumed {
                         navController.navigate(MealRoute()) { launchSingleTop = true }
+                    },
+                    onOpenMeal = { mealId ->
+                        // As dropUnlessResumed does: a second tile tapped while one opens is ignored.
+                        if (entry.lifecycle.currentState == Lifecycle.State.RESUMED) {
+                            navController.navigate(MealRoute(mealId)) { launchSingleTop = true }
+                        }
                     },
                 )
             }

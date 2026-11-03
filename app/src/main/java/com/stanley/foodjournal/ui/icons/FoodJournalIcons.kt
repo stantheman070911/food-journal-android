@@ -63,6 +63,16 @@ object FoodJournalIcons {
         )
     }
 
+    /** Three sliders: settings, without a gear's many small teeth at this stroke weight. */
+    val Settings: ImageVector by lazy {
+        strokeIcon(
+            "Settings",
+            "M4,7H7", "M11,7H20", "M11,7A2,2 0 1 1 7,7A2,2 0 1 1 11,7Z",
+            "M4,12H13", "M17,12H20", "M17,12A2,2 0 1 1 13,12A2,2 0 1 1 17,12Z",
+            "M4,17H6", "M10,17H20", "M10,17A2,2 0 1 1 6,17A2,2 0 1 1 10,17Z",
+        )
+    }
+
     val Edit: ImageVector by lazy {
         strokeIcon(
             "Edit",

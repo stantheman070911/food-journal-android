@@ -14,6 +14,10 @@ abstract class MealDao {
     @Query("SELECT COUNT(*) FROM meal")
     abstract fun observeCount(): Flow<Int>
 
+    /** Every meal, oldest first. About a thousand a year, so no paging is needed. */
+    @Query("SELECT * FROM meal ORDER BY eatenAt, id")
+    abstract fun observeAll(): Flow<List<Meal>>
+
     @Query("SELECT * FROM meal WHERE id = :id")
     abstract suspend fun get(id: Long): Meal?
 

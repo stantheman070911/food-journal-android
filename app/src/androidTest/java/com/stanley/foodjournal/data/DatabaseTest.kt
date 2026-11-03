@@ -231,6 +231,17 @@ class DatabaseTest {
         return meals.save(draft.toMeal(0), newPlace = draft.newPlace(location))
     }
 
+    @Test
+    fun allMealsComeOldestFirstAndFollowChanges() = runBlocking {
+        val later = meals.insert(meal(name = "Dinner", eatenAt = noon.plusHours(7)))
+        val earlier = meals.insert(meal(name = "Lunch", eatenAt = noon))
+
+        assertEquals(listOf(earlier, later), meals.observeAll().first().map { it.id })
+
+        meals.delete(meals.get(earlier)!!)
+        assertEquals(listOf(later), meals.observeAll().first().map { it.id })
+    }
+
     private fun meal(
         name: String? = "Meal",
         price: Int = 100,

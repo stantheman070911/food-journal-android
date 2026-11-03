@@ -44,6 +44,7 @@ private const val TAB_FADE_MILLIS = 150
 @Composable
 fun HomeScreen(
     onAddMeal: () -> Unit,
+    onOpenMeal: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val tabNavController = rememberNavController()
@@ -65,7 +66,7 @@ fun HomeScreen(
             enterTransition = { fadeIn(tween(TAB_FADE_MILLIS)) },
             exitTransition = { fadeOut(tween(TAB_FADE_MILLIS)) },
         ) {
-            composable<JournalRoute> { JournalScreen(onAddMeal = onAddMeal) }
+            composable<JournalRoute> { JournalScreen(onAddMeal = onAddMeal, onOpenMeal = onOpenMeal) }
             composable<SpendingRoute> { SpendingScreen() }
             composable<SearchRoute> { SearchScreen(onAddMeal = onAddMeal) }
         }
@@ -130,7 +131,7 @@ private fun NavController.navigateToTab(tab: TopLevelDestination) {
 private fun HomeEmptyPreview() {
     PreviewSurface {
         HomeScaffold(selected = TopLevelDestination.Journal, onSelect = {}, onAddMeal = {}) {
-            JournalScreen(uiState = JournalUiState(isLoading = false, isEmpty = true), onAddMeal = {})
+            JournalScreen(uiState = JournalUiState(isLoading = false), onAddMeal = {}, onOpenMeal = {})
         }
     }
 }

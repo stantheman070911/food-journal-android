@@ -173,9 +173,31 @@ From the review of commit `02e208e`, fixed on Nov 3, 2026, in the order given.
 
 **Left as they were**
 
-- **Places saved without coordinates** keep none, so they never prefill. This is a product decision, waiting on the user.
+- **Places saved without coordinates** keep none, so they never prefill. The user chose on Nov 3, 2026 to leave it so: a place's coordinates stay where it was first saved, as the product document says.
 - **Gallery date and place still apply after resizing**, about a second later. It was not on the list to fix.
 - **Not tested on a device:** Photo Picker location on a real phone, HEIC date and location, photo orientation with auto-rotate off, an end-to-end UI test of the logging flow, a run of the shrunk release build on the phone, and release timing of the 15-second target.
+
+## Phase 3: Journal
+
+Built on Nov 3, 2026, after the Phase 2 review fixes.
+
+- **Week headers.** The date range in the serif, the total beside it in grey sans: "Oct 26 – Nov 1 · 2,340".
+  - A week within one month names the month once: "Nov 2 – 8".
+  - The year shows only on dates outside the current year: "Oct 20 – 26, 2025", and across New Year "Dec 29, 2025 – Jan 4".
+- **Order.** Weeks run newest first. Within a week, tiles run from Monday to Sunday by time eaten, and meals saved at the same moment keep the order they were saved. Weeks without meals are left out.
+- **Tiles.**
+  - Portrait, 88 × 117 dp (the photos' 3:4), from the 400 px thumbnails. About four and a half fit across, so a long week invites a swipe.
+  - Tiles sit 2 dp apart, and only the strip's two ends are rounded, so a week reads as one band.
+  - Each tile names its weekday in the lower left: white with a soft shadow over a photo, grey on a plain tile. A day with several meals shows a tile for each.
+  - A meal without a photo is a plain grey tile with its name, up to four lines.
+  - No prices on tiles: totals are visible but never the focus.
+- **Opening a meal.** Tapping a tile opens the Meal screen, with the photo at its full 3:4. A second tile tapped while the first opens is ignored.
+- **Settings icon.** Three sliders, top right. A gear's small teeth blur at this stroke weight. It does nothing until Phase 6 adds Export and Import.
+- **No page title.** The first week's header heads the screen; the product document lists no title.
+- **Not adopted from Retro:**
+  - Pale tiles for days without meals: the document makes tiles meals, and two kinds of grey tile would compete.
+  - A separate photo viewer: the Meal screen is one screen to add, read, and edit.
+- **Release build.** With the personal key in place, the shrunk release build was installed and run on the emulator: logging, the Journal, and opening a meal work, with no crashes.
 
 ## Design references: Retro
 

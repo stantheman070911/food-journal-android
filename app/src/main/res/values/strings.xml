@@ -43,6 +43,9 @@
     <string name="undo_deleted">Deleted</string>
     <string name="undo_merged">Merged</string>
 
+    <string name="settings">Settings</string>
+    <string name="journal_open_meal">Open meal</string>
+
     <string name="empty_journal">No meals yet</string>
     <string name="empty_search">Nothing to search yet</string>
     <string name="empty_spending">No meals</string>
