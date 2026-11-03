@@ -1,6 +1,5 @@
 package com.stanley.foodjournal.ui.spending
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -19,8 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -64,6 +61,7 @@ import com.stanley.foodjournal.logic.TimeBand
 import com.stanley.foodjournal.logic.formatPrice
 import com.stanley.foodjournal.ui.components.EmptyState
 import com.stanley.foodjournal.ui.components.MealTile
+import com.stanley.foodjournal.ui.components.SegmentedPill
 import com.stanley.foodjournal.ui.components.MealTileGap
 import com.stanley.foodjournal.ui.components.stripShape
 import com.stanley.foodjournal.ui.preview.PreviewSurface
@@ -128,46 +126,13 @@ fun SpendingScreen(
 /** Week, Month, and Year as a segmented pill, the selected segment filled in ink. */
 @Composable
 private fun PeriodSwitch(selected: PeriodKind, onSelect: (PeriodKind) -> Unit) {
-    val colors = MaterialTheme.colorScheme
-    Row(
-        Modifier
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .fillMaxWidth()
-            .height(40.dp)
-            .clip(CircleShape)
-            .background(colors.surfaceContainer)
-            .padding(3.dp)
-            .selectableGroup(),
-    ) {
-        PeriodKind.entries.forEach { kind ->
-            val isSelected = kind == selected
-            val container by animateColorAsState(
-                if (isSelected) colors.primary else Color.Transparent,
-                tween(SWITCH_FADE_MILLIS),
-                label = "segment",
-            )
-            val content by animateColorAsState(
-                if (isSelected) colors.onPrimary else colors.onSurface,
-                tween(SWITCH_FADE_MILLIS),
-                label = "segment label",
-            )
-            Box(
-                Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .clip(CircleShape)
-                    .background(container)
-                    .selectable(selected = isSelected, role = Role.Tab, onClick = { onSelect(kind) }),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = stringResource(kind.label),
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-                    color = content,
-                )
-            }
-        }
-    }
+    SegmentedPill(
+        options = PeriodKind.entries,
+        selected = selected,
+        label = { stringResource(it.label) },
+        onSelect = onSelect,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+    )
 }
 
 /**
@@ -514,7 +479,6 @@ private val TimeBand.label: Int
         TimeBand.Late -> R.string.spending_late
     }
 
-private const val SWITCH_FADE_MILLIS = 150
 
 private val ChartHeight = 180.dp
 private val AmountGap = 4.dp

@@ -12,6 +12,7 @@ class FoodJournalApplication : Application() {
         super.onCreate()
         container = AppContainer(this)
         container.sweepOnLaunch()
+        container.applyStoredTheme()
     }
 }
 

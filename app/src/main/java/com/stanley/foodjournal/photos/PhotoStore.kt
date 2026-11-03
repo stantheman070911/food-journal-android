@@ -3,6 +3,7 @@ package com.stanley.foodjournal.photos
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
@@ -14,11 +15,18 @@ import java.util.concurrent.TimeUnit
  * - `pending/`: photos taken or picked for a meal that is not saved yet
  *
  * Every photo gets a new random name, so a replaced photo never shows a stale cached image.
+ *
+ * An import unpacks into `import/`, then swaps its photo folder in for `photos/`, keeping the old
+ * one as `photos-old/` until the database has changed too.
  */
 class PhotoStore(root: File) {
     private val photos = File(root, "photos")
     private val thumbs = File(root, "thumbs")
     private val pending = File(root, "pending")
+    private val oldPhotos = File(root, "photos-old")
+
+    /** Where an import unpacks, beside the photo folder so a swap is a rename. */
+    val importFolder = File(root, "import")
 
     /** A fresh name for a new photo. */
     fun newName(): String = "${UUID.randomUUID()}.jpg"
@@ -74,6 +82,48 @@ class PhotoStore(root: File) {
         pending.listFiles()
             ?.filter { nowMillis - it.lastModified() > pendingMaxAgeMillis }
             ?.forEach { it.delete() }
+    }
+
+    /**
+     * Puts the photo folder [incoming] in place of the current one, which is kept aside until
+     * [dropOldPhotos] or [swapBack]. Throws if the folders can't be renamed; nothing changes then.
+     */
+    suspend fun swapIn(incoming: File) = withContext(Dispatchers.IO) {
+        oldPhotos.deleteRecursively()
+        if (photos.exists() && !photos.renameTo(oldPhotos)) throw IOException("Could not set the photos aside")
+        if (!incoming.renameTo(photos)) {
+            oldPhotos.renameTo(photos)
+            throw IOException("Could not move the new photos in")
+        }
+    }
+
+    /** Undoes [swapIn]: the photos set aside come back, and the new ones are deleted. */
+    suspend fun swapBack() = withContext(Dispatchers.IO) {
+        photos.deleteRecursively()
+        oldPhotos.renameTo(photos)
+        ensureFolders()
+    }
+
+    /** Deletes the photos [swapIn] set aside, once the database holds the new meals. */
+    suspend fun dropOldPhotos() = withContext(Dispatchers.IO) {
+        oldPhotos.deleteRecursively()
+    }
+
+    /**
+     * Tidies up after an import the app didn't finish. Photos set aside go back into the photo
+     * folder beside any new ones, so whichever meals the database holds keep theirs; [sweep]
+     * then removes the rest. A half-unpacked import is deleted.
+     */
+    suspend fun recoverInterruptedImport() = withContext(Dispatchers.IO) {
+        importFolder.deleteRecursively()
+        if (!oldPhotos.exists()) return@withContext
+        photos.mkdirs()
+        // A name in both is the same photo, as every photo has its own random name.
+        oldPhotos.listFiles()?.forEach { file ->
+            val target = File(photos, file.name)
+            if (!target.exists()) move(file, target)
+        }
+        oldPhotos.deleteRecursively()
     }
 
     private fun move(from: File, to: File) {

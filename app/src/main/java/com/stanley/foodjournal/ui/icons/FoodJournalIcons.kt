@@ -83,6 +83,9 @@ object FoodJournalIcons {
 
     val Check: ImageVector by lazy { strokeIcon("Check", "M5,12.5L9.5,17L19,7.5") }
 
+    /** A row that opens a page of its own. */
+    val Chevron: ImageVector by lazy { strokeIcon("Chevron", "M9.5,6L15.5,12L9.5,18") }
+
     val Delete: ImageVector by lazy {
         strokeIcon(
             "Delete",

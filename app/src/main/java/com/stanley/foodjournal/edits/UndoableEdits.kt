@@ -142,6 +142,15 @@ class UndoableEdits(
         scope.launch { mutex.withLock { closeLocked() } }
     }
 
+    /**
+     * Closes any open bar, then runs [block] with no edit able to start or be undone until it
+     * ends, as an import needs: it replaces every meal and place underneath.
+     */
+    suspend fun <T> withBarClosed(block: suspend () -> T): T = mutex.withLock {
+        closeLocked()
+        block()
+    }
+
     /** Removes places left with no meals, keeping any that a pending undo may still need. */
     suspend fun removeEmptyPlaces() {
         mutex.withLock {

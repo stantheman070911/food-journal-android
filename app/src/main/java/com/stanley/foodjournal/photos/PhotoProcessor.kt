@@ -90,6 +90,29 @@ class PhotoProcessor(
         }
     }
 
+    /**
+     * Writes the 400 px thumbnail of the stored photo [name] again, as after a restore, which
+     * brings back photos without their thumbnails. False if the photo can't be read.
+     */
+    suspend fun rebuildThumb(name: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val thumb = ImageDecoder.decodeBitmap(ImageDecoder.createSource(store.photoFile(name))) { decoder, info, _ ->
+                val size = fitWithin(PixelSize(info.size.width, info.size.height), THUMB_LONG_EDGE)
+                decoder.setTargetSize(size.width, size.height)
+                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+            }
+            store.ensureFolders()
+            writeJpeg(thumb, store.thumbFile(name))
+            thumb.recycle()
+            true
+        } catch (_: Exception) {
+            File(store.thumbFile(name).parentFile, "$name.part").delete()
+            false
+        } catch (_: OutOfMemoryError) {
+            false
+        }
+    }
+
     private fun discardPartial(name: String) {
         listOf(store.pendingPhotoFile(name), store.pendingThumbFile(name)).forEach { file ->
             file.delete()

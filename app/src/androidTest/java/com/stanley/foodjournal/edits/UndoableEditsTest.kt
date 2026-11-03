@@ -76,6 +76,22 @@ class UndoableEditsTest {
     }
 
     @Test
+    fun workWithTheBarClosedFinishesThePendingDeleteFirst() = runBlocking {
+        val (meal, photo, placeId) = savedMealWithPhotoAndPlace()
+        edits.deleteMeal(meal)
+        awaitPending { it is PendingEdit.MealDeleted }
+
+        val seen = edits.withBarClosed { edits.pending.value to photos.photoFile(photo).exists() }
+
+        // The bar was closed, and its photo and empty place gone, before the work began.
+        assertEquals(null to false, seen)
+        assertNull(db.placeDao().get(placeId))
+        edits.undo()
+        delay(100)
+        assertNull(db.mealDao().get(meal.id))
+    }
+
+    @Test
     fun undoPutsTheMealBackWithItsPlace() = runBlocking {
         val (meal, photo, placeId) = savedMealWithPhotoAndPlace()
 

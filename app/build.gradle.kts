@@ -99,6 +99,8 @@ dependencies {
     implementation(libs.androidx.camera.compose)
     implementation(libs.coil.compose)
     implementation(libs.kotlinx.serialization.core)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.androidx.datastore.preferences)
     ksp(libs.androidx.room.compiler)
 
     debugImplementation(libs.androidx.compose.ui.tooling)

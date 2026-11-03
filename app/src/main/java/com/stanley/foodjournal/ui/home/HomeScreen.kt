@@ -50,6 +50,7 @@ fun HomeScreen(
     onAddMeal: () -> Unit,
     onOpenMeal: (Long) -> Unit,
     modifier: Modifier = Modifier,
+    onOpenSettings: () -> Unit = {},
     searchRequest: SearchRoute? = null,
     onSearchRequestHandled: () -> Unit = {},
 ) {
@@ -78,7 +79,9 @@ fun HomeScreen(
             enterTransition = { fadeIn(tween(TAB_FADE_MILLIS)) },
             exitTransition = { fadeOut(tween(TAB_FADE_MILLIS)) },
         ) {
-            composable<JournalRoute> { JournalScreen(onAddMeal = onAddMeal, onOpenMeal = onOpenMeal) }
+            composable<JournalRoute> {
+                JournalScreen(onAddMeal = onAddMeal, onOpenMeal = onOpenMeal, onOpenSettings = onOpenSettings)
+            }
             composable<SpendingRoute> {
                 SpendingScreen(
                     onOpenMeal = onOpenMeal,

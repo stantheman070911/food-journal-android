@@ -22,12 +22,16 @@ import androidx.navigation.compose.rememberNavController
 import com.stanley.foodjournal.ui.home.HomeScreen
 import com.stanley.foodjournal.ui.meal.MealScreen
 import com.stanley.foodjournal.ui.navigation.HomeRoute
+import com.stanley.foodjournal.ui.navigation.LicensesRoute
 import com.stanley.foodjournal.ui.navigation.MealRoute
 import com.stanley.foodjournal.ui.navigation.SearchRoute
+import com.stanley.foodjournal.ui.navigation.SettingsRoute
+import com.stanley.foodjournal.ui.settings.LicensesScreen
+import com.stanley.foodjournal.ui.settings.SettingsScreen
 
 private const val SCREEN_MOTION_MILLIS = 220
 
-/** The tabs, with the Meal screen rising over them. */
+/** The tabs, with the Meal and Settings screens rising over them. */
 @Composable
 fun FoodJournalApp() {
     val navController = rememberNavController()
@@ -56,6 +60,9 @@ fun FoodJournalApp() {
                     onAddMeal = dropUnlessResumed {
                         navController.navigate(MealRoute()) { launchSingleTop = true }
                     },
+                    onOpenSettings = dropUnlessResumed {
+                        navController.navigate(SettingsRoute) { launchSingleTop = true }
+                    },
                     onOpenMeal = { mealId ->
                         // As dropUnlessResumed does: a second tile tapped while one opens is ignored.
                         if (entry.lifecycle.currentState == Lifecycle.State.RESUMED) {
@@ -69,6 +76,24 @@ fun FoodJournalApp() {
                     onClose = dropUnlessResumed { navController.popBackStack() },
                     onOpenPlace = { placeId -> searchPlaceId = placeId },
                 )
+            }
+            composable<SettingsRoute> {
+                SettingsScreen(
+                    onBack = dropUnlessResumed { navController.popBackStack() },
+                    onOpenLicenses = dropUnlessResumed {
+                        navController.navigate(LicensesRoute) { launchSingleTop = true }
+                    },
+                    // The tabs start afresh: a search or period kept from before could name a
+                    // place that now means another.
+                    onRestored = {
+                        navController.navigate(HomeRoute) {
+                            popUpTo<HomeRoute> { inclusive = true }
+                        }
+                    },
+                )
+            }
+            composable<LicensesRoute> {
+                LicensesScreen(onBack = dropUnlessResumed { navController.popBackStack() })
             }
         }
     }

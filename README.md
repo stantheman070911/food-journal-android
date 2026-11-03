@@ -4,7 +4,7 @@ A personal Android app for recording what I eat, where, and what I spend. It is 
 
 The goal is a personal archive of meals that is quick to add to and pleasant to look back on.
 
-> **Status:** Phases 1 to 5 of 6 (foundation; meal and logging; journal; spending; search) are built. The product is specified in [Food Journal — Product Document](<Food Journal — Product Document.md>); open points and decisions are in [Development Notes](DECISIONS.md).
+> **Status:** All six phases (foundation; meal and logging; journal; spending; search; backup and restore) are built. The product is specified in [Food Journal — Product Document](<Food Journal — Product Document.md>); open points and decisions are in [Development Notes](DECISIONS.md).
 
 ## Principles
 
@@ -22,7 +22,8 @@ The goal is a personal archive of meals that is quick to add to and pleasant to 
 - **Journal:** one row per week (Monday to Sunday), newest first, with a horizontal filmstrip of photo tiles.
 - **Spending:** totals, averages, a bar chart, top places, time of day, and priciest meals by week, month, or year. Numbers are shown, never judged.
 - **Search:** text search on name, note, and place, with date-range and favorite filters.
-- **Backup and restore:** one ZIP holding a versioned JSON file of all records plus the original photos.
+- **Backup and restore:** one ZIP holding a versioned JSON file of all records plus the original photos, saved and opened through Android's file dialogs. A quiet line on the Journal offers a backup once the last one is over 30 days old.
+- **Settings:** the theme (System, Light, or Dark), Export and Import, the version, and the open-source licenses.
 
 Out of scope: calories, nutrition, diet goals, social sharing, multiple currencies, maps, and cloud sync. Further features are decided after four weeks of use.
 
@@ -41,7 +42,7 @@ Monochrome and quiet, so the food photos are the only color. Black, white, and g
 | Async | Kotlin Coroutines and Flow |
 | Database | Room (SQLite) |
 | Charts | Compose Canvas |
-| Settings | DataStore |
+| Settings | DataStore (theme, last backup day) |
 | Camera / gallery | CameraX, Android Photo Picker |
 | Images | Coil 3 |
 | Location | From gallery photos only (EXIF); the phone's location is not used |

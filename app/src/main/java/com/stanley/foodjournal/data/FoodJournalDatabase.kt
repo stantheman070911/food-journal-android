@@ -13,6 +13,8 @@ abstract class FoodJournalDatabase : RoomDatabase() {
 
     abstract fun placeDao(): PlaceDao
 
+    abstract fun backupDao(): BackupDao
+
     companion object {
         fun create(context: Context): FoodJournalDatabase =
             Room.databaseBuilder(context, FoodJournalDatabase::class.java, "food-journal.db").build()

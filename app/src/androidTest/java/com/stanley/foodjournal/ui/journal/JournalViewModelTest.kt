@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.stanley.foodjournal.backup.BackupFixture
 import com.stanley.foodjournal.data.FoodJournalDatabase
 import com.stanley.foodjournal.data.Meal
 import com.stanley.foodjournal.photos.PhotoStore
@@ -33,6 +34,9 @@ class JournalViewModelTest {
     private val photos = PhotoStore(File("/journal-test"))
     private val store = ViewModelStore()
 
+    // For the reminder's settings; the weeks come from [db].
+    private val backup = BackupFixture()
+
     // A Wednesday, so the current week is Nov 2 – 8.
     private val today = LocalDate.of(2026, 11, 4)
 
@@ -49,6 +53,7 @@ class JournalViewModelTest {
         // Stop the ViewModel's query before the database closes under it.
         runBlocking { withContext(Dispatchers.Main) { store.clear() } }
         db.close()
+        backup.close()
     }
 
     @Test
@@ -90,13 +95,48 @@ class JournalViewModelTest {
         assertFalse(weeks().single().isCurrent)
     }
 
-    private suspend fun weeks(): List<JournalWeek> {
-        val factory = viewModelFactory { initializer { JournalViewModel(db.mealDao(), photos, today = { today }) } }
-        val vm = withContext(Dispatchers.Main) {
+    @Test
+    fun theReminderShowsOnceTheFirstMealIsOverAMonthOldWithNoBackup() = runBlocking {
+        db.mealDao().insert(meal(LocalDateTime.of(2026, 10, 4, 12, 0)))
+        val vm = viewModel()
+
+        assertEquals(BackupReminder(lastBackup = null), vm.state { it.reminder != null }.reminder)
+
+        backup.settings.setLastBackup(today)
+        assertNull(vm.state { it.reminder == null }.reminder)
+    }
+
+    @Test
+    fun theReminderNamesTheLastBackupOnceItIsOverAMonthOld() = runBlocking {
+        db.mealDao().insert(meal(LocalDateTime.of(2026, 1, 4, 12, 0)))
+        // 30 days before Nov 4: not yet over a month.
+        backup.settings.setLastBackup(LocalDate.of(2026, 10, 5))
+        val vm = viewModel()
+        assertNull(vm.state { true }.reminder)
+
+        backup.settings.setLastBackup(LocalDate.of(2026, 10, 4))
+
+        assertEquals(BackupReminder(lastBackup = "Oct 4"), vm.state { it.reminder != null }.reminder)
+    }
+
+    @Test
+    fun noMealsNoReminder() = runBlocking {
+        assertNull(viewModel().state { true }.reminder)
+    }
+
+    private suspend fun weeks(): List<JournalWeek> = viewModel().state { true }.weeks
+
+    private suspend fun viewModel(): JournalViewModel {
+        val factory = viewModelFactory {
+            initializer { JournalViewModel(db.mealDao(), photos, backup.settings, backup.backup, today = { today }) }
+        }
+        return withContext(Dispatchers.Main) {
             ViewModelProvider.create(store, factory)["journal-${System.nanoTime()}", JournalViewModel::class]
         }
-        return withTimeout(3_000) { vm.uiState.first { !it.isLoading }.weeks }
     }
+
+    private suspend fun JournalViewModel.state(until: (JournalUiState) -> Boolean): JournalUiState =
+        withTimeout(3_000) { uiState.first { !it.isLoading && until(it) } }
 
     private fun meal(eatenAt: LocalDateTime, photo: String? = null, name: String? = "Tea", price: Int = 50) =
         Meal(eatenAt = eatenAt, photo = photo, name = name, price = price)

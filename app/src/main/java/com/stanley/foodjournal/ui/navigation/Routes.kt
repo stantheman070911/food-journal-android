@@ -10,6 +10,14 @@ data object HomeRoute
 @Serializable
 data class MealRoute(val mealId: Long? = null)
 
+/** Settings: theme, backup and restore, and About. */
+@Serializable
+data object SettingsRoute
+
+/** The open-source licenses, from Settings' About. */
+@Serializable
+data object LicensesRoute
+
 @Serializable
 data object JournalRoute
 

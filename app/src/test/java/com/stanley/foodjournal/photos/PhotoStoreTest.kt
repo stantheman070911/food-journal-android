@@ -8,6 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.io.File
 import java.util.concurrent.TimeUnit
 
 class PhotoStoreTest {
@@ -74,6 +75,62 @@ class PhotoStoreTest {
 
         assertTrue(recent.exists())
         assertFalse(old.exists())
+    }
+
+    @Test
+    fun `swapping in an import keeps the old photos aside until they are dropped`() = runBlocking {
+        val old = saved(store.newName())
+        val incoming = File(store.importFolder, "photos").apply { mkdirs() }
+        val new = store.newName().also { File(incoming, it).writeText("new") }
+
+        store.swapIn(incoming)
+
+        assertTrue(store.photoFile(new).exists())
+        assertFalse(store.photoFile(old).exists())
+        store.dropOldPhotos()
+        assertFalse(File(folder.root, "photos-old").exists())
+    }
+
+    @Test
+    fun `swapping back brings the old photos back`() = runBlocking {
+        val old = saved(store.newName())
+        val incoming = File(store.importFolder, "photos").apply { mkdirs() }
+        val new = store.newName().also { File(incoming, it).writeText("new") }
+
+        store.swapIn(incoming)
+        store.swapBack()
+
+        assertEquals("photo", store.photoFile(old).readText())
+        assertFalse(store.photoFile(new).exists())
+    }
+
+    @Test
+    fun `an interrupted import keeps both sets of photos for the sweep to sort out`() = runBlocking {
+        val old = saved(store.newName())
+        val shared = saved(store.newName())
+        val incoming = File(store.importFolder, "photos").apply { mkdirs() }
+        val new = store.newName().also { File(incoming, it).writeText("new") }
+        File(incoming, shared).writeText("photo")
+        store.swapIn(incoming)
+        File(store.importFolder, "backup.json").writeText("{}")
+
+        store.recoverInterruptedImport()
+
+        assertTrue(store.photoFile(old).exists())
+        assertTrue(store.photoFile(shared).exists())
+        assertTrue(store.photoFile(new).exists())
+        assertFalse(File(folder.root, "photos-old").exists())
+        assertFalse(store.importFolder.exists())
+    }
+
+    @Test
+    fun `an import interrupted between the two renames loses nothing`() = runBlocking {
+        val old = saved(store.newName())
+        File(folder.root, "photos").renameTo(File(folder.root, "photos-old"))
+
+        store.recoverInterruptedImport()
+
+        assertEquals("photo", store.photoFile(old).readText())
     }
 
     private fun saved(name: String): String {

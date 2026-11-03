@@ -44,7 +44,7 @@ The latest stable version of each library on Nov 3, 2026, from Google Maven and 
 | DataStore | 1.3.0 | Phase 6 |
 | JUnit 4 (tests only) | 4.13.2 | Phase 1 |
 
-The app does not use the phone's location (see "Places without phone location" below), so there is no location library. DataStore is declared in the catalog but not used until Phase 6.
+The app does not use the phone's location (see "Places without phone location" below), so there is no location library. DataStore holds the theme choice and the last backup's day, from Phase 6.
 
 ## Document review
 
@@ -80,7 +80,7 @@ The app does not use the phone's location (see "Places without phone location" b
 | Search before typing | All meals, newest first, with their total | 5 |
 | What "original photos" means in the backup | The stored 1600 px photos. Camera originals are never kept. | 6 |
 | Where the backup reminder shows | One quiet line at the top of Journal, also shown when no export has ever been made and the first meal is over 30 days old | 6 |
-| Settings contents | A small menu from the settings icon (Export, Import), not a separate screen | 6 |
+| Settings contents | A small menu from the settings icon (Export, Import), not a separate screen. *Superseded on Nov 4, 2026: a Settings screen; see Phase 6.* | 6 |
 
 ### Gaps
 
@@ -89,7 +89,7 @@ The app does not use the phone's location (see "Places without phone location" b
 - **Photo Picker location option.** The exact API, and whether it needs `ACCESS_MEDIA_LOCATION`, must be confirmed in Phase 2 before anything is added.
 - **Orphaned files.** If the app is killed mid-flow, photos and empty places can be left behind. See the Phase 2 plan for how they are cleaned up without touching unsaved work.
 - **Font.** No family is named. The interface uses the system sans-serif (Roboto). Fraunces was added after Phase 1 for big numbers and headings (see Type below).
-- **Light and dark.** No switch is specified. The app follows the system setting.
+- **Light and dark.** No switch is specified. The app follows the system setting. *From Phase 6, on request, Settings offers System, Light, and Dark; System stays the default.*
 - **Number format.** "2,340" uses English grouping on every device, since the app is English only.
 - **App icon.** Not specified. Phase 1 used a monochrome plate: two thin rings, white on black. On Nov 4, 2026, the user chose a filmstrip instead: three white portrait tiles on black, rounded only at the strip's ends, like a week in the Journal. The same drawing is the themed-icon layer; its solid shapes hold up at small sizes better than thin rings.
 - **Test libraries.** Unit tests need JUnit 4. It is test-only and never ships in the app.
@@ -195,7 +195,7 @@ Built on Nov 3, 2026, after the Phase 2 review fixes.
   - No prices on tiles: totals are visible but never the focus.
 - **Scroll position.** The current week's strip opens at its newest meal, so a meal just logged is in view. Strips of earlier weeks open at Monday. A meal that turns up later in a strip, logged meanwhile or brought back by Undo, scrolls into view. Decided on Nov 3, 2026, after the Phase 3 review.
 - **Opening a meal.** Tapping a tile opens the Meal screen, with the photo at its full 3:4. A second tile tapped while the first opens is ignored.
-- **Settings icon.** Three sliders, top right. A gear's small teeth blur at this stroke weight. It does nothing until Phase 6 adds Export and Import.
+- **Settings icon.** Three sliders, top right. A gear's small teeth blur at this stroke weight. It opened nothing until Phase 6, when it opens Settings.
 - **No page title.** The first week's header heads the screen; the product document lists no title.
 - **Not adopted from Retro:**
   - Pale tiles for days without meals: the document makes tiles meals, and two kinds of grey tile would compete.
@@ -312,6 +312,43 @@ Settled on Nov 4, 2026, before any Phase 5 code, all as recommended. These add t
 
 **Left open:** tab navigation and the Meal screen's hand-off to Search have no automated test; that needs the Compose UI test or navigation-testing library, which would need an OK first.
 
+## Phase 6: Settings, backup, and restore
+
+Settled on Nov 4, 2026, all as recommended. On request, Settings grows from the small Export and Import menu the Ambiguities table first settled into a screen with a theme choice and an About section. This overrides that row, and the "Light and dark" gap, which said the app only follows the system.
+
+- **Settings screen.** The Journal's settings icon opens it as a full screen over the tabs, like the Meal screen, with a back arrow and the title "Settings". Rows sit on rounded grey cards under grey section labels, after Retro's Settings screen.
+- **Appearance.** A System, Light, Dark switch, as the segmented pill Spending uses. System is the default. The choice goes to Android's own per-app night mode (`UiModeManager.setApplicationNightMode`), which Android keeps and applies before the app draws, so launch never flashes the wrong theme. Android offers no way to read it back, so DataStore keeps the choice for the switch, and the app sets it again at launch in case the two ever drift apart.
+- **No color preferences.** The interface is black, white, and greys, so the food photos are the only color. Asked for and declined on the product document's own principle.
+- **Backup.** Export, Import, and a grey line with the last backup's date, or "Never backed up".
+  - **Export** opens Android's save dialog with the name `food-journal-2026-11-04.zip`. While it runs, its row reads "Exporting…", and leaving the screen doesn't stop it.
+  - **Import** opens a file, reads and checks it, then asks before replacing anything: "This backup has 412 meals, the last on Oct 30. It replaces the 99 meals on this phone." An open undo bar closes first. Thumbnails are rebuilt in the background; tiles show the full photo until then.
+  - **The reminder line** on the Journal starts Export directly.
+- **About.** "Version 0.1", and "Open-source licenses", a plain text page. Fraunces' license asks that its text travel with the font, and the AndroidX libraries carry Apache 2.0 notices.
+- **Not added:** week start, currency, and language, which the product document fixes; a switch for the reminder; and "delete all data", since importing a backup already gives a fresh start.
+- **The file.** One ZIP. `backup.json` holds a format version, the time of the export, the places, and the meals, with their ids. `photos/` holds the stored 1600 px photos, uncompressed. Thumbnails are left out.
+- **Checks on import,** before anything changes: the format version; every meal has a photo or a name and a price from 0 to 999,999, and its time reads; ids are unique; every place a meal names is in the file; place names are present and unique, ignoring case; every photo a meal names is in the file. Entries outside `backup.json` and `photos/<name>` are ignored, and a name with a folder in it is refused, so no file can land outside the import folder.
+- **Replacing the data.** The backup unpacks into a folder beside the app's own. The photo folders are swapped, then one database transaction replaces every place and meal. If the transaction fails, the folders swap back. A failed import leaves the meals and photos as they were.
+- **Last backup after an import** is the backup's own export date, since the phone then holds exactly what that backup holds.
+
+**Built** on Nov 4, 2026.
+
+- **The screen.** "← Settings", the title in the serif headline, then Appearance, Backup, and About under grey labels. Rows have a semibold title and a grey line below it, as Retro's do, and a row that opens a page ends in a chevron.
+- **Two backup rows, not three.** The last backup's date is Export's grey line: "Last backup Oct 2, 2026", or "Never backed up". Import's reads "Replaces the meals on this phone". The date always shows its year here, since it says how old the backup is.
+- **The theme switch** is Spending's segmented pill, now one shared component, so the two can't drift apart.
+- **Busy rows.** Export reads "Exporting…", and Import "Reading backup…" while it unpacks and checks the file, then "Restoring…". Export and Import each wait while the other is busy; the rows turn grey.
+- **The confirmation** reads "This backup has 412 meals, the last on Oct 30. It replaces the 99 meals on this phone.", with Cancel and Replace. A backup without meals says "This backup has no meals.", and a phone without any, "This phone has no meals yet." The last meal's year shows only outside the current year, as elsewhere.
+- **Refusals** are one line and OK, each ending "Nothing on this phone changed.": not a Food Journal backup; from a newer version of the app; damaged; or couldn't be read, such as when the phone runs out of room unpacking it. The format is read before the records, so a newer backup is called newer even if its records no longer read. A backup.json over 64 MB is taken as damaged.
+- **After a restore** the Settings screen closes onto the Journal, and the tabs start afresh. A search or period kept from before could hold a place id that now means another place. Back waits the moment a restore takes.
+- **No edit runs during a restore.** It closes an open undo bar and holds the undo lock until the meals are replaced, so a deleted meal's photo is removed before the photo folders swap, never after.
+- **Thumbnails.** Photos the phone already had keep their thumbnails, since every photo has its own random name. The rest are rebuilt in the background from the stored photos.
+- **An import cut short**, by the app being closed mid-restore, leaves nothing missing. At the next launch, photos set aside go back into the photo folder beside the new ones, the launch sweep removes those no meal uses, and a half-unpacked import is deleted. Whichever meals the database holds keep their photos.
+- **Names that leave the folder.** Android's own ZIP reader refuses an entry whose name holds "..", and with it the whole file, which is then reported as damaged. Other stray entries are skipped.
+- **The reminder** sits at the left of the Journal's top bar, beside the settings icon: "Last backup Oct 2 · Back up", or "Not backed up yet · Back up", grey with the action in ink. It shows only while there are meals. A tap opens the save dialog at once, the line reads "Exporting…" while it runs, and it disappears when the export is done. A failed export shows its reason where it was started, on the Journal or in Settings.
+- **Export failures.** A meal whose photo file is missing stops the export before anything is written: "A meal's photo is missing, so the backup wasn't made." A file that can't be written, such as on a full drive, is deleted rather than left half-written. If a meal is deleted during an export and its undo bar closes before the export reaches its photo, that export fails and can be run again.
+- **Import picks** ZIP files, including those other file apps label as "x-zip-compressed" or plain binary.
+- **About.** The version comes from the app itself, "0.1". The licenses page holds Fraunces' Open Font License; the Apache License 2.0 for AndroidX, Coil, Dagger, Guava, Kotlin, kotlinx.coroutines, kotlinx.serialization, and Okio; and the BSD license of Protocol Buffers, which DataStore carries inside it, found by listing what the release build ships. The texts are wrapped to the screen. The license file in `licenses/` is copied into the app's resources.
+- **Known nit.** The reminder reads today's date when the meals or the backup day change, so if the app stays open across midnight, a reminder due that day can appear only once something changes.
+
 ## Design references: Retro
 
 Added on Nov 3, 2026, during the Phase 2 review. Screenshots of [Retro](https://retro.app/), the weekly photo journal the product document already names, are in `UI inspo(retro-screenshots)/`. They are a standing visual reference for every phase. Ideas are adapted to Food Journal's monochrome, photo-first identity, never copied: no Retro branding, art, or layouts are reproduced, and nothing they show is added unless the product document names it.
@@ -331,7 +368,7 @@ Added on Nov 3, 2026, during the Phase 2 review. Screenshots of [Retro](https://
 
 - **Phase 3, Journal.** A big serif heading. Week rows as rounded filmstrips. Empty days as pale grey tiles with the month, date, and weekday stacked in grey. Day names set in white over the photo's lower-left corner. Opening a meal can borrow Retro's photo viewer: the photo first, then the place in bold and the date in grey below it.
 - **Phase 4, Spending.** The Week, Month, Year switch as a segmented pill, with the selected segment filled. Applied in Phase 4.
-- **Phase 6, Settings menu.** Rows grouped on rounded grey cards, with grey section labels.
+- **Phase 6, Settings menu.** Rows grouped on rounded grey cards, with grey section labels. Applied in Phase 6.
 - **Sheets.** Action sheets can float inset from the screen edges, rounded on all corners.
 
 **Not adopted:** red notification dots and badges, colored buttons or text (Retro's blue Upgrade, red Delete), and everything social: friends, feeds, sharing, captions, comments, profiles, and reminders. They break the monochrome rule or the scope.
