@@ -20,7 +20,7 @@ import com.stanley.foodjournal.data.PlaceDao
 import com.stanley.foodjournal.data.PlaceSummary
 import com.stanley.foodjournal.edits.RenameResult
 import com.stanley.foodjournal.edits.UndoableEdits
-import com.stanley.foodjournal.location.LocationTracker
+import com.stanley.foodjournal.location.LocationSource
 import com.stanley.foodjournal.logic.LocationFix
 import com.stanley.foodjournal.logic.PermissionRequest
 import com.stanley.foodjournal.logic.PlacePickerContent
@@ -31,10 +31,11 @@ import com.stanley.foodjournal.logic.permissionsToRequest
 import com.stanley.foodjournal.logic.placePickerContent
 import com.stanley.foodjournal.logic.prefillPlace
 import com.stanley.foodjournal.logic.suggestNames
-import com.stanley.foodjournal.photos.PhotoProcessor
+import com.stanley.foodjournal.photos.PhotoProcessing
 import com.stanley.foodjournal.photos.PhotoStore
 import com.stanley.foodjournal.settings.AppSettings
 import com.stanley.foodjournal.ui.navigation.MealRoute
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -44,6 +45,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.Serializable
 import java.time.LocalDateTime
 import java.time.temporal.ChronoUnit
 
@@ -57,6 +59,12 @@ data class MealUiState(
     val photoFile: File?,
     /** The photo is still being resized; its file isn't ready to show yet. */
     val photoProcessing: Boolean,
+    /** The last photo taken or picked couldn't be read, so the one before it is back. */
+    val photoFailed: Boolean,
+    /** Save was tapped while the photo was still being resized; it saves once that is done. */
+    val savePending: Boolean,
+    /** The screen is closing. Its buttons do nothing from here on. */
+    val closing: Boolean,
     val nameSuggestions: List<String>,
     /** The chosen place's name, or a new one typed in the picker. Null without a place. */
     val placeName: String?,
@@ -64,18 +72,30 @@ data class MealUiState(
     val showSave: Boolean,
 )
 
+/**
+ * A photo the draft can fall back to if a newer one can't be read, with where it came from, so a
+ * failed capture after a gallery pick still places the meal by the gallery photo.
+ */
+data class PhotoRef(
+    val name: String?,
+    val isPending: Boolean,
+    val fromGallery: Boolean = false,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+) : Serializable
+
 class MealViewModel(
     private val savedState: SavedStateHandle,
+    private val mealId: Long?,
     private val mealDao: MealDao,
     private val placeDao: PlaceDao,
     private val edits: UndoableEdits,
     private val photos: PhotoStore,
-    private val processor: PhotoProcessor,
+    private val processor: PhotoProcessing,
     private val settings: AppSettings,
-    private val locationTracker: LocationTracker,
+    private val locationTracker: LocationSource,
     private val appScope: CoroutineScope,
 ) : ViewModel() {
-    private val mealId: Long? = savedState.toRoute<MealRoute>().mealId
     private val isNew = mealId == null
     private var original by mutableStateOf<Meal?>(null)
     private var recentNames by mutableStateOf<List<String>>(emptyList())
@@ -96,9 +116,17 @@ class MealViewModel(
 
     /** Whether the camera was opened from the form to replace the photo, so Back returns there. */
     private var replacingPhoto: Boolean = savedState.get<Boolean>(REPLACING_PHOTO) ?: false
-    private var photoProcessing by mutableStateOf(false)
+
+    /** The newest photo still being resized, if any. */
+    private var processingPhoto by mutableStateOf<String?>(null)
     private var photoJob: Job? = null
+
+    /** The last photo that was ready, restored if a newer one can't be read. */
+    private var fallback: PhotoRef? = savedState.get<PhotoRef>(FALLBACK)
+    private var photoFailed by mutableStateOf(false)
+    private var savePending by mutableStateOf(false)
     private val _finished = MutableStateFlow(false)
+    private val closing: Boolean get() = _finished.value
 
     /** Null while a saved meal is still loading. Read it from composition. */
     val uiState: MealUiState?
@@ -109,7 +137,10 @@ class MealViewModel(
                 stage = stage,
                 draft = current,
                 photoFile = current.photo?.let { photoFile(it, current.photoIsPending) },
-                photoProcessing = photoProcessing,
+                photoProcessing = processingPhoto != null && processingPhoto == current.photo,
+                photoFailed = photoFailed,
+                savePending = savePending,
+                closing = closing,
                 nameSuggestions = suggestNames(recentNames, current.name),
                 placeName = current.newPlaceName
                     ?: current.placeId?.let { id -> places.firstOrNull { it.place.id == id }?.place?.name },
@@ -144,7 +175,10 @@ class MealViewModel(
                     _finished.value = true
                 } else {
                     original = meal
-                    if (draft == null) replaceDraft(MealDraft.from(meal))
+                    if (draft == null) {
+                        replaceDraft(MealDraft.from(meal))
+                        setFallback(PhotoRef(meal.photo, isPending = false))
+                    }
                 }
             }
         }
@@ -227,6 +261,11 @@ class MealViewModel(
     }
 
     fun onCaptured(name: String) {
+        // A capture that lands after the screen closed belongs to no meal.
+        if (closing) {
+            appScope.launch { photos.discardPending(name) }
+            return
+        }
         // A photo taken now is located by the phone, even if it replaces a gallery photo.
         if (isNew) update { it.copy(fromGallery = false, photoLatitude = null, photoLongitude = null) }
         attachPhoto(name)
@@ -239,12 +278,15 @@ class MealViewModel(
      * location, if shared, is the only one used for the place.
      */
     fun onPicked(uri: Uri) {
+        if (closing) return
         val name = photos.newName()
         attachPhoto(name)
         processPhoto(name) {
-            val metadata = processor.fromPicker(uri, name) ?: return@processPhoto false
+            val metadata = processor.readMetadata(uri)
+            if (!processor.fromPicker(uri, name)) return@processPhoto false
             if (isNew) {
                 withContext(Dispatchers.Main) {
+                    if (draft?.photo != name) return@withContext
                     update {
                         it.copy(
                             eatenAt = metadata.takenAt ?: it.eatenAt,
@@ -279,9 +321,20 @@ class MealViewModel(
         }
     }
 
+    /**
+     * Saves and closes. Runs once: a second tap, or the keyboard's ✓ followed by a tap, does
+     * nothing. While the photo is still being resized, the screen waits for it, so a photo that
+     * turns out unreadable leaves the meal open with a message instead of losing it.
+     */
     fun save() {
+        if (closing) return
         val current = draft ?: return
         if (!current.canSave) return
+        if (processingPhoto != null && processingPhoto == current.photo) {
+            savePending = true
+            return
+        }
+        savePending = false
         persist(current)
         _finished.value = true
     }
@@ -291,6 +344,7 @@ class MealViewModel(
      * otherwise the last saved version stays.
      */
     fun onBack() {
+        if (closing) return
         val current = draft
         val saved = original
         when {
@@ -304,6 +358,7 @@ class MealViewModel(
 
     /** Deletes a saved meal, with undo. A new meal is simply discarded. */
     fun delete() {
+        if (closing) return
         val current = draft
         val saved = original
         if (current != null) discard(current)
@@ -311,30 +366,82 @@ class MealViewModel(
         _finished.value = true
     }
 
+    /**
+     * Shows a new photo while it is resized. The previous photo stays on disk as the fallback
+     * until the new one is ready, unless it was itself still being resized: then it is dropped
+     * when its own resizing ends.
+     */
     private fun attachPhoto(name: String) {
         val previous = draft
-        if (previous?.photo != null && previous.photoIsPending) {
-            val old = previous.photo
-            appScope.launch { photos.discardPending(old) }
+        if (previous != null && previous.photo != processingPhoto) {
+            setFallback(
+                PhotoRef(
+                    name = previous.photo,
+                    isPending = previous.photoIsPending,
+                    fromGallery = previous.fromGallery,
+                    latitude = previous.photoLatitude,
+                    longitude = previous.photoLongitude,
+                ),
+            )
         }
+        photoFailed = false
         update { it.copy(photo = name, photoIsPending = true) }
         replacingPhoto = false
         savedState[REPLACING_PHOTO] = false
         showStage(MealStage.Form)
     }
 
-    /** Resizes a new photo in the background. An unreadable photo is dropped from the draft. */
+    /** Resizes a new photo in the background, then settles it with [onProcessed]. */
     private fun processPhoto(name: String, work: suspend () -> Boolean) {
-        photoProcessing = true
+        processingPhoto = name
         photoJob = appScope.launch {
-            val ok = work()
-            withContext(Dispatchers.Main) {
-                if (!ok) update { if (it.photo == name) it.copy(photo = null, photoIsPending = false) else it }
-                // A newer photo may have replaced this one; its own job clears the flag.
-                val current = draft?.photo
-                if (current == name || current == null) photoProcessing = false
+            val ok = try {
+                work()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                false
             }
+            withContext(Dispatchers.Main) { onProcessed(name, ok) }
         }
+    }
+
+    /**
+     * A photo that was replaced while it was resized is dropped. The current one either becomes
+     * the new fallback, retiring the old one, or, if unreadable, gives way to the fallback with
+     * a message. A Save that was waiting goes ahead only if the photo is good.
+     */
+    private fun onProcessed(name: String, ok: Boolean) {
+        if (draft?.photo != name) {
+            if (ok) appScope.launch { photos.discardPending(name) }
+            return
+        }
+        processingPhoto = null
+        if (ok) {
+            val retired = fallback?.takeIf { it.isPending }?.name?.takeIf { it != name }
+            if (retired != null) appScope.launch { photos.discardPending(retired) }
+            setFallback(PhotoRef(name, isPending = true, draft?.fromGallery ?: false, draft?.photoLatitude, draft?.photoLongitude))
+            if (savePending) save()
+        } else {
+            val restore = fallback
+            update {
+                it.copy(
+                    photo = restore?.name,
+                    photoIsPending = restore?.isPending ?: false,
+                    fromGallery = restore?.fromGallery ?: false,
+                    photoLatitude = restore?.latitude,
+                    photoLongitude = restore?.longitude,
+                )
+            }
+            photoFailed = true
+            savePending = false
+            prefill()
+        }
+    }
+
+    private fun setFallback(ref: PhotoRef?) {
+        fallback = ref
+        savedState[FALLBACK] = ref
     }
 
     private fun showStage(next: MealStage) {
@@ -353,37 +460,40 @@ class MealViewModel(
     }
 
     // Runs in the app scope, so leaving the screen never cuts a save short. A photo still being
-    // resized is waited for first; one that turned out unreadable is left off the meal.
+    // resized (a saved meal closed with Back) is waited for first. Only then is it known which
+    // photo the meal keeps: an unreadable replacement gives way to the original, which is kept.
     private fun persist(draft: MealDraft) {
-        val replacedPhoto = original?.photo?.takeIf { it != draft.photo }
         val pendingWork = photoJob
         appScope.launch {
             pendingWork?.join()
-            // The photo's metadata may have arrived while it was being resized.
             var toSave = withContext(Dispatchers.Main) { this@MealViewModel.draft } ?: draft
             val location = mealLocation(isNew, toSave.fromGallery, toSave.photoLocation, locationTracker.fix.value)
-            if (draft.photo != null && draft.photoIsPending) {
-                if (photos.pendingPhotoFile(draft.photo).exists()) {
-                    photos.commit(draft.photo)
+            val photo = toSave.photo
+            if (photo != null && toSave.photoIsPending) {
+                if (photos.pendingPhotoFile(photo).exists()) {
+                    photos.commit(photo)
                 } else {
-                    toSave = draft.copy(photo = null, photoIsPending = false)
+                    toSave = toSave.copy(photo = null, photoIsPending = false)
                 }
             }
             if (!toSave.canSave) return@launch
             mealDao.save(toSave.toMeal(mealId ?: 0), newPlace = toSave.newPlace(location))
-            replacedPhoto?.let { photos.delete(it) }
+            original?.photo?.takeIf { it != toSave.photo }?.let { photos.delete(it) }
             edits.removeEmptyPlaces()
         }
     }
 
-    /** Drops what the draft added but never saved: a pending photo. */
+    /** Drops what the draft added but never saved: its pending photo and a pending fallback. */
     private fun discard(draft: MealDraft) {
-        if (draft.photo != null && draft.photoIsPending) {
-            val pendingWork = photoJob
-            appScope.launch {
-                pendingWork?.join()
-                photos.discardPending(draft.photo)
-            }
+        val pendingWork = photoJob
+        val names = listOfNotNull(
+            draft.photo?.takeIf { draft.photoIsPending },
+            fallback?.takeIf { it.isPending }?.name,
+        ).distinct()
+        if (names.isEmpty()) return
+        appScope.launch {
+            pendingWork?.join()
+            names.forEach { photos.discardPending(it) }
         }
     }
 
@@ -416,6 +526,7 @@ class MealViewModel(
         private const val DRAFT = "draft"
         private const val STAGE = "stage"
         private const val REPLACING_PHOTO = "replacingPhoto"
+        private const val FALLBACK = "fallbackPhoto"
         private const val RECENT_NAME_COUNT = 200
 
         private fun now() = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS)
@@ -423,8 +534,10 @@ class MealViewModel(
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val container = appContainer
+                val savedState = createSavedStateHandle()
                 MealViewModel(
-                    savedState = createSavedStateHandle(),
+                    savedState = savedState,
+                    mealId = savedState.toRoute<MealRoute>().mealId,
                     mealDao = container.mealDao,
                     placeDao = container.placeDao,
                     edits = container.edits,

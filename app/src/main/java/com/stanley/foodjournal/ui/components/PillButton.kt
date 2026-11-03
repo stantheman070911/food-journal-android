@@ -21,7 +21,8 @@ import com.stanley.foodjournal.ui.preview.ThemePreviews
 
 /**
  * The main action on a screen: a solid pill, black (white in dark). Disabled, it turns a
- * plain mid grey, so it reads as "not yet" rather than as faded text.
+ * plain mid grey, so it reads as "not yet" rather than as faded text. Not [interactive], as on
+ * a closing screen, it ignores taps but keeps its look.
  */
 @Composable
 fun PillButton(
@@ -29,16 +30,17 @@ fun PillButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    interactive: Boolean = true,
 ) {
     val colors = MaterialTheme.colorScheme
     Button(
         onClick = onClick,
-        enabled = enabled,
+        enabled = enabled && interactive,
         shape = CircleShape,
         colors = ButtonDefaults.buttonColors(
             containerColor = colors.primary,
             contentColor = colors.onPrimary,
-            disabledContainerColor = colors.outline,
+            disabledContainerColor = if (enabled) colors.primary else colors.outline,
             disabledContentColor = colors.onPrimary,
         ),
         modifier = modifier.height(PillHeight),

@@ -3,7 +3,9 @@ package com.stanley.foodjournal.logic
 import com.stanley.foodjournal.data.Place
 import com.stanley.foodjournal.data.PlaceSummary
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDateTime
 
@@ -143,6 +145,22 @@ class PlacesTest {
         assertNull(photoLocation(0.0, 0.0))
         assertNull(photoLocation(91.0, 121.5))
         assertNull(photoLocation(25.0, Double.NaN))
+    }
+
+    @Test
+    fun `a phone fix under two minutes old is recent`() {
+        val now = 600_000_000_000L
+        assertTrue(isRecentFix(now - 119_000_000_000L, now))
+        assertFalse(isRecentFix(now - 120_000_000_000L, now))
+        assertFalse(isRecentFix(now - 900_000_000_000L, now))
+    }
+
+    @Test
+    fun `a phone fix without an accuracy counts as vague`() {
+        val fix = deviceFix(25.033, 121.5654, accuracyMeters = null)
+        assertFalse(fix.isUsable())
+        assertNull(prefillPlace(listOf(at80m), fix))
+        assertTrue(deviceFix(25.033, 121.5654, accuracyMeters = 12f).isUsable())
     }
 
     private fun summary(place: Place, daysAgo: Long?) = PlaceSummary(

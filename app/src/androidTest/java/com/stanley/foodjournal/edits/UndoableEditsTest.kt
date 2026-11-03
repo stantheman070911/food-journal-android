@@ -119,11 +119,66 @@ class UndoableEditsTest {
         assertEquals(awayId, db.mealDao().get(mealId)?.placeId)
     }
 
-    private suspend fun savedMealWithPhotoAndPlace(): Triple<Meal, String, Long> {
+    @Test
+    fun aSecondDeleteClosesTheFirstBar() = runBlocking {
+        val (first, firstPhoto, _) = savedMealWithPhotoAndPlace(placeName = "First")
+        val (second, secondPhoto, _) = savedMealWithPhotoAndPlace(placeName = "Second")
+
+        edits.deleteMeal(first)
+        awaitPending { it == PendingEdit.MealDeleted(first) }
+        edits.deleteMeal(second)
+        awaitPending { it == PendingEdit.MealDeleted(second) }
+
+        assertFalse(photos.photoFile(firstPhoto).exists())
+        assertTrue(photos.photoFile(secondPhoto).exists())
+        edits.undo()
+        awaitTrue { db.mealDao().get(second.id) != null }
+        assertNull(db.mealDao().get(first.id))
+    }
+
+    @Test
+    fun aRenameClosesAPendingDeleteFirst() = runBlocking {
+        val (meal, photo, emptiedPlaceId) = savedMealWithPhotoAndPlace(placeName = "Dumplings")
+        val otherId = db.placeDao().insert(Place(name = "noodles"))
+        db.mealDao().insert(meal(placeId = otherId))
+        edits.deleteMeal(meal)
+        awaitPending { it is PendingEdit.MealDeleted }
+
+        val result = edits.renamePlace(db.placeDao().get(otherId)!!, "Noodles")
+
+        assertEquals(RenameResult.Renamed, result)
+        assertNull(edits.pending.value)
+        assertFalse(photos.photoFile(photo).exists())
+        assertNull(db.placeDao().get(emptiedPlaceId))
+    }
+
+    @Test
+    fun undoingAMergeWhenTheOldNameWasTakenJoinsThatPlace() = runBlocking {
+        val awayId = db.placeDao().insert(Place(name = "Lin Dong Fang", latitude = 25.05, longitude = 121.53))
+        val survivorId = db.placeDao().insert(Place(name = "Beef Noodles"))
+        val movedMeal = db.mealDao().insert(meal(placeId = awayId))
+        val survivorMeal = db.mealDao().insert(meal(placeId = survivorId))
+        edits.renamePlace(db.placeDao().get(awayId)!!, "beef noodles")
+        // During the undo window, a new meal recreates the old name.
+        val retakenId = db.placeDao().insert(Place(name = "LIN DONG FANG"))
+        db.mealDao().insert(meal(placeId = retakenId))
+
+        edits.undo()
+        awaitPending { it == null }
+        awaitTrue { db.mealDao().get(movedMeal)?.placeId == retakenId }
+
+        assertEquals(survivorId, db.mealDao().get(survivorMeal)?.placeId)
+        assertEquals("Beef Noodles", db.placeDao().get(survivorId)?.name)
+        assertNull(db.placeDao().get(survivorId)?.latitude)
+        assertEquals(25.05, db.placeDao().get(retakenId)?.latitude!!, 0.0)
+        assertNull(db.placeDao().get(awayId))
+    }
+
+    private suspend fun savedMealWithPhotoAndPlace(placeName: String = "Dumplings"): Triple<Meal, String, Long> {
         val photo = photos.newName()
         photos.photoFile(photo).writeText("photo")
         photos.thumbFile(photo).writeText("thumb")
-        val placeId = db.placeDao().insert(Place(name = "Dumplings"))
+        val placeId = db.placeDao().insert(Place(name = placeName))
         val id = db.mealDao().insert(meal(placeId = placeId, photo = photo))
         return Triple(db.mealDao().get(id)!!, photo, placeId)
     }

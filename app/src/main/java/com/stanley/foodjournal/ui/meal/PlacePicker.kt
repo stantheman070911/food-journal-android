@@ -41,6 +41,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -54,7 +55,9 @@ import androidx.compose.ui.unit.dp
 import com.stanley.foodjournal.R
 import com.stanley.foodjournal.data.Place
 import com.stanley.foodjournal.logic.PickerPlace
+import com.stanley.foodjournal.logic.PickerSubmit
 import com.stanley.foodjournal.logic.PlacePickerContent
+import com.stanley.foodjournal.logic.pickerSubmit
 import com.stanley.foodjournal.ui.components.UndoBar
 import com.stanley.foodjournal.ui.icons.FoodJournalIcons
 import com.stanley.foodjournal.ui.preview.PreviewSurface
@@ -125,7 +128,18 @@ private fun PlacePicker(
     var editingId by rememberSaveable { mutableStateOf(initialEditingId) }
     Column(modifier.fillMaxSize()) {
         PickerHeader(onClose = onClose)
-        QueryField(query = query, onQueryChange = onQueryChange, requestFocus = focusQuery)
+        QueryField(
+            query = query,
+            onQueryChange = onQueryChange,
+            onSubmit = {
+                when (val submit = pickerSubmit(content, query)) {
+                    is PickerSubmit.Select -> onSelect(submit.placeId)
+                    is PickerSubmit.Add -> onAdd(submit.name)
+                    PickerSubmit.Nothing -> Unit
+                }
+            },
+            requestFocus = focusQuery,
+        )
         LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(top = 8.dp, bottom = 88.dp)) {
             content.addName?.let { name ->
                 item(key = "add") {
@@ -195,7 +209,13 @@ private fun PickerHeader(onClose: () -> Unit) {
 
 /** The filter, in a soft grey pill. Its icon and text line up with the rows below. */
 @Composable
-private fun QueryField(query: String, onQueryChange: (String) -> Unit, requestFocus: Boolean) {
+private fun QueryField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    requestFocus: Boolean,
+) {
+    val focusManager = LocalFocusManager.current
     val focus = remember { FocusRequester() }
     if (requestFocus) LaunchedEffect(Unit) { focus.requestFocus() }
     val colors = MaterialTheme.colorScheme
@@ -231,6 +251,10 @@ private fun QueryField(query: String, onQueryChange: (String) -> Unit, requestFo
                     capitalization = KeyboardCapitalization.Words,
                     imeAction = ImeAction.Done,
                 ),
+                keyboardActions = KeyboardActions(onDone = {
+                    focusManager.clearFocus()
+                    onSubmit()
+                }),
                 modifier = Modifier
                     .fillMaxWidth()
                     .focusRequester(focus),

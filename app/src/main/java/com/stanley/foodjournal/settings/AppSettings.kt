@@ -9,9 +9,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 /** The app's few stored settings. Phase 6 adds the last backup date. */
-class AppSettings(context: Context) {
+class AppSettings(context: Context, fileName: String = "settings") {
     private val store = PreferenceDataStoreFactory.create {
-        context.preferencesDataStoreFile("settings")
+        context.preferencesDataStoreFile(fileName)
     }
 
     /** Whether location has ever been asked for. It is asked once only. */

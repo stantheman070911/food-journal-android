@@ -139,6 +139,44 @@ Requested on Nov 3, 2026, after Phase 1. This overrides "One sans-serif family" 
 - **Preview.** `ui/preview/TypePreview.kt` shows the styles together, in light and dark. The axis settings were checked on the API 37 emulator.
 - **Tracking.** Display and headline styles are set 2% tight, after the Retro references.
 
+### Phase 2 review fixes
+
+From the review of commit `02e208e`, fixed on Nov 3, 2026, in the order given.
+
+1. **A double tap on Save stored the meal twice.** The Meal screen now acts once: Save, Back, and Delete do nothing after the first of them, in the ViewModel, and their buttons stop responding while the screen fades out. They keep their look, so nothing flashes grey on the way out. This covers the keyboard's ✓ followed by a tap on Save.
+2. **A replacement photo that failed deleted the saved photo.** The photo before it is kept as a fallback until the new one is ready, and comes back if the new one can't be read. The photo a save deletes is decided only after resizing finishes, so a saved meal never loses its original to an unreadable replacement.
+3. **Save during resizing could lose the meal.** The screen now waits for the photo, about a second at most, with Save held. If the photo turns out unreadable, the meal stays open with the line "That photo couldn't be read. Try another." The same line shows whenever a photo fails.
+4. **Background errors crashed the app.**
+   - The app-wide scope logs a failure instead of crashing, and other work carries on.
+   - Photo processing catches every error, including running out of memory, and removes half-written files.
+   - Undoing a merge, when a place with the old name was created during the undo window, moves the meals to that place instead of failing on the unique name.
+5. **Leftover pending files.** A capture that lands after the screen closed is deleted. So is a photo replaced while it was still being resized, and a pending fallback when a new meal is discarded.
+6. **Device tests never touch the phone.** `connected…AndroidTest` tasks refuse to run unless `ANDROID_SERIAL` names an emulator, before anything is installed. Run them as `ANDROID_SERIAL=emulator-5560 ./gradlew :app:connectedDebugAndroidTest`.
+7. **Deviations.**
+   - **The photo shows at 3:4**, the camera's frame, so none of the shot is cut away. With the number pad up, the form scrolls so the price and Save stay above it; the photo's top scrolls out of view while typing.
+   - **The price field's ✓ always closes the keyboard**, and still saves a new meal that is ready.
+   - **The place picker's ✓** picks the saved place whose name was typed in full, adds a new name, or keeps a pending new place typed again. With nothing typed, it only closes the keyboard.
+   - **The undo bar can be swiped away sideways**, which closes it as the timer would.
+8. **Tests.** The ViewModel now takes its photo processing and location through small interfaces (`PhotoProcessing`, `LocationSource`), so device tests drive it with fakes. Added:
+   - **MealViewModel:**
+     - a double save, and Save followed by Back or Delete
+     - a failed new photo, and a failed replacement on a saved meal
+     - Save during resizing, both when the photo succeeds and when it fails
+     - late gallery date and location
+     - prefill after a manual pick
+     - following a merge and its undo
+     - a capture landing after close, and a photo replaced while resizing
+   - **Gallery reading on real JPEG files:** the date with its fallback, GPS, a zeroed location, no metadata, and an unreadable photo.
+   - **Location:** the two-minute freshness rule and fixes without an accuracy, as pure functions the tracker now uses.
+   - **UndoableEdits:** a second delete closing the first, a rename during a pending delete, and a merge undo with the old name taken.
+   - **Place picker:** what its ✓ does.
+
+**Left as they were**
+
+- **Places saved without coordinates** keep none, so they never prefill. This is a product decision, waiting on the user.
+- **Gallery date and place still apply after resizing**, about a second later. It was not on the list to fix.
+- **Not tested on a device:** Photo Picker location on a real phone, HEIC date and location, photo orientation with auto-rotate off, an end-to-end UI test of the logging flow, a run of the shrunk release build on the phone, and release timing of the 15-second target.
+
 ## Design references: Retro
 
 Added on Nov 3, 2026, during the Phase 2 review. Screenshots of [Retro](https://retro.app/), the weekly photo journal the product document already names, are in `UI inspo(retro-screenshots)/`. They are a standing visual reference for every phase. Ideas are adapted to Food Journal's monochrome, photo-first identity, never copied: no Retro branding, art, or layouts are reproduced, and nothing they show is added unless the product document names it.
@@ -240,7 +278,7 @@ All four steps are done and committed: data layer and tests; Meal form; camera, 
 - **Camera permission** is asked when the camera stage opens, and again on later Adds while it is refused; Android limits how often. Refused, the stage shows "Camera access is off" with "Open settings", and gallery and Skip still work.
 - **Capture** aims for 2048 × 1536 at 4:3 with minimum latency. The form appears as soon as the capture file is written (under a second on the emulator), and resizing finishes in the app scope; Save waits for it.
 - **Processing.** `ImageDecoder` applies the EXIF rotation and reports the rotated size, which was checked with a sideways 3000 × 2000 photo. Photos are stored at up to 1600 px with a 400 px thumbnail, JPEG 85, and no metadata.
-- **The form crops the photo to 4:3**, so photo, price, and Save fit above the number pad.
+- **The form showed the photo at 4:3**, so photo, price, and Save fit above the number pad. Changed after the Phase 2 review: see below.
 - **Gallery backfill** reads `DateTimeOriginal` (falling back to `DateTime`) and GPS with the framework `ExifInterface`. A photo without a date keeps the time Add was tapped.
 - **Photo Picker location.** The picker gets `MediaStore.EXTRA_REQUEST_LOCATION_METADATA_ACCESS = true`. The constant is behind a feature flag and missing from the public API 37 jar, so its documented value `"android.provider.extra.REQUEST_LOCATION_METADATA_ACCESS"` is used. For apps targeting above Android 16 it is the only control, so `ACCESS_MEDIA_LOCATION` is not needed. On the emulator (picker version 17), there was no location prompt and picking needs a Done tap. Whether location arrives on the phone is still unverified.
 - **Known nit.** The date picker starts weeks on Sunday, following the locale, while the app's weeks run Monday to Sunday.

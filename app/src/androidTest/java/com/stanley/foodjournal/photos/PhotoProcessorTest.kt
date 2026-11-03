@@ -7,17 +7,20 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.media.ExifInterface
+import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.time.LocalDateTime
 
 @RunWith(AndroidJUnit4::class)
 class PhotoProcessorTest {
@@ -82,6 +85,80 @@ class PhotoProcessorTest {
 
         assertFalse(processor.fromCapture(name))
         assertFalse(store.pendingPhotoFile(name).exists())
+    }
+
+    @Test
+    fun readsAGalleryPhotosDateAndLocation() = runBlocking {
+        val file = File(root, "dinner.jpg")
+        writeJpeg(file, width = 800, height = 600, darkLeftEdge = false)
+        ExifInterface(file).apply {
+            setAttribute(ExifInterface.TAG_DATETIME_ORIGINAL, "2026:11:01 19:05:00")
+            setAttribute(ExifInterface.TAG_DATETIME, "2026:11:02 08:00:00")
+            setGps(25.0331, 121.5297)
+            saveAttributes()
+        }
+
+        val metadata = processor.readMetadata(Uri.fromFile(file))
+
+        assertEquals(LocalDateTime.of(2026, 11, 1, 19, 5), metadata.takenAt)
+        assertEquals(25.0331, metadata.location!!.latitude, 0.0001)
+        assertEquals(121.5297, metadata.location!!.longitude, 0.0001)
+        assertNull(metadata.location!!.accuracyMeters)
+    }
+
+    @Test
+    fun fallsBackToTheFileDateAndIgnoresAZeroedLocation() = runBlocking {
+        val file = File(root, "redacted.jpg")
+        writeJpeg(file, width = 800, height = 600, darkLeftEdge = false)
+        ExifInterface(file).apply {
+            setAttribute(ExifInterface.TAG_DATETIME, "2026:11:02 08:00:00")
+            setGps(0.0, 0.0)
+            saveAttributes()
+        }
+
+        val metadata = processor.readMetadata(Uri.fromFile(file))
+
+        assertEquals(LocalDateTime.of(2026, 11, 2, 8, 0), metadata.takenAt)
+        assertNull(metadata.location)
+    }
+
+    @Test
+    fun aPhotoWithoutMetadataHasNone() = runBlocking {
+        val file = File(root, "plain.jpg")
+        writeJpeg(file, width = 400, height = 300, darkLeftEdge = false)
+
+        val metadata = processor.readMetadata(Uri.fromFile(file))
+
+        assertNull(metadata.takenAt)
+        assertNull(metadata.location)
+        assertNull(processor.readMetadata(Uri.fromFile(File(root, "missing.jpg"))).takenAt)
+    }
+
+    @Test
+    fun reportsAnUnreadableGalleryPhotoAndLeavesNoFiles() = runBlocking {
+        val file = File(root, "broken.jpg").apply { writeText("not a photo") }
+        val name = store.newName()
+
+        assertFalse(processor.fromPicker(Uri.fromFile(file), name))
+        assertFalse(store.pendingPhotoFile(name).exists())
+        assertFalse(store.pendingThumbFile(name).exists())
+    }
+
+    // The framework ExifInterface reads GPS but has no setter for it, so write the tags as a
+    // camera does: degrees, minutes, and seconds as rationals, with a hemisphere letter.
+    private fun ExifInterface.setGps(latitude: Double, longitude: Double) {
+        setAttribute(ExifInterface.TAG_GPS_LATITUDE, dms(latitude))
+        setAttribute(ExifInterface.TAG_GPS_LATITUDE_REF, if (latitude < 0) "S" else "N")
+        setAttribute(ExifInterface.TAG_GPS_LONGITUDE, dms(longitude))
+        setAttribute(ExifInterface.TAG_GPS_LONGITUDE_REF, if (longitude < 0) "W" else "E")
+    }
+
+    private fun dms(value: Double): String {
+        val abs = kotlin.math.abs(value)
+        val degrees = abs.toInt()
+        val minutes = ((abs - degrees) * 60).toInt()
+        val seconds = Math.round(((abs - degrees) * 60 - minutes) * 60 * 10_000)
+        return "$degrees/1,$minutes/1,$seconds/10000"
     }
 
     private fun writeJpeg(file: File, width: Int, height: Int, darkLeftEdge: Boolean) {

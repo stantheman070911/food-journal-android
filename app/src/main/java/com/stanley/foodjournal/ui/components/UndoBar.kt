@@ -10,10 +10,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,6 +46,8 @@ class UndoBarViewModel(private val edits: UndoableEdits) : ViewModel() {
 
     fun undo() = edits.undo()
 
+    fun dismiss() = edits.dismiss()
+
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer { UndoBarViewModel(appContainer.edits) }
@@ -56,14 +62,16 @@ fun UndoBar(
     viewModel: UndoBarViewModel = viewModel(factory = UndoBarViewModel.Factory),
 ) {
     val pending by viewModel.pending.collectAsStateWithLifecycle()
-    UndoBar(pending = pending, onUndo = viewModel::undo, modifier = modifier)
+    UndoBar(pending = pending, onUndo = viewModel::undo, onDismiss = viewModel::dismiss, modifier = modifier)
 }
 
+/** Swiping the bar sideways closes it early, as the timer would. */
 @Composable
 fun UndoBar(
     pending: PendingEdit?,
     onUndo: () -> Unit,
     modifier: Modifier = Modifier,
+    onDismiss: () -> Unit = {},
 ) {
     // Keep the last message while the bar slides away.
     var lastShown by remember { mutableStateOf<PendingEdit?>(null) }
@@ -79,19 +87,33 @@ fun UndoBar(
             is PendingEdit.PlacesMerged -> stringResource(R.string.undo_merged)
             else -> stringResource(R.string.undo_deleted)
         }
-        Snackbar(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            shape = RoundedCornerShape(16.dp),
-            containerColor = MaterialTheme.colorScheme.inverseSurface,
-            contentColor = MaterialTheme.colorScheme.inverseOnSurface,
-            action = {
-                TextButton(onClick = onUndo) {
-                    Text(stringResource(R.string.undo), color = MaterialTheme.colorScheme.inversePrimary)
-                }
-            },
-        ) {
-            Text(message)
+        // A fresh swipe state for each edit, so a dismissed bar never hides the next one.
+        key(shown) {
+            val swipe = rememberSwipeToDismissBoxState()
+            LaunchedEffect(swipe.currentValue) {
+                if (swipe.currentValue != SwipeToDismissBoxValue.Settled) onDismiss()
+            }
+            SwipeToDismissBox(state = swipe, backgroundContent = {}) {
+                UndoSnackbar(message = message, onUndo = onUndo)
+            }
         }
+    }
+}
+
+@Composable
+private fun UndoSnackbar(message: String, onUndo: () -> Unit) {
+    Snackbar(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(16.dp),
+        containerColor = MaterialTheme.colorScheme.inverseSurface,
+        contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+        action = {
+            TextButton(onClick = onUndo) {
+                Text(stringResource(R.string.undo), color = MaterialTheme.colorScheme.inversePrimary)
+            }
+        },
+    ) {
+        Text(message)
     }
 }
 

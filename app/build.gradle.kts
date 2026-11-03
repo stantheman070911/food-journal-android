@@ -69,6 +69,18 @@ room {
     schemaDirectory("$projectDir/schemas")
 }
 
+// Device tests install the app on every connected device and uninstall it afterwards, which
+// would delete real meals on the phone. They run only when ANDROID_SERIAL names an emulator:
+//   ANDROID_SERIAL=emulator-5560 ./gradlew :app:connectedDebugAndroidTest
+tasks.matching { it.name.startsWith("connected") && it.name.endsWith("AndroidTest") }.configureEach {
+    doFirst {
+        val serial = System.getenv("ANDROID_SERIAL").orEmpty()
+        check(serial.startsWith("emulator-")) {
+            "Device tests run only on an emulator. Set ANDROID_SERIAL, e.g. ANDROID_SERIAL=emulator-5560."
+        }
+    }
+}
+
 dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))

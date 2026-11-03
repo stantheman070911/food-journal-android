@@ -92,6 +92,31 @@ class PlacePickerTest {
         assertEquals(listOf(true, false, false), content.places.map { it.isSelected })
     }
 
+    @Test
+    fun `the check key picks a saved place typed in full`() {
+        assertEquals(PickerSubmit.Select(2), pickerSubmit(content(query = "simple kaffa"), "simple kaffa"))
+    }
+
+    @Test
+    fun `the check key adds a new name`() {
+        assertEquals(PickerSubmit.Add("Lin Dong Fang"), pickerSubmit(content(query = "Lin Dong Fang "), "Lin Dong Fang "))
+        assertEquals(PickerSubmit.Add("Noodle"), pickerSubmit(content(query = "Noodle"), "Noodle"))
+    }
+
+    @Test
+    fun `the check key keeps a pending place typed again`() {
+        val query = "lin dong fang"
+        assertEquals(
+            PickerSubmit.Add("Lin Dong Fang"),
+            pickerSubmit(content(query = query, newPlaceName = "Lin Dong Fang"), query),
+        )
+    }
+
+    @Test
+    fun `the check key does nothing with nothing typed`() {
+        assertEquals(PickerSubmit.Nothing, pickerSubmit(content(query = "  "), "  "))
+    }
+
     private fun content(
         query: String = "",
         location: LocationFix? = here,

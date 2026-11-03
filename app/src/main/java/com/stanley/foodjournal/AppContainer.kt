@@ -1,6 +1,7 @@
 package com.stanley.foodjournal
 
 import android.content.Context
+import android.util.Log
 import com.stanley.foodjournal.data.FoodJournalDatabase
 import com.stanley.foodjournal.data.MealDao
 import com.stanley.foodjournal.data.PlaceDao
@@ -9,6 +10,7 @@ import com.stanley.foodjournal.location.LocationTracker
 import com.stanley.foodjournal.photos.PhotoProcessor
 import com.stanley.foodjournal.photos.PhotoStore
 import com.stanley.foodjournal.settings.AppSettings
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -16,8 +18,15 @@ import kotlinx.coroutines.launch
 
 /** Holds the app's long-lived objects. Built once by [FoodJournalApplication]. */
 class AppContainer(context: Context) {
-    /** Work that must outlive any one screen, such as an undo bar's cleanup. */
-    val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    /**
+     * Work that must outlive any one screen, such as a save or an undo bar's cleanup. A failure
+     * in one piece of work is logged rather than crashing the app; the others carry on.
+     */
+    val appScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Default + CoroutineExceptionHandler { _, error ->
+            Log.e(TAG, "Background work failed", error)
+        },
+    )
 
     private val database: FoodJournalDatabase by lazy { FoodJournalDatabase.create(context) }
 
@@ -47,3 +56,5 @@ class AppContainer(context: Context) {
         }
     }
 }
+
+private const val TAG = "FoodJournal"

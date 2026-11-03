@@ -7,6 +7,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import com.stanley.foodjournal.logic.mergedPlace
+import com.stanley.foodjournal.logic.sameName
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -68,11 +69,21 @@ abstract class PlaceDao {
         return moved
     }
 
-    /** Reverses [merge]: [mergedAway] returns with its id, and [mealIds] move back to it. */
+    /**
+     * Reverses [merge]: [mergedAway] returns with its id, and [mealIds] move back to it. If a
+     * place with its name was created meanwhile, its meals join that place instead, which takes
+     * its coordinates if it has none.
+     */
     @Transaction
     open suspend fun unmerge(mergedAway: Place, survivorBefore: Place, mealIds: List<Long>) {
         update(survivorBefore)
-        insert(mergedAway)
-        moveMeals(mealIds, mergedAway.id)
+        val taken = all().firstOrNull { it.id != survivorBefore.id && sameName(it.name, mergedAway.name) }
+        if (taken == null) {
+            insert(mergedAway)
+            moveMeals(mealIds, mergedAway.id)
+        } else {
+            moveMeals(mealIds, taken.id)
+            update(mergedPlace(survivor = taken, mergedAway = mergedAway))
+        }
     }
 }

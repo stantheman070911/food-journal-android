@@ -49,6 +49,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.SuggestionChipDefaults
@@ -221,6 +223,7 @@ fun MealScreen(
 ) {
     val draft = uiState.draft
     val priceFocus = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
     var editingTime by rememberSaveable { mutableStateOf(false) }
 
     // A new meal starts with the number pad up, ready for the price.
@@ -231,6 +234,7 @@ fun MealScreen(
     Column(modifier.fillMaxSize().safeDrawingPadding()) {
         MealTopBar(
             isFavorite = draft.isFavorite,
+            enabled = !uiState.closing,
             onBack = actions.onBack,
             onToggleFavorite = actions.onToggleFavorite,
             onDelete = actions.onDelete,
@@ -245,10 +249,21 @@ fun MealScreen(
                 processing = uiState.photoProcessing,
                 onClick = actions.onReplacePhoto,
             )
+            if (uiState.photoFailed) {
+                Text(
+                    text = stringResource(R.string.meal_photo_failed),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 32.dp, end = 32.dp, top = 8.dp),
+                )
+            }
             PriceField(
                 priceText = draft.priceText,
                 onPriceChange = actions.onPriceChange,
-                onDone = { if (uiState.isNew && draft.canSave) actions.onSave() },
+                onDone = {
+                    focusManager.clearFocus()
+                    if (uiState.isNew && draft.canSave) actions.onSave()
+                },
                 focusRequester = priceFocus,
             )
             FieldGroup {
@@ -285,7 +300,8 @@ fun MealScreen(
             PillButton(
                 text = stringResource(R.string.meal_save),
                 onClick = actions.onSave,
-                enabled = draft.canSave,
+                enabled = draft.canSave && !uiState.savePending,
+                interactive = !uiState.closing,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 12.dp),
@@ -309,6 +325,7 @@ fun MealScreen(
 @Composable
 private fun MealTopBar(
     isFavorite: Boolean,
+    enabled: Boolean,
     onBack: () -> Unit,
     onToggleFavorite: () -> Unit,
     onDelete: () -> Unit,
@@ -320,11 +337,11 @@ private fun MealTopBar(
             .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = onBack) {
+        IconButton(onClick = onBack, enabled = enabled, colors = closingIconColors()) {
             Icon(FoodJournalIcons.Back, contentDescription = stringResource(R.string.back))
         }
         Spacer(Modifier.weight(1f))
-        IconButton(onClick = onToggleFavorite) {
+        IconButton(onClick = onToggleFavorite, enabled = enabled, colors = closingIconColors()) {
             Icon(
                 imageVector = if (isFavorite) FoodJournalIcons.FavoriteOn else FoodJournalIcons.Favorite,
                 contentDescription = stringResource(
@@ -332,16 +349,22 @@ private fun MealTopBar(
                 ),
             )
         }
-        IconButton(onClick = onDelete) {
+        IconButton(onClick = onDelete, enabled = enabled, colors = closingIconColors()) {
             Icon(FoodJournalIcons.Delete, contentDescription = stringResource(R.string.meal_delete))
         }
     }
 }
 
+/** A closing screen's buttons stop responding but keep their look through the fade-out. */
+@Composable
+private fun closingIconColors() = IconButtonDefaults.iconButtonColors(
+    disabledContentColor = LocalContentColor.current,
+)
+
 /**
- * The photo on top, inset with rounded corners and cropped to 4:3, so the price stays in view
- * above the number pad. Tapping it retakes or picks another. Without a photo, a short grey tile
- * offers to add one.
+ * The photo on top, inset with rounded corners, at the camera's 3:4 frame so none of the shot
+ * is cut away. With the number pad up, the form scrolls the price into view below it. Tapping
+ * it retakes or picks another. Without a photo, a short grey tile offers to add one.
  */
 @Composable
 private fun PhotoArea(photoFile: File?, processing: Boolean, onClick: () -> Unit) {
@@ -372,7 +395,7 @@ private fun PhotoArea(photoFile: File?, processing: Boolean, onClick: () -> Unit
         Modifier
             .padding(horizontal = 16.dp, vertical = 4.dp)
             .fillMaxWidth()
-            .aspectRatio(4f / 3f)
+            .aspectRatio(3f / 4f)
             .clip(PhotoShape)
             .background(colors.surfaceContainer)
             .clickable(onClickLabel = stringResource(R.string.meal_change_photo), onClick = onClick),
@@ -571,6 +594,9 @@ private fun MealNewPreview() {
                 stage = MealStage.Form,
                 photoFile = null,
                 photoProcessing = true,
+                photoFailed = false,
+                savePending = false,
+                closing = false,
                 nameSuggestions = emptyList(),
                 placeName = "Lin Dong Fang",
                 showSave = true,
@@ -598,6 +624,9 @@ private fun MealSavedPreview() {
                 stage = MealStage.Form,
                 photoFile = null,
                 photoProcessing = false,
+                photoFailed = false,
+                savePending = false,
+                closing = false,
                 nameSuggestions = emptyList(),
                 placeName = "Yongkang Beef Noodles",
                 showSave = false,

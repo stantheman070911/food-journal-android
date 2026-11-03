@@ -21,6 +21,7 @@
     <string name="meal_photo">Photo</string>
     <string name="meal_add_photo">Add photo</string>
     <string name="meal_change_photo">Change photo</string>
+    <string name="meal_photo_failed">That photo couldn’t be read. Try another.</string>
     <string name="meal_price">Price</string>
     <string name="meal_name">Name</string>
     <string name="meal_time">Time</string>

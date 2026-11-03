@@ -30,6 +30,18 @@ data class PhotoMetadata(
     val location: LocationFix?,
 )
 
+/** Turns new photos into pending photos. An interface so tests can decide when it finishes. */
+interface PhotoProcessing {
+    /** Processes the capture in [PhotoStore.captureFile] and deletes it. False if unreadable. */
+    suspend fun fromCapture(name: String): Boolean
+
+    /** A gallery photo's date and location, read quickly, before the photo is processed. */
+    suspend fun readMetadata(uri: Uri): PhotoMetadata
+
+    /** Processes a photo from the Photo Picker. False if it can't be read. */
+    suspend fun fromPicker(uri: Uri, name: String): Boolean
+}
+
 /**
  * Turns a camera capture or a gallery photo into a pending photo: 1600 px on the long edge and
  * a 400 px thumbnail, both JPEG at quality 85. The stored files carry no metadata.
@@ -37,35 +49,55 @@ data class PhotoMetadata(
 class PhotoProcessor(
     private val store: PhotoStore,
     private val resolver: ContentResolver,
-) {
-    /** Processes the capture in [PhotoStore.captureFile] and deletes it. False if unreadable. */
-    suspend fun fromCapture(name: String): Boolean = withContext(Dispatchers.IO) {
+) : PhotoProcessing {
+    // Any failure, not only I/O: a photo the decoder rejects, a revoked grant, or too little
+    // memory all leave the meal without that photo rather than crashing the app.
+    override suspend fun fromCapture(name: String): Boolean = withContext(Dispatchers.IO) {
         val capture = store.captureFile(name)
         try {
             write(ImageDecoder.createSource(capture), name)
             true
-        } catch (_: IOException) {
+        } catch (_: Exception) {
+            discardPartial(name)
+            false
+        } catch (_: OutOfMemoryError) {
+            discardPartial(name)
             false
         } finally {
             capture.delete()
         }
     }
 
-    /**
-     * Processes a photo from the Photo Picker and reads its metadata. The location is only
-     * there when the picker was allowed to share it. Null if the photo can't be read.
-     */
-    suspend fun fromPicker(uri: Uri, name: String): PhotoMetadata? = withContext(Dispatchers.IO) {
+    /** The location is only there when the picker was allowed to share it. */
+    override suspend fun readMetadata(uri: Uri): PhotoMetadata = withContext(Dispatchers.IO) {
         try {
-            val metadata = readMetadata(uri)
-            write(ImageDecoder.createSource(resolver, uri), name)
-            metadata
-        } catch (_: IOException) {
-            null
+            exifMetadata(uri)
+        } catch (_: Exception) {
+            PhotoMetadata(takenAt = null, location = null)
         }
     }
 
-    private fun readMetadata(uri: Uri): PhotoMetadata {
+    override suspend fun fromPicker(uri: Uri, name: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            write(ImageDecoder.createSource(resolver, uri), name)
+            true
+        } catch (_: Exception) {
+            discardPartial(name)
+            false
+        } catch (_: OutOfMemoryError) {
+            discardPartial(name)
+            false
+        }
+    }
+
+    private fun discardPartial(name: String) {
+        listOf(store.pendingPhotoFile(name), store.pendingThumbFile(name)).forEach { file ->
+            file.delete()
+            File(file.parentFile, "${file.name}.part").delete()
+        }
+    }
+
+    private fun exifMetadata(uri: Uri): PhotoMetadata {
         val exif = resolver.openInputStream(uri)?.use { ExifInterface(it) }
             ?: return PhotoMetadata(takenAt = null, location = null)
         val takenAt = parseExifDateTime(exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL))

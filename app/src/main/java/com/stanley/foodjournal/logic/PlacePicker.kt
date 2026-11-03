@@ -61,3 +61,26 @@ fun placePickerContent(
         places = rows,
     )
 }
+
+/** What the picker's ✓ key does with what has been typed. */
+sealed interface PickerSubmit {
+    data class Select(val placeId: Long) : PickerSubmit
+
+    data class Add(val name: String) : PickerSubmit
+
+    /** Nothing typed: the key only closes the keyboard. */
+    data object Nothing : PickerSubmit
+}
+
+/**
+ * The ✓ key picks the saved place whose name was typed in full, adds a new name, or keeps a
+ * pending new place typed again. Otherwise it only closes the keyboard.
+ */
+fun pickerSubmit(content: PlacePickerContent, query: String): PickerSubmit {
+    val typed = normalizePlaceName(query)
+    if (typed.isEmpty()) return PickerSubmit.Nothing
+    content.places.firstOrNull { sameName(it.place.name, typed) }?.let { return PickerSubmit.Select(it.place.id) }
+    content.addName?.let { return PickerSubmit.Add(it) }
+    content.pendingName?.takeIf { sameName(it, typed) }?.let { return PickerSubmit.Add(it) }
+    return PickerSubmit.Nothing
+}
