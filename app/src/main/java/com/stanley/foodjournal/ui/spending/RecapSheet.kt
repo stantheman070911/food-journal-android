@@ -76,7 +76,7 @@ fun RecapSheet(
 }
 
 @Composable
-private fun RecapSheetContent(
+internal fun RecapSheetContent(
     sheet: RecapSheetUiState,
     onChangeOptions: ((RecapOptions) -> RecapOptions) -> Unit,
     onShare: () -> Unit,

@@ -92,7 +92,7 @@ The app does not use the phone's location (see "Places without phone location" b
 - **Light and dark.** No switch is specified. The app follows the system setting. *From Phase 6, on request, Settings offers System, Light, and Dark; System stays the default.*
 - **Number format.** "2,340" uses English grouping on every device, since the app is English only.
 - **App icon.** Not specified. Phase 1 used a monochrome plate: two thin rings, white on black. On Nov 4, 2026, the user chose a filmstrip instead: three white portrait tiles on black, rounded only at the strip's ends, like a week in the Journal. The same drawing is the themed-icon layer; its solid shapes hold up at small sizes better than thin rings.
-- **Test libraries.** Unit tests need JUnit 4. It is test-only and never ships in the app.
+- **Test libraries.** Unit tests need JUnit 4. It is test-only and never ships in the app. Device tests of the screens use Compose's UI test library, added on Nov 4, 2026, as the user agreed. It never ships either: a small part of it, an empty activity to host a test, is in debug builds only.
 
 ## Decisions
 
@@ -310,7 +310,7 @@ Settled on Nov 4, 2026, before any Phase 5 code, all as recommended. These add t
 5. **The keyboard no longer hides results.** The Search column sits above it, so "No meals found" and the last results stay in view.
 6. **"Meals here" survives a rotation** between the Meal screen closing and Search opening.
 
-**Left open:** tab navigation and the Meal screen's hand-off to Search have no automated test; that needs the Compose UI test or navigation-testing library, which would need an OK first.
+**Left open:** tab navigation and the Meal screen's hand-off to Search have no automated test; that needs the Compose UI test or navigation-testing library, which would need an OK first. *Nov 4, 2026: the Compose UI test library came in with the Share sheet's tests. These tests are still to be written.*
 
 ## Phase 6: Settings, backup, and restore
 
@@ -382,7 +382,7 @@ Requested on Nov 4, 2026, after version 1.01.00: each figure on a recap should b
 - **Making and closing.** Share reads "Making…" while the image is drawn. The close button slides the sheet away, as on the place picker, but while the image is being drawn it closes at once and drops the image, so it can't reach Android's share sheet afterward. A recap that can't be drawn is logged and leaves the sheet open; one whose meals or saved choice can't be read is logged and leaves it closed.
 - **A short window,** such as a phone on its side: the rows scroll inside the card, and Share stays in view.
 - **The choice is remembered** in DataStore for the next recap, across launches, from the moment a switch changes, whether or not that recap is shared. A save that fails is logged by the app's scope, and the sheet keeps the choice. All four are on until the first change. Added without asking, since choosing again for every recap would be a chore; it is one small step to take out.
-- **Left open.** The sheet's layout and taps have no automated test, since that needs the Compose UI test library, which would need an OK first. The ViewModel, the saved choice, and the image each have device tests, and the short window was checked by hand on the emulator.
+- **Tests.** The sheet's layout in a short window, its switches, and how it closes have device tests, written with Compose's UI test library after 1.01.01 shipped. The ViewModel, the saved choice, and the image have device tests of their own.
 
 ## Design references: Retro
 
