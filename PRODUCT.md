@@ -1,6 +1,6 @@
 # Food Journal
 
-This document describes Food Journal at version 1.01.01: what it does, how it looks, and how it is built.
+This document describes Food Journal at version 1.02.00: what it does, how it looks, and how it is built.
 
 ## Overview
 
