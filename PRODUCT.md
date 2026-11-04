@@ -561,6 +561,9 @@ ANDROID_SERIAL=emulator-5560 ./gradlew :app:connectedDebugAndroidTest
   - DataStore
   - each screen's ViewModel
   - the recap sheet
+  - the Meal screen's date line, camera icon, and stepping gestures
+  - the chart's bars
+  - closing and stepping through a meal in the whole app, adding and removing their own test meals
 - **Fakes.** The Meal and Spending ViewModels take photo processing and recap drawing through small interfaces, `PhotoProcessing` and `RecapDrawing`, so tests drive them with fakes.
 - **Test-only code.** Test libraries never ship. Only an empty activity for hosting UI tests is in debug builds.
 - **Previews.** `ui/preview/` holds Compose previews of the theme and type, in light and dark.
@@ -571,6 +574,8 @@ ANDROID_SERIAL=emulator-5560 ./gradlew :app:connectedDebugAndroidTest
 
 - Photo Picker location on a real phone. On the emulator it arrives as 0, 0, so gallery prefill is tested only through the database and unit tests.
 - HEIC date and location.
+- A capture that fails: the emulator's camera doesn't fail on demand, so its message hasn't been seen on screen.
+- `tools/build-districts.sh` on the ministry's shapefile. The bundled districts come from taiwan-atlas's 2021 copy until the ministry's download is back.
 - Photo orientation with auto-rotate off.
 - Anything on Android 16, on a device or an emulator.
 
