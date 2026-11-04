@@ -22,9 +22,11 @@ import com.stanley.foodjournal.edits.PendingEdit
 import com.stanley.foodjournal.edits.RenameResult
 import com.stanley.foodjournal.edits.UndoableEdits
 import com.stanley.foodjournal.logic.LocationFix
+import com.stanley.foodjournal.logic.MealSteps
 import com.stanley.foodjournal.logic.PlacePickerContent
 import com.stanley.foodjournal.logic.cleanPriceInput
 import com.stanley.foodjournal.logic.mealLocation
+import com.stanley.foodjournal.logic.mealSteps
 import com.stanley.foodjournal.logic.normalizePlaceName
 import com.stanley.foodjournal.logic.placePickerContent
 import com.stanley.foodjournal.logic.prefillPlace
@@ -39,6 +41,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -67,6 +71,8 @@ data class MealUiState(
     val placeName: String?,
     /** A new meal always shows Save. A saved meal shows it once something has changed. */
     val showSave: Boolean,
+    /** Where a saved meal stands among all meals. Null for a new meal, or until they are read. */
+    val steps: MealSteps? = null,
 )
 
 /**
@@ -95,6 +101,7 @@ class MealViewModel(
     private var original by mutableStateOf<Meal?>(null)
     private var recentNames by mutableStateOf<List<String>>(emptyList())
     private var places by mutableStateOf<List<PlaceSummary>>(emptyList())
+    private var steps by mutableStateOf<MealSteps?>(null)
 
     /** The last merge that moved the draft to its survivor, so an undo can move it back. */
     private var mergedAway: Pair<Long, Long>? = null
@@ -123,7 +130,9 @@ class MealViewModel(
     private var photoFailed by mutableStateOf(false)
     private var savePending by mutableStateOf(false)
     private val _finished = MutableStateFlow(false)
-    private val closing: Boolean get() = _finished.value
+    private var stepping by mutableStateOf(false)
+    private val closing: Boolean get() = _finished.value || stepping
+    private val _stepTo = MutableStateFlow<Long?>(null)
 
     /** Null while a saved meal is still loading. Read it from composition. */
     val uiState: MealUiState?
@@ -142,11 +151,15 @@ class MealViewModel(
                 placeName = current.newPlaceName
                     ?: current.placeId?.let { id -> places.firstOrNull { it.place.id == id }?.place?.name },
                 showSave = isNew || (saved != null && current.hasChangesFrom(saved)),
+                steps = steps,
             )
         }
 
     /** Set when the screen should close. */
     val finished: StateFlow<Boolean> = _finished.asStateFlow()
+
+    /** The meal to open in this screen's place, once this one's edits are settled. */
+    val stepTo: StateFlow<Long?> = _stepTo.asStateFlow()
 
     /**
      * The place "Meals here" opens in Search: the meal's own, once the meal and the place are both
@@ -172,6 +185,12 @@ class MealViewModel(
         }
         viewModelScope.launch { edits.undone.collect { followUndo(it) } }
         if (mealId != null) {
+            viewModelScope.launch {
+                mealDao.observeAll()
+                    .map { meals -> mealSteps(meals, mealId) }
+                    .flowOn(Dispatchers.Default)
+                    .collect { steps = it }
+            }
             viewModelScope.launch {
                 val meal = mealDao.get(mealId)
                 if (meal == null) {
@@ -341,15 +360,38 @@ class MealViewModel(
      */
     fun onBack() {
         if (closing) return
-        val current = draft
-        val saved = original
-        when {
-            current == null -> Unit
-            isNew -> discard(current)
-            saved != null && current.hasChangesFrom(saved) && current.canSave -> persist(current)
-            else -> discard(current)
-        }
+        keepOrDropEdits()
         _finished.value = true
+    }
+
+    /** Opens the meal before this one in the Journal's order, keeping edits as Back does. */
+    fun stepToPrevious() = stepTo(steps?.previous)
+
+    /** Opens the meal after this one in the Journal's order, keeping edits as Back does. */
+    fun stepToNext() = stepTo(steps?.next)
+
+    /**
+     * Keeps or drops the edits, then asks for [target]. It waits for a save to finish: coming back
+     * to this meal before then would read its old row, and a later edit could bring back a photo
+     * the save has already deleted. Does nothing at either end of the meals.
+     */
+    private fun stepTo(target: Long?) {
+        if (closing || target == null) return
+        stepping = true
+        val saving = keepOrDropEdits()
+        viewModelScope.launch {
+            saving?.join()
+            _stepTo.value = target
+        }
+    }
+
+    /** Saves a saved meal's valid edits and returns that work; anything else is dropped. */
+    private fun keepOrDropEdits(): Job? {
+        val current = draft ?: return null
+        val saved = original
+        if (!isNew && saved != null && current.hasChangesFrom(saved) && current.canSave) return persist(current)
+        discard(current)
+        return null
     }
 
     /**
@@ -469,9 +511,9 @@ class MealViewModel(
     // Runs in the app scope, so leaving the screen never cuts a save short. A photo still being
     // resized (a saved meal closed with Back) is waited for first. Only then is it known which
     // photo the meal keeps: an unreadable replacement gives way to the original, which is kept.
-    private fun persist(draft: MealDraft) {
+    private fun persist(draft: MealDraft): Job {
         val pendingWork = photoJob
-        appScope.launch {
+        return appScope.launch {
             pendingWork?.join()
             var toSave = withContext(Dispatchers.Main) { this@MealViewModel.draft } ?: draft
             val location = mealLocation(isNew, toSave.fromGallery, toSave.photoLocation)

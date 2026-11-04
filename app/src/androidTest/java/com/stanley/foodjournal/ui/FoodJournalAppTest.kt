@@ -1,12 +1,17 @@
 package com.stanley.foodjournal.ui
 
 import android.content.Context
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.stanley.foodjournal.FoodJournalApplication
@@ -69,6 +74,31 @@ class FoodJournalAppTest {
         compose.onNodeWithContentDescription(context.getString(R.string.meal_delete)).assertDoesNotExist()
         compose.onNodeWithContentDescription(context.getString(R.string.add_meal)).assertExists()
     }
+
+    @Test
+    fun steppingReplacesTheOpenMealSoBackReturnsToTheTabs() = runBlocking<Unit> {
+        val nextMeal = meal.copy(eatenAt = meal.eatenAt.plusDays(1), name = "Next test meal")
+        val nextId = meals.insert(nextMeal)
+        try {
+            compose.setContent { FoodJournalTheme { FoodJournalApp() } }
+            compose.waitUntil(WAIT_MILLIS) { hasNode(hasText(meal.name!!)) }
+            compose.onNodeWithText(meal.name!!).performClick()
+            val canStep = SemanticsMatcher.keyIsDefined(SemanticsActions.CustomActions)
+            compose.waitUntil(WAIT_MILLIS) { hasNode(canStep) }
+
+            compose.onNode(canStep).performTouchInput { click(Offset(width * 0.9f, centerY)) }
+            compose.waitUntil(WAIT_MILLIS) { hasNode(hasText("Next test meal")) }
+
+            compose.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
+            compose.waitForIdle()
+            compose.onNodeWithContentDescription(context.getString(R.string.meal_delete)).assertDoesNotExist()
+            compose.onNodeWithContentDescription(context.getString(R.string.add_meal)).assertExists()
+        } finally {
+            meals.delete(nextMeal.copy(id = nextId))
+        }
+    }
+
+    private fun hasNode(matcher: SemanticsMatcher) = compose.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty()
 
     private companion object {
         const val WAIT_MILLIS = 5_000L

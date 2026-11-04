@@ -26,6 +26,7 @@ It's a diary, not a diet tracker. There are no calories, goals, streaks, or scor
 - One row per week, Monday to Sunday, newest first, with the week's total.
 - Each week is a filmstrip of photo tiles. Swipe sideways through a week, and scroll down through earlier ones.
 - A meal without a photo shows as a plain tile with its name.
+- Open a meal, then tap or swipe its photo to step to the next or previous one, across weeks.
 
 ### Spending
 

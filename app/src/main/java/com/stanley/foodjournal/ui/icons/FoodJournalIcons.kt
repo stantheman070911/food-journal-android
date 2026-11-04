@@ -63,6 +63,14 @@ object FoodJournalIcons {
         )
     }
 
+    val Camera: ImageVector by lazy {
+        strokeIcon(
+            "Camera",
+            "M4.5,7.5H7.5L9,5H15L16.5,7.5H19.5A1.5,1.5 0 0 1 21,9V18A1.5,1.5 0 0 1 19.5,19.5H4.5A1.5,1.5 0 0 1 3,18V9A1.5,1.5 0 0 1 4.5,7.5Z",
+            "M15.5,13A3.5,3.5 0 1 1 8.5,13A3.5,3.5 0 1 1 15.5,13Z",
+        )
+    }
+
     /** Three sliders: settings, without a gear's many small teeth at this stroke weight. */
     val Settings: ImageVector by lazy {
         strokeIcon(

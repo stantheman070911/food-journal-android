@@ -373,6 +373,83 @@ class MealViewModelTest {
 
     private val noon = LocalDateTime.of(2026, 11, 3, 12, 0)
 
+    @Test
+    fun stepsFollowTheJournalsOrderAndStopAtBothEnds() = runBlocking {
+        val first = insertMeal(LocalDateTime.of(2026, 10, 26, 9, 0), "First")
+        val last = insertMeal(LocalDateTime.of(2026, 11, 1, 20, 0), "Last of the week")
+        val next = insertMeal(LocalDateTime.of(2026, 11, 2, 8, 0), "First of the next week")
+
+        val middle = savedMeal(last)
+        awaitTrue { main { middle.uiState?.steps } != null }
+        assertEquals(first, main { middle.uiState!!.steps!!.previous })
+        main { middle.stepToNext() }
+        awaitTrue { middle.stepTo.value == next }
+        assertTrue(main { middle.uiState!!.closing })
+
+        val newest = savedMeal(next)
+        awaitTrue { main { newest.uiState?.steps } != null }
+        main { newest.stepToNext() }
+        delay(200)
+        assertNull(newest.stepTo.value)
+        assertFalse(main { newest.uiState!!.closing })
+
+        val oldest = savedMeal(first)
+        awaitTrue { main { oldest.uiState?.steps } != null }
+        main { oldest.stepToPrevious() }
+        delay(200)
+        assertNull(oldest.stepTo.value)
+
+        // A new meal has nowhere to step to.
+        val new = newMeal()
+        assertNull(main { new.uiState!!.steps })
+    }
+
+    @Test
+    fun steppingKeepsValidEditsAndDropsTheRest() = runBlocking {
+        val one = insertMeal(LocalDateTime.of(2026, 11, 2, 8, 0), "One")
+        val two = insertMeal(LocalDateTime.of(2026, 11, 3, 8, 0), "Two")
+
+        val edited = savedMeal(one)
+        awaitTrue { main { edited.uiState?.steps } != null }
+        main {
+            edited.onNameChange("Edited")
+            edited.stepToNext()
+        }
+        awaitTrue { edited.stepTo.value == two }
+        // The step is only asked for once the save is done.
+        assertEquals("Edited", db.mealDao().get(one)!!.name)
+
+        val invalid = savedMeal(two)
+        awaitTrue { main { invalid.uiState?.steps } != null }
+        main {
+            invalid.onPriceChange("")
+            invalid.stepToPrevious()
+        }
+        awaitTrue { invalid.stepTo.value == one }
+        assertEquals(100, db.mealDao().get(two)!!.price)
+    }
+
+    @Test
+    fun steppingWaitsForAPhotoStillBeingProcessed() = runBlocking {
+        val one = insertMeal(LocalDateTime.of(2026, 11, 2, 8, 0), "One")
+        val two = insertMeal(LocalDateTime.of(2026, 11, 3, 8, 0), "Two")
+
+        val vm = savedMeal(one)
+        awaitTrue { main { vm.uiState?.steps } != null }
+        val photo = capture(vm)
+        main { vm.stepToNext() }
+        delay(200)
+        assertNull(vm.stepTo.value)
+        assertTrue(main { vm.uiState!!.closing })
+
+        processing.finish(photo, ok = true)
+        awaitTrue { vm.stepTo.value == two }
+        assertEquals(photo, db.mealDao().get(one)!!.photo)
+    }
+
+    private suspend fun insertMeal(eatenAt: LocalDateTime, name: String): Long =
+        db.mealDao().insert(Meal(eatenAt = eatenAt, name = name, price = 100))
+
     private fun newMeal(): MealViewModel = viewModel(mealId = null)
 
     private fun savedMeal(id: Long): MealViewModel = viewModel(mealId = id)

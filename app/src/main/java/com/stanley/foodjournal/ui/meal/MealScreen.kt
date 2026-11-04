@@ -12,7 +12,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.aspectRatio
@@ -61,6 +64,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -69,10 +73,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
@@ -88,6 +99,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.stanley.foodjournal.R
+import com.stanley.foodjournal.logic.MealSteps
 import com.stanley.foodjournal.logic.formatMealTime
 import com.stanley.foodjournal.logic.groupDigits
 import com.stanley.foodjournal.logic.groupedToOriginal
@@ -99,17 +111,23 @@ import com.stanley.foodjournal.ui.preview.ThemePreviews
 import java.time.LocalDate
 import java.time.LocalDateTime
 
-/** Adds, shows, and edits one meal. [onOpenPlace] opens a place's meals in Search. */
+/**
+ * Adds, shows, and edits one meal. [onOpenPlace] opens a place's meals in Search, and [onStepTo]
+ * opens another meal in this one's place.
+ */
 @Composable
 fun MealScreen(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
     onOpenPlace: (placeId: Long) -> Unit = {},
+    onStepTo: (mealId: Long) -> Unit = {},
     viewModel: MealViewModel = viewModel(factory = MealViewModel.Factory),
 ) {
     val uiState = viewModel.uiState
     val finished by viewModel.finished.collectAsStateWithLifecycle()
     LaunchedEffect(finished) { if (finished) onClose() }
+    val stepTo by viewModel.stepTo.collectAsStateWithLifecycle()
+    LaunchedEffect(stepTo) { stepTo?.let(onStepTo) }
     BackHandler(enabled = !finished) {
         if (uiState?.stage == MealStage.Camera) viewModel.onCameraBack() else viewModel.onBack()
     }
@@ -165,6 +183,8 @@ fun MealScreen(
                             onEatenAtChange = viewModel::onEatenAtChange,
                             onPickPlace = { pickingPlace = true },
                             onSave = viewModel::save,
+                            onPreviousMeal = viewModel::stepToPrevious,
+                            onNextMeal = viewModel::stepToNext,
                         ),
                     )
                 }
@@ -204,6 +224,8 @@ class MealActions(
     val onEatenAtChange: (LocalDateTime) -> Unit = {},
     val onPickPlace: () -> Unit = {},
     val onSave: () -> Unit = {},
+    val onPreviousMeal: () -> Unit = {},
+    val onNextMeal: () -> Unit = {},
 )
 
 @Composable
@@ -230,21 +252,33 @@ fun MealScreen(
             onBack = actions.onBack,
             onToggleFavorite = actions.onToggleFavorite,
             onDelete = actions.onDelete,
+            // A new meal's photo opens the camera itself.
+            camera = if (uiState.isNew) null else CameraButton(hasPhoto = draft.photo != null, onClick = actions.onReplacePhoto),
         )
         Column(
             Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState()),
         ) {
-            // On a saved meal the time is mostly read, so it heads the screen.
-            if (!uiState.isNew) {
+            if (uiState.isNew) {
+                PhotoArea(
+                    photoFile = uiState.photoFile,
+                    processing = uiState.photoProcessing,
+                    onClick = actions.onReplacePhoto,
+                )
+            } else {
+                // On a saved meal the time is mostly read, so it heads the screen.
                 DateLine(text = formatMealTime(draft.eatenAt, today), onClick = { editingTime = true })
+                WeekSegments(steps = uiState.steps)
+                SteppingPhoto(
+                    photoFile = uiState.photoFile,
+                    processing = uiState.photoProcessing,
+                    name = draft.name,
+                    steps = uiState.steps,
+                    onPrevious = actions.onPreviousMeal,
+                    onNext = actions.onNextMeal,
+                )
             }
-            PhotoArea(
-                photoFile = uiState.photoFile,
-                processing = uiState.photoProcessing,
-                onClick = actions.onReplacePhoto,
-            )
             if (uiState.photoFailed) {
                 Text(
                     text = stringResource(R.string.meal_photo_failed),
@@ -320,6 +354,9 @@ fun MealScreen(
     }
 }
 
+/** A saved meal's way to the camera, now its photo steps between meals. */
+private class CameraButton(val hasPhoto: Boolean, val onClick: () -> Unit)
+
 @Composable
 private fun MealTopBar(
     isFavorite: Boolean,
@@ -327,6 +364,7 @@ private fun MealTopBar(
     onBack: () -> Unit,
     onToggleFavorite: () -> Unit,
     onDelete: () -> Unit,
+    camera: CameraButton?,
 ) {
     Row(
         modifier = Modifier
@@ -339,6 +377,14 @@ private fun MealTopBar(
             Icon(FoodJournalIcons.Back, contentDescription = stringResource(R.string.back))
         }
         Spacer(Modifier.weight(1f))
+        camera?.let {
+            IconButton(onClick = it.onClick, enabled = enabled, colors = closingIconColors()) {
+                Icon(
+                    FoodJournalIcons.Camera,
+                    contentDescription = stringResource(if (it.hasPhoto) R.string.meal_change_photo else R.string.meal_add_photo),
+                )
+            }
+        }
         IconButton(onClick = onToggleFavorite, enabled = enabled, colors = closingIconColors()) {
             Icon(
                 imageVector = if (isFavorite) FoodJournalIcons.FavoriteOn else FoodJournalIcons.Favorite,
@@ -379,7 +425,97 @@ private fun DateLine(text: String, onClick: () -> Unit) {
 }
 
 /**
- * The photo on top, inset with rounded corners, at the camera's 3:4 frame so none of the shot
+ * A thin segment for each meal of the week, oldest on the left, with this meal's in ink. Its room
+ * is kept while the meals are read, so the photo below never jumps.
+ */
+@Composable
+private fun WeekSegments(steps: MealSteps?) {
+    val colors = MaterialTheme.colorScheme
+    Canvas(
+        Modifier
+            .padding(start = 16.dp, end = 16.dp, bottom = 4.dp)
+            .fillMaxWidth()
+            .height(SegmentHeight),
+    ) {
+        val count = steps?.weekCount ?: return@Canvas
+        val gap = SegmentGap.toPx()
+        val width = ((size.width - gap * (count - 1)) / count).coerceAtLeast(1f)
+        repeat(count) { index ->
+            drawRoundRect(
+                color = if (index == steps.weekIndex) colors.primary else colors.surfaceContainerHighest,
+                topLeft = Offset(index * (width + gap), 0f),
+                size = Size(width, size.height),
+                cornerRadius = CornerRadius(size.height / 2),
+            )
+        }
+    }
+}
+
+/**
+ * A saved meal's photo, or a plain tile with its name. The left third opens the previous meal and
+ * the rest the next; a swipe left opens the next and a swipe right the previous. A vertical drag
+ * still scrolls the form.
+ */
+@Composable
+private fun SteppingPhoto(
+    photoFile: File?,
+    processing: Boolean,
+    name: String,
+    steps: MealSteps?,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+) {
+    val previous by rememberUpdatedState(onPrevious)
+    val next by rememberUpdatedState(onNext)
+    val previousLabel = stringResource(R.string.meal_previous)
+    val nextLabel = stringResource(R.string.meal_next)
+    val colors = MaterialTheme.colorScheme
+    Box(
+        Modifier
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .fillMaxWidth()
+            .aspectRatio(3f / 4f)
+            .clip(PhotoShape)
+            .background(colors.surfaceContainer)
+            .pointerInput(Unit) {
+                detectTapGestures { offset -> if (offset.x < size.width / 3f) previous() else next() }
+            }
+            .pointerInput(Unit) {
+                var dragged = 0f
+                detectHorizontalDragGestures(
+                    onDragStart = { dragged = 0f },
+                    onDragEnd = {
+                        val swipe = SwipeDistance.toPx()
+                        if (dragged <= -swipe) next() else if (dragged >= swipe) previous()
+                    },
+                ) { change, amount ->
+                    change.consume()
+                    dragged += amount
+                }
+            }
+            .semantics(mergeDescendants = true) {
+                // Only the steps there are: at either end of the meals, one has nowhere to go.
+                customActions = listOfNotNull(
+                    steps?.previous?.let { CustomAccessibilityAction(previousLabel) { previous(); true } },
+                    steps?.next?.let { CustomAccessibilityAction(nextLabel) { next(); true } },
+                )
+            },
+    ) {
+        if (photoFile != null && !processing) {
+            MealPhoto(photoFile)
+        } else if (!processing) {
+            Text(
+                text = name,
+                style = MaterialTheme.typography.titleLarge,
+                color = colors.onSurface,
+                modifier = Modifier.padding(20.dp),
+            )
+        }
+    }
+}
+
+/**
+ * A new meal's photo, inset with rounded corners, at the camera's 3:4 frame so none of the shot
  * is cut away. With the number pad up, the form scrolls the price into view below it. Tapping
  * it retakes or picks another. Without a photo, a short grey tile offers to add one.
  */
@@ -418,17 +554,22 @@ private fun PhotoArea(photoFile: File?, processing: Boolean, onClick: () -> Unit
             .clickable(onClickLabel = stringResource(R.string.meal_change_photo), onClick = onClick),
     ) {
         if (!processing && photoFile != null) {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalPlatformContext.current)
-                    .data(photoFile)
-                    .crossfade(true)
-                    .build(),
-                contentDescription = stringResource(R.string.meal_photo),
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
+            MealPhoto(photoFile)
         }
     }
+}
+
+@Composable
+private fun MealPhoto(file: File) {
+    AsyncImage(
+        model = ImageRequest.Builder(LocalPlatformContext.current)
+            .data(file)
+            .crossfade(true)
+            .build(),
+        contentDescription = stringResource(R.string.meal_photo),
+        contentScale = ContentScale.Crop,
+        modifier = Modifier.fillMaxSize(),
+    )
 }
 
 /** The price, large, in Fraunces. Digits group as they are typed: "2,340". */
@@ -582,6 +723,11 @@ private fun Divider() {
 
 private val PhotoShape = RoundedCornerShape(20.dp)
 private val GroupShape = RoundedCornerShape(16.dp)
+private val SegmentHeight = 3.dp
+private val SegmentGap = 2.dp
+
+/** How far a drag has to run to count as a swipe. */
+private val SwipeDistance = 48.dp
 
 /** Shows "2340" as "2,340" while keeping the cursor where it belongs. */
 private object GroupedDigits : VisualTransformation {

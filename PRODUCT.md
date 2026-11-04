@@ -59,7 +59,7 @@ Two records, Meal and Place. A meal belongs to at most one place.
 - **Add.** A round button, ink on every tab, opens a new meal.
 - **Screens above the tabs.** The Meal and Settings screens cover the bottom bar.
 - **Back.** From a tab, Back returns to Journal, then exits. Each tab keeps its state while switching tabs, but not across a cold start.
-- **Motion.** Tabs crossfade in 150 ms. The Meal and Settings screens fade in with a slight rise over 220 ms. Nothing slows logging.
+- **Motion.** Tabs crossfade in 150 ms, as does a step from one saved meal to another. The Meal and Settings screens fade in with a slight rise over 220 ms. Nothing slows logging.
 
 ## Logging a meal
 
@@ -79,8 +79,14 @@ Two records, Meal and Place. A meal belongs to at most one place.
 
 **The Meal screen** adds, reads, and edits a meal, and is always editable.
 
-- **Top.** Back, Favorite, and Delete.
-- **Photo.** Shown at 3:4, inset 16 dp with 20 dp corners. Tap it to retake or pick another; Back from that camera returns to the form. Without a photo, a short grey tile reads "+ Add photo".
+- **Top.** Back, Favorite, and Delete. A saved meal also has a camera icon before Favorite, which opens the camera to retake the photo or add one; Back from that camera returns to the form.
+- **A new meal's photo.** Shown at 3:4, inset 16 dp with 20 dp corners. Tap it to retake or pick another; Back from that camera returns to the form. Without a photo, a short grey tile reads "+ Add photo".
+- **A saved meal's photo.** Shown the same way. Without a photo, it is a plain 3:4 grey tile with the meal's name. Either way, it steps between meals:
+  - **Taps and swipes.** Tapping the left third opens the previous meal, and the rest opens the next. Swiping left opens the next meal, and swiping right the previous. Screen readers get "Previous meal" and "Next meal" actions.
+  - **Order.** The Journal's strips, in time eaten, from wherever the meal was opened. Next is the tile to the right, continuing to the following week; Previous is the tile to the left, continuing to the week before. At the newest meal Next does nothing, and at the oldest Previous does nothing.
+  - **Edits.** Stepping away keeps edits as Back does: valid edits are saved, and others are dropped. It waits for the save, so coming back always reads the saved meal. An edited date moves the meal only once saved, so the next step still follows from where it was.
+  - **Segments.** A row of thin segments between the date and the photo shows the week's meals, oldest on the left, with this meal's in ink and the others grey.
+  - **Motion.** Each step crossfades in 150 ms, without the usual rise. Back returns to where the first meal was opened.
 - **Price.** Typed in the serif display style.
 - **Card.** Name, Place, Time, and Note sit on one grey card, divided by hairlines.
 - **Time.** Written with the date and weekday, as Search writes them: "Tue, Nov 3 · 18:03", or "Mon, Oct 27, 2025 · 19:05" outside the current year.

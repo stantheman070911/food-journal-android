@@ -90,4 +90,50 @@ class WeeksTest {
 
     private fun meal(id: Long, eatenAt: LocalDateTime, price: Int = 100) =
         Meal(id = id, eatenAt = eatenAt, name = "Meal $id", price = price)
+
+    private val stepMeals = listOf(
+        // Newest first, as a list may come, to show the order is the steps' own.
+        Meal(id = 5, eatenAt = LocalDateTime.of(2026, 11, 2, 8, 0), price = 1),
+        Meal(id = 4, eatenAt = LocalDateTime.of(2026, 11, 1, 20, 0), price = 1),
+        Meal(id = 3, eatenAt = LocalDateTime.of(2026, 10, 27, 12, 0), price = 1),
+        Meal(id = 2, eatenAt = LocalDateTime.of(2026, 10, 27, 12, 0), price = 1),
+        Meal(id = 1, eatenAt = LocalDateTime.of(2026, 10, 26, 9, 0), price = 1),
+    )
+
+    @Test
+    fun `steps run in the strips' order within a week`() {
+        val steps = mealSteps(stepMeals, 3)!!
+
+        assertEquals(2L, steps.previous)
+        assertEquals(4L, steps.next)
+    }
+
+    @Test
+    fun `steps cross into the weeks on either side`() {
+        // The last meal of Oct 26 - Nov 1 leads to the first of the following week, and back.
+        assertEquals(5L, mealSteps(stepMeals, 4)!!.next)
+        assertEquals(4L, mealSteps(stepMeals, 5)!!.previous)
+    }
+
+    @Test
+    fun `steps stop at the newest and the oldest meal`() {
+        assertEquals(null, mealSteps(stepMeals, 5)!!.next)
+        assertEquals(null, mealSteps(stepMeals, 1)!!.previous)
+    }
+
+    @Test
+    fun `steps place a meal among its own week's meals`() {
+        val steps = mealSteps(stepMeals, 3)!!
+        assertEquals(4, steps.weekCount)
+        assertEquals(2, steps.weekIndex)
+
+        val alone = mealSteps(stepMeals, 5)!!
+        assertEquals(1, alone.weekCount)
+        assertEquals(0, alone.weekIndex)
+    }
+
+    @Test
+    fun `a meal no longer among the meals has no steps`() {
+        assertEquals(null, mealSteps(stepMeals, 99))
+    }
 }
