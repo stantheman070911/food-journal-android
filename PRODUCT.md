@@ -76,6 +76,7 @@ Two records, Meal and Place. A meal belongs to at most one place.
 - Refused, the stage shows "Camera access is off" with "Open settings". Gallery and Skip still work. Access is checked again on resume.
 - Capture aims for 2048 × 1536 at 4:3, with minimum latency.
 - The close button sits on a dark grey disc.
+- A capture that fails leaves the camera open, with "That photo couldn't be read. Try another." below the viewfinder.
 
 **The Meal screen** adds, reads, and edits a meal, and is always editable.
 

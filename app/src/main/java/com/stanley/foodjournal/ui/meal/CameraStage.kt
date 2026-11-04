@@ -106,6 +106,7 @@ fun CameraStage(
     }
     var surfaceRequest by remember { mutableStateOf<SurfaceRequest?>(null) }
     var capturing by remember { mutableStateOf(false) }
+    var captureFailed by remember { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
     if (hasCamera) {
@@ -126,6 +127,7 @@ fun CameraStage(
     fun capture() {
         if (capturing || !hasCamera) return
         capturing = true
+        captureFailed = false
         val (name, file) = newCaptureFile()
         imageCapture.takePicture(
             ImageCapture.OutputFileOptions.Builder(file).build(),
@@ -138,6 +140,7 @@ fun CameraStage(
 
                 override fun onError(exception: ImageCaptureException) {
                     capturing = false
+                    captureFailed = true
                     file.delete()
                 }
             },
@@ -175,7 +178,22 @@ fun CameraStage(
                 !hasCamera -> CameraOff()
             }
         }
-        Spacer(Modifier.weight(1f))
+        Box(
+            Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(horizontal = 32.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (captureFailed) {
+                Text(
+                    text = stringResource(R.string.meal_photo_failed),
+                    color = CameraGrey,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
