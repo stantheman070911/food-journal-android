@@ -225,14 +225,15 @@ The Spending tab answers how much, where, and when, for a week, a month, or a ye
 
 - Grey bars on a hairline baseline. There is no y-axis.
 - Axis labels: "M T W T F S S" for a week, "1 8 15 22 29" for a month, and month initials for a year.
-- **Tapping.** A tap shows the amount above the bar in small sans and turns the bar ink. A second tap clears it, and changing period resets it.
-- **Empty and future days.** Days with nothing spent can be tapped and show "0". Future days have no bar and no amount, so they never set the scale.
-- **Targets.** Each bar is one tap target the full height of the chart, read aloud as "Nov 12, 340" with the action "Show amount". The targets cover the chart with no gaps.
+- **Tapping.** A tap shows the amount above the bar in small sans and turns the bar ink. A second tap on the same bar opens its meals in Search: that day in a week or month, that month in a year. Tapping another bar moves the amount there, and changing period clears it.
+- **Empty and future days.** Days with nothing spent can be tapped and show "0", and a second tap opens nothing. Future days have no bar and no amount, so they never set the scale.
+- **Targets.** Each bar is one tap target the full height of the chart, read aloud as "Nov 12, 340" with the action "Show amount", then "Show meals" once its amount shows. The targets cover the chart with no gaps.
 - **Large fonts.** The chart measures its labels, so at large font sizes the amount and the axis stay inside it.
 
 **Taps**
 
 - A place row is a "Show meals" button. It opens Search with that place, and with the period as the dates, so the totals match. The dates end at today, or at the period's end once it is over, or at a later meal's day if one is dated after today. Other can't be tapped.
+- A bar's second tap opens Search with its dates and no place. A month's bar ends its dates the same way as a place row, so the totals match there too.
 - A Priciest tile opens its meal.
 
 **Priciest tiles** use the Journal's tile, three across, with the price in the lower left where the Journal shows the weekday. Meals priced 0 are left out. The section is hidden when no meal costs anything.
@@ -256,7 +257,7 @@ The Spending tab answers how much, where, and when, for a week, a month, or a ye
 - **The place chip.**
   - With a chip, the text searches within that place. Its × clears it.
   - A chip whose place is merged away or deleted disappears and filters nothing out. It comes back if the change is undone.
-- **Opening Search with a place.** "Meals here" and Spending's place rows open the Search tab with a fresh search: only that place, plus Spending's dates.
+- **Opening Search from elsewhere.** "Meals here" and Spending's place rows and bars open the Search tab with a fresh search: only that place, or Spending's dates, or both.
   - The new search replaces the one showing, and survives tab switches.
   - Back returns to Journal and drops it, as Back drops any tab's state.
 - **Result rows.**

@@ -22,6 +22,7 @@ import com.stanley.foodjournal.logic.describeBar
 import com.stanley.foodjournal.logic.formatChange
 import com.stanley.foodjournal.logic.formatPeriodName
 import com.stanley.foodjournal.logic.formatPrice
+import com.stanley.foodjournal.logic.lastDayInSearch
 import com.stanley.foodjournal.logic.periodOf
 import com.stanley.foodjournal.logic.periodSpending
 import com.stanley.foodjournal.logic.periodsThrough
@@ -52,13 +53,18 @@ import kotlinx.coroutines.launch
 import java.io.File
 import java.time.LocalDate
 
-/** One bar of the chart. A future bar is drawn empty and can't be tapped. */
+/**
+ * One bar of the chart. A future bar is drawn empty and can't be tapped. [firstDay] and [lastDay]
+ * are the dates its meals open with in Search.
+ */
 data class ChartBar(
     val amount: Int,
     val amountText: String,
     val axisLabel: String?,
     val description: String,
     val isFuture: Boolean,
+    val firstDay: LocalDate,
+    val lastDay: LocalDate,
 )
 
 /** A row with a share bar: a place, Other, or a time band. [share] runs from 0 to 1. */
@@ -291,7 +297,7 @@ class SpendingViewModel(
                 knownPlaces = names.keys,
             )
             val latest = byPeriod[period.start]?.maxOfOrNull { it.eatenAt.toLocalDate() }
-            val lastDay = listOfNotNull(minOf(period.end, today), latest).max()
+            val lastDay = lastDayInSearch(period.end, today, latest)
             SpendingPage(period, formatPeriodName(period, today), spending?.toFigures(names, today), lastDay)
         }
     }
@@ -310,6 +316,8 @@ class SpendingViewModel(
                     axisLabel = axisLabel(period.kind, bar.start),
                     description = describeBar(period.kind, bar),
                     isFuture = bar.isFuture,
+                    firstDay = bar.start,
+                    lastDay = bar.lastDay,
                 )
             },
             places = topPlaces.map { PlaceRow(it.placeId, names.getValue(it.placeId), it.visits, share(it.total)) },

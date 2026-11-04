@@ -79,6 +79,7 @@ import java.time.LocalDate
 fun SpendingScreen(
     onOpenMeal: (Long) -> Unit,
     onOpenPlace: (placeId: Long, from: LocalDate, to: LocalDate) -> Unit,
+    onOpenDays: (from: LocalDate, to: LocalDate) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SpendingViewModel = viewModel(factory = SpendingViewModel.Factory),
 ) {
@@ -98,6 +99,7 @@ fun SpendingScreen(
         onShowPeriod = viewModel::showPeriod,
         onOpenMeal = onOpenMeal,
         onOpenPlace = onOpenPlace,
+        onOpenDays = onOpenDays,
         onShareRecap = viewModel::openRecap,
         modifier = modifier,
     )
@@ -114,7 +116,7 @@ fun SpendingScreen(
 /**
  * The Week, Month, Year switch, with the periods beneath it to swipe through: total, change,
  * averages, bars, places, time of day, and the priciest meals. A place's row opens its meals of
- * the period in Search.
+ * the period in Search, and a bar's second tap opens its day's or month's meals.
  */
 @Composable
 fun SpendingScreen(
@@ -124,6 +126,7 @@ fun SpendingScreen(
     onOpenMeal: (Long) -> Unit,
     modifier: Modifier = Modifier,
     onOpenPlace: (placeId: Long, from: LocalDate, to: LocalDate) -> Unit = { _, _, _ -> },
+    onOpenDays: (from: LocalDate, to: LocalDate) -> Unit = { _, _ -> },
     onShareRecap: (Period) -> Unit = {},
 ) {
     when {
@@ -138,6 +141,7 @@ fun SpendingScreen(
                     onShowPeriod = onShowPeriod,
                     onOpenMeal = onOpenMeal,
                     onOpenPlace = onOpenPlace,
+                    onOpenDays = onOpenDays,
                     onShareRecap = onShareRecap,
                 )
             }
@@ -171,6 +175,7 @@ private fun PeriodPager(
     onShowPeriod: (Period) -> Unit,
     onOpenMeal: (Long) -> Unit,
     onOpenPlace: (placeId: Long, from: LocalDate, to: LocalDate) -> Unit,
+    onOpenDays: (from: LocalDate, to: LocalDate) -> Unit,
     onShareRecap: (Period) -> Unit,
 ) {
     val pages = uiState.pages
@@ -198,6 +203,7 @@ private fun PeriodPager(
             page = page,
             onOpenMeal = onOpenMeal,
             onOpenPlace = onOpenPlace,
+            onOpenDays = onOpenDays,
             onShareRecap = { onShareRecap(page.period) },
         )
     }
@@ -208,6 +214,7 @@ private fun PeriodPage(
     page: SpendingPage,
     onOpenMeal: (Long) -> Unit,
     onOpenPlace: (placeId: Long, from: LocalDate, to: LocalDate) -> Unit,
+    onOpenDays: (from: LocalDate, to: LocalDate) -> Unit,
     onShareRecap: () -> Unit = {},
 ) {
     val figures = page.figures
@@ -258,7 +265,7 @@ private fun PeriodPage(
         )
 
         Section(stringResource(R.string.spending_over_time)) {
-            BarChart(bars = figures.bars)
+            BarChart(bars = figures.bars, onOpenDays = onOpenDays)
         }
 
         Section(stringResource(R.string.spending_by_place)) {
@@ -353,14 +360,14 @@ private fun Section(title: String, content: @Composable () -> Unit) {
 
 /**
  * Grey bars on a hairline baseline, scaled to the period's dearest bar. Tapping a bar turns it
- * ink and shows its amount above it; a second tap clears it. Each bar is a tap target the full
- * height of the chart. Future bars are empty and can't be tapped.
+ * ink and shows its amount above it; a second tap opens its meals, unless it is at 0. Each bar is
+ * a tap target the full height of the chart. Future bars are empty and can't be tapped.
  *
  * The room above the bars and below the baseline is measured from the label text, so the amount
  * and the axis stay inside the chart at any font size.
  */
 @Composable
-private fun BarChart(bars: List<ChartBar>) {
+private fun BarChart(bars: List<ChartBar>, onOpenDays: (from: LocalDate, to: LocalDate) -> Unit) {
     // Changing period starts a new page, which clears the selection.
     var selected by remember(bars) { mutableStateOf<Int?>(null) }
     val colors = MaterialTheme.colorScheme
@@ -418,7 +425,8 @@ private fun BarChart(bars: List<ChartBar>) {
                 val target = Modifier
                     .weight(1f)
                     .fillMaxHeight()
-                val showAmount = stringResource(R.string.spending_show_amount)
+                val opensMeals = selected == index && bar.amount > 0
+                val action = stringResource(if (opensMeals) R.string.spending_show_meals else R.string.spending_show_amount)
                 Box(
                     if (bar.isFuture) {
                         target.clearAndSetSemantics {}
@@ -427,10 +435,11 @@ private fun BarChart(bars: List<ChartBar>) {
                             .clickable(
                                 interactionSource = null,
                                 indication = null,
-                                onClickLabel = showAmount,
+                                onClickLabel = action,
                                 role = Role.Button,
                             ) {
-                                selected = if (selected == index) null else index
+                                // A bar at 0 has nothing to open, so its amount just stays.
+                                if (opensMeals) onOpenDays(bar.firstDay, bar.lastDay) else selected = index
                             }
                             .semantics {
                                 contentDescription = bar.description
@@ -567,7 +576,8 @@ private fun samplePage(): SpendingPage {
             dailyAverage = "239",
             perMeal = "191",
             bars = amounts.mapIndexed { index, amount ->
-                ChartBar(amount, "$amount", "MTWTFSS"[index].toString(), "Nov ${index + 2}, $amount", isFuture = index > 3)
+                val day = LocalDate.of(2026, 11, index + 2)
+                ChartBar(amount, "$amount", "MTWTFSS"[index].toString(), "Nov ${index + 2}, $amount", isFuture = index > 3, day, day)
             },
             places = listOf(
                 PlaceRow(1, "林家乾麵", 2, ShareRow("410", 0.43f)),

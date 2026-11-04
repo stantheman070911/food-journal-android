@@ -88,6 +88,9 @@ fun HomeScreen(
                     onOpenPlace = { placeId, from, to ->
                         tabNavController.openSearch(SearchRoute(placeId, from.toEpochDay(), to.toEpochDay()))
                     },
+                    onOpenDays = { from, to ->
+                        tabNavController.openSearch(SearchRoute(fromDay = from.toEpochDay(), toDay = to.toEpochDay()))
+                    },
                 )
             }
             composable<SearchRoute> { SearchScreen(onAddMeal = onAddMeal, onOpenMeal = onOpenMeal) }

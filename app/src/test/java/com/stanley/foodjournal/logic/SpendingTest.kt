@@ -221,6 +221,29 @@ class SpendingTest {
     }
 
     @Test
+    fun `a day's bar opens that day in Search`() {
+        val spending = spend(november, listOf(meal(1, day(11, 2), 100)))
+
+        assertEquals(LocalDate.of(2026, 11, 2), spending.bars[1].start)
+        assertEquals(LocalDate.of(2026, 11, 2), spending.bars[1].lastDay)
+    }
+
+    @Test
+    fun `a month's bar opens that month in Search, ending as a place's row does`() {
+        val year = periodOf(PeriodKind.Year, today)
+
+        val past = spend(year, listOf(meal(1, day(10, 3), 300)))
+        assertEquals(LocalDate.of(2026, 10, 1), past.bars[9].start)
+        assertEquals(LocalDate.of(2026, 10, 31), past.bars[9].lastDay)
+
+        val current = spend(year, listOf(meal(1, day(11, 2), 300)))
+        assertEquals(today, current.bars[10].lastDay)
+
+        val dated = spend(year, listOf(meal(1, day(11, 20), 300)))
+        assertEquals(LocalDate.of(2026, 11, 20), dated.bars[10].lastDay)
+    }
+
+    @Test
     fun `a meal dated later has no bar, so it never sets the chart's scale`() {
         val spending = spend(november, listOf(meal(1, day(11, 2), 100), meal(2, day(11, 20), 5_000)))
 

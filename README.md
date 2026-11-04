@@ -38,7 +38,7 @@ It's a diary, not a diet tracker. There are no calories, goals, streaks, or scor
 
 - Search meal names, notes, and places, and filter by dates or favorites.
 - Results show how many meals were found and what they cost in total.
-- Tap a place in Spending to see its meals in that period, or tap Meals here in a meal's place picker to see every meal eaten there.
+- Tap a place in Spending to see its meals in that period, or tap a bar twice to see that day's or month's meals. Tap Meals here in a meal's place picker to see every meal eaten there.
 
 ### Places
 
