@@ -8,12 +8,15 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
@@ -118,6 +121,37 @@ class MealScreenTest {
         compose.onNodeWithText(string(R.string.meal_add_photo)).assertDoesNotExist()
         // Once on the tile, and once in the card's Name field.
         compose.onAllNodesWithText("Soup").assertCountEquals(2)
+    }
+
+    @Test
+    fun aNewMealWithALocationHasTheSaveLocationSwitchAndItsDistrict() {
+        val changes = mutableListOf<Boolean>()
+        show(
+            state(isNew = true).copy(locationRow = LocationRow(isOn = false, district = "臺北市 大安區")),
+            MealActions(onSaveLocationChange = { changes += it }),
+        )
+
+        val row = compose.onNodeWithText(string(R.string.meal_save_location)).performScrollTo()
+        row.assertIsOff()
+        compose.onNodeWithText("臺北市 大安區").assertExists()
+        row.performClick()
+        assertEquals(listOf(true), changes)
+    }
+
+    @Test
+    fun aSavedMealsRowReadsLocationWithItsSwitchOn() {
+        show(state(isNew = false).copy(locationRow = LocationRow(isOn = true, district = "臺北市 大安區")))
+
+        compose.onNodeWithText(string(R.string.meal_location)).performScrollTo().assertIsOn()
+        compose.onNodeWithText(string(R.string.meal_save_location)).assertDoesNotExist()
+    }
+
+    @Test
+    fun withoutALocationThereIsNoRow() {
+        show(state(isNew = true))
+
+        compose.onNodeWithText(string(R.string.meal_save_location)).assertDoesNotExist()
+        compose.onNodeWithText(string(R.string.meal_location)).assertDoesNotExist()
     }
 
     @Test

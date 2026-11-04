@@ -7,6 +7,8 @@ import com.stanley.foodjournal.data.FoodJournalDatabase
 import com.stanley.foodjournal.data.MealDao
 import com.stanley.foodjournal.data.PlaceDao
 import com.stanley.foodjournal.edits.UndoableEdits
+import com.stanley.foodjournal.location.LocationTracker
+import com.stanley.foodjournal.location.PhoneLocation
 import com.stanley.foodjournal.logic.DistrictMap
 import com.stanley.foodjournal.photos.PhotoProcessor
 import com.stanley.foodjournal.photos.PhotoStore
@@ -66,6 +68,9 @@ class AppContainer(context: Context) {
 
     /** Taiwan's districts, or null if the bundled file can't be read. */
     suspend fun districtMap(): DistrictMap? = districts.await()
+
+    /** Finds where the phone is, for one Meal screen. Each screen starts afresh. */
+    val newPhoneLocation: () -> PhoneLocation = { LocationTracker(context) }
 
     /** Applies a theme choice for the whole app, as Settings makes it. */
     val applyTheme: (ThemeChoice) -> Unit = { applyNightMode(context, it) }

@@ -5,7 +5,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.stanley.foodjournal.logic.LocationFix
-import com.stanley.foodjournal.logic.mealLocation
+import com.stanley.foodjournal.logic.LocationSource
 import com.stanley.foodjournal.logic.prefillPlace
 import com.stanley.foodjournal.ui.meal.MealDraft
 import kotlinx.coroutines.flow.first
@@ -85,6 +85,37 @@ class DatabaseTest {
         assertEquals("Dumplings", place.name)
         assertEquals(25.0, place.latitude!!, 0.0)
         assertEquals(place.id, meals.get(id)?.placeId)
+    }
+
+    @Test
+    fun aMealSavedWithItsLocationGivesItToAPlaceWithoutCoordinates() = runBlocking {
+        val market = places.insert(Place(name = "Market"))
+
+        val id = meals.save(meal(placeId = market).copy(latitude = 25.0418, longitude = 121.549))
+
+        assertEquals(25.0418, places.get(market)!!.latitude!!, 0.0)
+        assertEquals(121.549, places.get(market)!!.longitude!!, 0.0)
+        assertEquals(25.0418, meals.get(id)!!.latitude!!, 0.0)
+    }
+
+    @Test
+    fun aPlaceWithCoordinatesKeepsItsOwn() = runBlocking {
+        val noodles = places.insert(Place(name = "Noodles", latitude = 25.03, longitude = 121.53))
+
+        meals.save(meal(placeId = noodles).copy(latitude = 25.0418, longitude = 121.549))
+        meals.save(meal().copy(latitude = 25.0418, longitude = 121.549), newPlace = Place(name = "NOODLES"))
+
+        assertEquals(25.03, places.get(noodles)!!.latitude!!, 0.0)
+        assertEquals(121.53, places.get(noodles)!!.longitude!!, 0.0)
+    }
+
+    @Test
+    fun aMealWithoutALocationLeavesItsPlaceAsItIs() = runBlocking {
+        val market = places.insert(Place(name = "Market"))
+
+        meals.save(meal(placeId = market))
+
+        assertNull(places.get(market)!!.latitude)
     }
 
     @Test
@@ -178,13 +209,10 @@ class DatabaseTest {
             photo = "a.jpg",
             priceText = "280",
             newPlaceName = "Night market",
-            fromGallery = true,
-            photoLatitude = 25.0478,
-            photoLongitude = 121.5170,
-        )
+        ).withLocation(LocationSource.Gallery, LocationFix(25.0478, 121.5170))
 
         saveNew(draft)
-        saveNew(draft.copy(newPlaceName = "No location", photoLatitude = null, photoLongitude = null))
+        saveNew(draft.copy(newPlaceName = "No location").withLocation(LocationSource.Gallery, null))
 
         val saved = places.all().associateBy { it.name }
         assertEquals(25.0478, saved.getValue("Night market").latitude!!, 0.0)
@@ -216,8 +244,9 @@ class DatabaseTest {
         assertNull(meals.get(id)?.placeId)
     }
 
+    /** Saves a new meal as the Meal screen does, with location allowed. */
     private suspend fun saveNew(draft: MealDraft): Long {
-        val location = mealLocation(isNew = true, draft.fromGallery, draft.photoLocation)
+        val location = draft.placeLocation(isNew = true, locationAllowed = true)
         return meals.save(draft.toMeal(0), newPlace = draft.newPlace(location))
     }
 

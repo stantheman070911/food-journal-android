@@ -45,6 +45,7 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -59,6 +60,8 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.SuggestionChipDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -78,6 +81,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
@@ -139,19 +143,25 @@ fun MealScreen(
     }
     var pickingPlace by rememberSaveable { mutableStateOf(false) }
 
-    // Opening the camera asks for it while it is off; Android limits how often it shows.
+    // Opening the camera asks for it while it is off, and on the first Add for location too;
+    // Android limits how often each shows. Finding the location starts then, so it is usually
+    // ready by the time the form shows.
     val context = LocalContext.current
     var hasCamera by remember { mutableStateOf(context.isGranted(Manifest.permission.CAMERA)) }
-    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        hasCamera = it
+    val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        hasCamera = context.isGranted(Manifest.permission.CAMERA)
+        viewModel.onPermissionsChecked()
     }
     val stage = uiState?.stage
     LaunchedEffect(stage) {
-        if (stage == MealStage.Camera && !hasCamera) permission.launch(Manifest.permission.CAMERA)
+        if (stage != MealStage.Camera) return@LaunchedEffect
+        val request = viewModel.permissionsToRequest(hasCamera)
+        if (request.isEmpty()) viewModel.onPermissionsChecked() else permissions.launch(request.toTypedArray())
     }
-    // Camera access may have been turned on in Settings.
+    // Camera or location access may have been turned on in Settings.
     LifecycleResumeEffect(Unit) {
         hasCamera = context.isGranted(Manifest.permission.CAMERA)
+        viewModel.onPermissionsChecked()
         onPauseOrDispose {}
     }
 
@@ -178,6 +188,7 @@ fun MealScreen(
                         actions = MealActions(
                             onBack = viewModel::onBack,
                             onToggleFavorite = viewModel::onToggleFavorite,
+                            onSaveLocationChange = viewModel::onSaveLocationChange,
                             onDelete = viewModel::delete,
                             onReplacePhoto = viewModel::onRetakePhoto,
                             onPriceChange = viewModel::onPriceChange,
@@ -219,6 +230,7 @@ private const val STAGE_FADE_MILLIS = 150
 class MealActions(
     val onBack: () -> Unit = {},
     val onToggleFavorite: () -> Unit = {},
+    val onSaveLocationChange: (Boolean) -> Unit = {},
     val onDelete: () -> Unit = {},
     val onReplacePhoto: () -> Unit = {},
     val onPriceChange: (String) -> Unit = {},
@@ -335,6 +347,14 @@ fun MealScreen(
                     }
                 }
                 Divider()
+                uiState.locationRow?.let { row ->
+                    SaveLocationRow(
+                        title = stringResource(if (uiState.isNew) R.string.meal_save_location else R.string.meal_location),
+                        row = row,
+                        onChange = actions.onSaveLocationChange,
+                    )
+                    Divider()
+                }
                 if (uiState.isNew) {
                     FieldRow(
                         label = stringResource(R.string.meal_time),
@@ -699,6 +719,54 @@ private fun NoteField(note: String, onNoteChange: (String) -> Unit) {
     }
 }
 
+/**
+ * "Save location", with the county and district in grey, and a switch. On, the meal keeps where it
+ * was eaten. The whole row takes the tap, as a switch row does in Settings.
+ */
+@Composable
+private fun SaveLocationRow(title: String, row: LocationRow, onChange: (Boolean) -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .toggleable(value = row.isOn, role = Role.Switch, onValueChange = onChange)
+            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyLarge,
+            color = colors.onSurface,
+            maxLines = 1,
+        )
+        row.district?.let { district ->
+            Text(
+                text = district,
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 8.dp).weight(1f, fill = false),
+            )
+        }
+        Spacer(Modifier.weight(1f).widthIn(min = 12.dp))
+        // In ink, as Retro's switches are in color: filled when on, outlined when off.
+        Switch(
+            checked = row.isOn,
+            onCheckedChange = null,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = colors.onPrimary,
+                checkedTrackColor = colors.primary,
+                checkedBorderColor = colors.primary,
+                uncheckedThumbColor = colors.onSurface,
+                uncheckedTrackColor = Color.Transparent,
+                uncheckedBorderColor = colors.onSurface,
+            ),
+        )
+    }
+}
+
 private val LabelWidth = 72.dp
 
 /** A form row: a grey label on the left, the value beside it. */
@@ -793,6 +861,7 @@ private fun MealNewPreview() {
                 nameSuggestions = emptyList(),
                 placeName = "Lin Dong Fang",
                 showSave = true,
+                locationRow = LocationRow(isOn = false, district = "臺北市 中山區"),
             ),
             actions = MealActions(),
             today = sampleToday,
@@ -824,6 +893,7 @@ private fun MealSavedPreview() {
                 placeName = "Yongkang Beef Noodles",
                 showSave = false,
                 placeDistrict = "臺北市 大安區",
+                locationRow = LocationRow(isOn = true, district = "臺北市 大安區"),
             ),
             actions = MealActions(),
             today = sampleToday,

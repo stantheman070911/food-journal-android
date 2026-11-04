@@ -16,6 +16,7 @@ class BackupFormatTest {
         Meal(id = 4, eatenAt = noon, photo = "a.jpg", name = null, price = 180, placeId = 1),
         Meal(id = 7, eatenAt = noon.plusHours(8), name = "Latte", price = 0, isFavorite = true, note = "Oat", placeId = 2),
         Meal(id = 9, eatenAt = noon.minusDays(30), name = "Snack", price = 999_999),
+        Meal(id = 11, eatenAt = noon.minusDays(2), name = "Dumplings", price = 120, latitude = 25.0418, longitude = 121.549),
     )
     private val backup = backupOf(meals, places, LocalDateTime.of(2026, 11, 4, 1, 15))
 
@@ -33,7 +34,7 @@ class BackupFormatTest {
     fun `the file carries its format and wall-clock times`() {
         val json = BackupJson.encodeToString(BackupFile.serializer(), backup)
 
-        assertTrue(json.contains("\"format\": 1"))
+        assertTrue(json.contains("\"format\": 2"))
         assertTrue(json.contains("\"eatenAt\": \"2026-11-03T12:30:00\""))
         assertTrue(json.contains("\"exportedAt\": \"2026-11-04T01:15:00\""))
     }
@@ -56,7 +57,7 @@ class BackupFormatTest {
 
     @Test
     fun `a newer format is refused, and no format is not a backup`() {
-        assertEquals(BackupProblem.NewerVersion, checkBackup(backup.copy(format = 2), setOf("a.jpg")))
+        assertEquals(BackupProblem.NewerVersion, checkBackup(backup.copy(format = 3), setOf("a.jpg")))
         assertEquals(BackupProblem.NotABackup, checkBackup(backup.copy(format = 0), setOf("a.jpg")))
     }
 
@@ -78,6 +79,33 @@ class BackupFormatTest {
         assertTrue(withMeal(sound.copy(placeId = 3)) is BackupProblem.Damaged)
         assertTrue(withMeal(sound.copy(id = 4)) is BackupProblem.Damaged)
         assertTrue(withMeal(sound.copy(id = 0)) is BackupProblem.Damaged)
+        assertNull(withMeal(sound.copy(latitude = 25.03, longitude = 121.53)))
+        assertTrue(withMeal(sound.copy(latitude = 25.03)) is BackupProblem.Damaged)
+        assertTrue(withMeal(sound.copy(longitude = 121.53)) is BackupProblem.Damaged)
+        assertTrue(withMeal(sound.copy(latitude = 91.0, longitude = 121.53)) is BackupProblem.Damaged)
+        assertTrue(withMeal(sound.copy(latitude = 25.03, longitude = 181.0)) is BackupProblem.Damaged)
+    }
+
+    @Test
+    fun `a version 1 backup restores its meals without locations`() {
+        val json = """{"format":1,"exportedAt":"2026-11-04T01:15:00","places":[],
+            "meals":[{"id":1,"eatenAt":"2026-11-03T12:30:00","name":"Tea","price":50}]}"""
+
+        val check = readBackup(json, emptySet())
+
+        val meal = (check as BackupCheck.Passed).file.restoredMeals().single()
+        assertNull(meal.latitude)
+        assertNull(meal.longitude)
+    }
+
+    @Test
+    fun `a version 2 backup restores where its meals were eaten`() {
+        val json = BackupJson.encodeToString(BackupFile.serializer(), backup)
+
+        val restored = (readBackup(json, setOf("a.jpg")) as BackupCheck.Passed).file.restoredMeals()
+
+        assertEquals(25.0418, restored.single { it.id == 11L }.latitude)
+        assertEquals(121.549, restored.single { it.id == 11L }.longitude)
     }
 
     @Test
@@ -121,7 +149,7 @@ class BackupFormatTest {
 
     @Test
     fun `a newer backup is newer even when its records no longer read`() {
-        val json = """{"format":2,"exportedAt":"2026-11-04T01:15:00","records":{"meals":[]}}"""
+        val json = """{"format":3,"exportedAt":"2026-11-04T01:15:00","records":{"meals":[]}}"""
 
         assertEquals(BackupCheck.Failed(BackupProblem.NewerVersion), readBackup(json, emptySet()))
     }

@@ -15,11 +15,12 @@ It's a diary, not a diet tracker. There are no calories, goals, streaks, or scor
 - Tap Add and the camera opens. Take the photo, type the price, and tap Save.
 - A meal needs only a photo or a name, plus its price. A name, note, place, and favorite star are there whenever you want them.
 - Names you've used before and your saved places come up as you type.
+- Save where you ate: a photo taken in the app keeps the phone's location, with a switch on the form to leave it off. A meal logged later keeps the phone's location only if you turn the switch on. The district shows beside it.
 
 ### Backfill from the gallery
 
 - Forgot to log lunch? Pick the photo from your gallery, and the meal takes the date and time the photo was taken.
-- On Android 17, if the photo picker shares the photo's location, and exactly one of your saved places is within 150 m of it, the meal is placed there. On Android 16, you pick the place yourself. The phone's own location is never used.
+- On Android 17, if the photo picker shares the photo's location, and exactly one of your saved places is within 150 m of it, the meal is placed there. On Android 16, you pick the place yourself.
 
 ### Journal
 
@@ -69,7 +70,8 @@ It's a diary, not a diet tracker. There are no calories, goals, streaks, or scor
 
 - No account and no sign-in. The app works fully offline.
 - The app has no internet permission, so it can't send anything anywhere. It contains no analytics or ads.
-- The only permission it asks for is the camera, the first time you add a meal. Gallery photos come through Android's photo picker, which needs no storage permission, and the app never asks for your location.
+- It asks for the camera, and once for your location, the first time you add a meal. Gallery photos come through Android's photo picker, which needs no storage permission.
+- A meal's location is saved only while its switch is on, and only in the app's own database, never in the photo. With approximate location, the phone's location isn't used. Without location permission, no meal keeps a location.
 - Photos are stored resized, without their original metadata.
 - Android's cloud backup and device-to-device transfer are turned off for this app. The backup you export is the only copy of your meals off the phone.
 

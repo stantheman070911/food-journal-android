@@ -7,10 +7,21 @@
         android:name="android.permission.INTERNET"
         tools:node="remove" />
 
-    <!-- In-app capture. Asked for the first time Add is tapped. -->
+    <!-- In-app capture. Asked for each time Add is tapped while it is off. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature
         android:name="android.hardware.camera.any"
+        android:required="false" />
+
+    <!--
+        Where each meal was eaten, saved with it when its switch is on. Asked once, on the first
+        Add, with the camera. Only precise location uses the phone's own; approximate location
+        still lets a gallery photo's location be saved.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-feature
+        android:name="android.hardware.location.gps"
         android:required="false" />
 
     <application

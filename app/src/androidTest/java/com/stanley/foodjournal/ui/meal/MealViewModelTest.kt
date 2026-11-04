@@ -1,5 +1,6 @@
 package com.stanley.foodjournal.ui.meal
 
+import android.Manifest
 import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
@@ -16,7 +17,9 @@ import com.stanley.foodjournal.data.Place
 import com.stanley.foodjournal.logic.DistrictMap
 import com.stanley.foodjournal.edits.PendingEdit
 import com.stanley.foodjournal.edits.UndoableEdits
+import com.stanley.foodjournal.location.PhoneLocation
 import com.stanley.foodjournal.logic.LocationFix
+import com.stanley.foodjournal.logic.LocationSource
 import com.stanley.foodjournal.photos.PhotoMetadata
 import com.stanley.foodjournal.photos.PhotoProcessing
 import com.stanley.foodjournal.photos.PhotoStore
@@ -27,6 +30,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -53,6 +57,8 @@ class MealViewModelTest {
     private lateinit var scope: CoroutineScope
     private lateinit var edits: UndoableEdits
     private lateinit var processing: FakeProcessing
+    private lateinit var phone: FakeLocation
+    private val locationAsked = MutableStateFlow(false)
     private val store = ViewModelStore()
 
     // One thousandth of a degree of latitude is about 111 m. Photo locations have no accuracy.
@@ -68,6 +74,7 @@ class MealViewModelTest {
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         edits = UndoableEdits(db.mealDao(), db.placeDao(), photos, scope, window = 1_500.milliseconds)
         processing = FakeProcessing(photos)
+        phone = FakeLocation()
         // Read here, on the test's thread, as the app reads it off the main thread. Read on the
         // main thread instead, it holds up every step a test waits for.
         districts
@@ -219,11 +226,11 @@ class MealViewModelTest {
 
         awaitTrue { main { vm.uiState!!.draft.eatenAt } == takenAt }
         awaitTrue { main { vm.uiState!!.draft.placeId } == noodles }
-        assertTrue(main { vm.uiState!!.draft.fromGallery })
+        assertEquals(LocationSource.Gallery, main { vm.uiState!!.draft.locationSource })
     }
 
     @Test
-    fun aCameraMealIsNeverPlacedByLocation() = runBlocking {
+    fun aCameraMealWithoutAFixIsNotPlaced() = runBlocking {
         db.placeDao().insert(Place(name = "Noodles", latitude = noodlesSpot.latitude, longitude = noodlesSpot.longitude))
         val vm = newMeal()
         val name = capture(vm)
@@ -245,7 +252,7 @@ class MealViewModelTest {
         main { vm.onPicked(Uri.parse("content://test/photo/2")) }
         processing.finish(main { vm.uiState!!.draft.photo!! }, ok = true)
 
-        awaitTrue { main { vm.uiState!!.draft.fromGallery } }
+        awaitTrue { main { vm.uiState!!.draft.locationSource } == LocationSource.Gallery }
         delay(200)
         assertEquals(market, main { vm.uiState!!.draft.placeId })
     }
@@ -479,10 +486,247 @@ class MealViewModelTest {
         assertNull(main { vm.uiState!!.placeDistrict })
     }
 
-    private suspend fun insertMeal(eatenAt: LocalDateTime, name: String): Long =
-        db.mealDao().insert(Meal(eatenAt = eatenAt, name = name, price = 100))
+    @Test
+    fun theSwitchStartsOnForACameraPhotoOrAGalleryLocationAndOffForThePhoneWhileTyping() = runBlocking {
+        phone.fix.value = noodlesSpot
+        val camera = newMealChecked()
+        processing.finish(capture(camera), ok = true)
+        assertEquals(LocationRow(isOn = true, district = null), main { camera.uiState!!.locationRow }?.copy(district = null))
+        assertEquals(LocationSource.Camera, main { camera.uiState!!.draft.locationSource })
+
+        val gallery = newMealChecked()
+        processing.metadata = PhotoMetadata(takenAt = null, location = cafeSpot)
+        main { gallery.onPicked(Uri.parse("content://test/photo/3")) }
+        processing.finish(main { gallery.uiState!!.draft.photo!! }, ok = true)
+        awaitTrue { main { gallery.uiState!!.draft.locationSource } == LocationSource.Gallery }
+        assertEquals(cafeSpot, main { gallery.uiState!!.draft.location })
+        assertTrue(main { gallery.uiState!!.locationRow!!.isOn })
+
+        val skipped = newMealChecked()
+        skip(skipped)
+        assertEquals(LocationSource.Phone, main { skipped.uiState!!.draft.locationSource })
+        assertFalse(main { skipped.uiState!!.locationRow!!.isOn })
+
+        // A gallery photo without a location falls back to the phone's, switched off.
+        val unlocated = newMealChecked()
+        processing.metadata = PhotoMetadata(takenAt = null, location = null)
+        main { unlocated.onPicked(Uri.parse("content://test/photo/4")) }
+        processing.finish(main { unlocated.uiState!!.draft.photo!! }, ok = true)
+        awaitTrue { main { unlocated.uiState!!.draft.locationSource } == LocationSource.Phone }
+        assertFalse(main { unlocated.uiState!!.locationRow!!.isOn })
+    }
+
+    @Test
+    fun aFixArrivingAfterTheCaptureIsWhereThePhotoWasTakenAndPlacesTheMeal() = runBlocking {
+        val noodles = db.placeDao().insert(Place(name = "Noodles", latitude = noodlesSpot.latitude, longitude = noodlesSpot.longitude))
+        val vm = newMealChecked()
+        processing.finish(capture(vm), ok = true)
+        assertNull(main { vm.uiState!!.locationRow })
+
+        phone.fix.value = LocationFix(25.0331, 121.5297, accuracyMeters = 12f)
+
+        awaitTrue { main { vm.uiState!!.locationRow } != null }
+        awaitTrue { main { vm.uiState!!.draft.placeId } == noodles }
+        // A later fix doesn't move where the photo was taken.
+        phone.fix.value = cafeSpot
+        delay(200)
+        assertEquals(25.0331, main { vm.uiState!!.draft.latitude }!!, 0.0)
+    }
+
+    @Test
+    fun theRowNamesTheLocationsDistrict() = runBlocking {
+        // NTU's main gate.
+        phone.fix.value = LocationFix(25.0174, 121.5397, accuracyMeters = 10f)
+        val vm = newMealChecked()
+        processing.finish(capture(vm), ok = true)
+
+        awaitTrue { main { vm.uiState!!.locationRow?.district } == "臺北市 大安區" }
+    }
+
+    @Test
+    fun theWhileTypingLocationFollowsTheLatestFix() = runBlocking {
+        val vm = newMealChecked()
+        skip(vm)
+        assertNull(main { vm.uiState!!.locationRow })
+
+        phone.fix.value = noodlesSpot
+        awaitTrue { main { vm.uiState!!.draft.location } == noodlesSpot }
+        phone.fix.value = cafeSpot
+        awaitTrue { main { vm.uiState!!.draft.location } == cafeSpot }
+    }
+
+    @Test
+    fun aMealSavedBeforeAnyFixArrivesSavesWithoutALocation() = runBlocking {
+        val vm = newMealChecked()
+        main {
+            vm.onSkipPhoto()
+            vm.onNameChange("Soup")
+            vm.onPriceChange("280")
+            vm.onSaveLocationChange(true)
+            vm.save()
+        }
+
+        awaitTrue { mealCount() == 1 }
+        val saved = db.mealDao().observeAll().first().single()
+        assertNull(saved.latitude)
+        assertNull(saved.longitude)
+    }
+
+    @Test
+    fun theSwitchOnSavesTheLocationAndOffDropsItAndThePlaceItFilledIn() = runBlocking {
+        val noodles = db.placeDao().insert(Place(name = "Noodles", latitude = noodlesSpot.latitude, longitude = noodlesSpot.longitude))
+        phone.fix.value = noodlesSpot
+        val on = newMealChecked()
+        val name = capture(on)
+        processing.finish(name, ok = true)
+        awaitTrue { main { on.uiState!!.draft.placeId } == noodles }
+        main {
+            on.onPriceChange("120")
+            on.save()
+        }
+        awaitTrue { mealCount() == 1 }
+        val kept = db.mealDao().observeAll().first().single()
+        assertEquals(noodlesSpot.latitude, kept.latitude!!, 0.0)
+        assertEquals(noodlesSpot.longitude, kept.longitude!!, 0.0)
+
+        val off = newMealChecked()
+        processing.finish(capture(off), ok = true)
+        awaitTrue { main { off.uiState!!.draft.placeId } == noodles }
+        main { off.onSaveLocationChange(false) }
+        assertNull(main { off.uiState!!.draft.placeId })
+        main {
+            off.onPriceChange("90")
+            off.save()
+        }
+        awaitTrue { mealCount() == 2 }
+        val dropped = db.mealDao().observeAll().first().single { it.id != kept.id }
+        assertNull(dropped.latitude)
+        assertNull(dropped.placeId)
+    }
+
+    @Test
+    fun aPlaceTakesTheLocationOnlyWhenItHasNoCoordinates() = runBlocking {
+        val market = db.placeDao().insert(Place(name = "Market"))
+        val cafe = db.placeDao().insert(Place(name = "Cafe", latitude = cafeSpot.latitude, longitude = cafeSpot.longitude))
+        // Each has a meal already, as a saved place does, so neither is tidied away as empty.
+        insertMeal(noon, "Earlier", placeId = market)
+        insertMeal(noon, "Earlier", placeId = cafe)
+        phone.fix.value = noodlesSpot
+
+        for (placeId in listOf(market, cafe)) {
+            val vm = newMealChecked()
+            processing.finish(capture(vm), ok = true)
+            main {
+                vm.onPlaceSelected(placeId)
+                vm.onPriceChange("100")
+                vm.save()
+            }
+        }
+
+        awaitTrue { mealCount() == 4 }
+        assertEquals(noodlesSpot.latitude, db.placeDao().get(market)!!.latitude!!, 0.0)
+        assertEquals(cafeSpot.latitude, db.placeDao().get(cafe)!!.latitude!!, 0.0)
+    }
+
+    @Test
+    fun aNewPlaceIsCreatedAtTheSavedLocation() = runBlocking {
+        phone.fix.value = noodlesSpot
+        val vm = newMealChecked()
+        processing.finish(capture(vm), ok = true)
+        main {
+            vm.onNewPlace("Night market")
+            vm.onPriceChange("100")
+            vm.save()
+        }
+
+        awaitTrue { mealCount() == 1 }
+        assertEquals(noodlesSpot.latitude, db.placeDao().all().single().latitude!!, 0.0)
+    }
+
+    @Test
+    fun withLocationRefusedTheRowNeverShowsAndAGalleryPhotoStillLocatesANewPlace() = runBlocking {
+        phone.allowed = false
+        processing.metadata = PhotoMetadata(takenAt = null, location = noodlesSpot)
+        val vm = newMealChecked()
+        main { vm.onPicked(Uri.parse("content://test/photo/5")) }
+        processing.finish(main { vm.uiState!!.draft.photo!! }, ok = true)
+        awaitTrue { main { vm.uiState!!.draft.locationSource } == LocationSource.Gallery }
+        assertNull(main { vm.uiState!!.locationRow })
+
+        main {
+            vm.onNewPlace("Night market")
+            vm.onPriceChange("100")
+            vm.save()
+        }
+
+        awaitTrue { mealCount() == 1 }
+        assertNull(db.mealDao().observeAll().first().single().latitude)
+        assertEquals(noodlesSpot.latitude, db.placeDao().all().single().latitude!!, 0.0)
+        assertEquals(0, phone.starts)
+    }
+
+    @Test
+    fun locationIsAskedForOnceAndOnlyForANewMeal() = runBlocking {
+        val mealId = insertMeal(noon, "Tea")
+        phone.allowed = false
+
+        assertEquals(listOf(Manifest.permission.CAMERA), savedMeal(mealId).permissionsToRequest(hasCamera = false))
+        assertFalse(locationAsked.value)
+
+        val first = newMeal().permissionsToRequest(hasCamera = true)
+        assertEquals(listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION), first)
+        assertTrue(locationAsked.value)
+        assertEquals(emptyList<String>(), newMeal().permissionsToRequest(hasCamera = true))
+    }
+
+    @Test
+    fun aSavedMealShowsItsLocationAndTurningItOffRemovesIt() = runBlocking {
+        val mealId = db.mealDao().insert(
+            Meal(eatenAt = noon, name = "Tea", price = 50, latitude = noodlesSpot.latitude, longitude = noodlesSpot.longitude),
+        )
+        val vm = savedMeal(mealId)
+        awaitTrue { main { vm.uiState?.locationRow } != null }
+        assertTrue(main { vm.uiState!!.locationRow!!.isOn })
+        assertFalse(main { vm.uiState!!.showSave })
+
+        main { vm.onSaveLocationChange(false) }
+        assertTrue(main { vm.uiState!!.showSave })
+        main { vm.save() }
+
+        awaitTrue { db.mealDao().get(mealId)!!.latitude == null }
+        assertNull(db.mealDao().get(mealId)!!.longitude)
+    }
+
+    @Test
+    fun aSavedMealNeverGainsALocation() = runBlocking {
+        val mealId = insertMeal(noon, "Tea")
+        phone.fix.value = noodlesSpot
+        val vm = savedMeal(mealId)
+        awaitTrue { main { vm.uiState } != null }
+        main { vm.onPermissionsChecked() }
+        val name = capture(vm)
+        processing.finish(name, ok = true)
+
+        awaitTrue { !main { vm.uiState!!.photoProcessing } }
+        assertNull(main { vm.uiState!!.locationRow })
+        assertEquals(0, phone.starts)
+    }
+
+    private suspend fun insertMeal(eatenAt: LocalDateTime, name: String, placeId: Long? = null): Long =
+        db.mealDao().insert(Meal(eatenAt = eatenAt, name = name, price = 100, placeId = placeId))
 
     private fun newMeal(): MealViewModel = viewModel(mealId = null)
+
+    /** A new meal past the camera's permission check, as the screen runs it. */
+    private suspend fun newMealChecked(): MealViewModel = newMeal().also { vm ->
+        main { vm.onPermissionsChecked() }
+    }
+
+    private suspend fun skip(vm: MealViewModel, name: String = "Soup", price: String = "280") = main {
+        vm.onSkipPhoto()
+        vm.onNameChange(name)
+        vm.onPriceChange(price)
+    }
 
     private fun savedMeal(id: Long): MealViewModel = viewModel(mealId = id)
 
@@ -500,6 +744,9 @@ class MealViewModelTest {
                     processor = processing,
                     appScope = scope,
                     districtMap = { districts },
+                    phoneLocation = phone,
+                    locationAsked = locationAsked,
+                    markLocationAsked = { locationAsked.value = true },
                 ) as T
             }
             ViewModelProvider.create(store, factory)["meal-${System.nanoTime()}", MealViewModel::class]
@@ -552,6 +799,21 @@ class MealViewModelTest {
         }
 
         private fun result(name: String) = results.getOrPut(name) { CompletableDeferred() }
+    }
+
+    /** The phone's location, set by the test. Allowed and precise unless a test says otherwise. */
+    private class FakeLocation : PhoneLocation {
+        override val fix = MutableStateFlow<LocationFix?>(null)
+        var allowed = true
+        var starts = 0
+
+        override fun isAllowed() = allowed
+
+        override fun start() {
+            if (allowed) starts++
+        }
+
+        override fun stop() = Unit
     }
 
     private companion object {

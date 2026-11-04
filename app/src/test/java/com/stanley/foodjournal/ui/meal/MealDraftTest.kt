@@ -3,6 +3,7 @@ package com.stanley.foodjournal.ui.meal
 import com.stanley.foodjournal.data.Meal
 import com.stanley.foodjournal.data.Place
 import com.stanley.foodjournal.logic.LocationFix
+import com.stanley.foodjournal.logic.LocationSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -77,9 +78,51 @@ class MealDraftTest {
     }
 
     @Test
-    fun `a photo's location needs both coordinates`() {
-        val draft = MealDraft(eatenAt = meal.eatenAt, fromGallery = true, photoLatitude = 25.05, photoLongitude = 121.53)
-        assertEquals(LocationFix(25.05, 121.53), draft.photoLocation)
-        assertNull(draft.copy(photoLongitude = null).photoLocation)
+    fun `a location needs both coordinates`() {
+        val draft = MealDraft(eatenAt = meal.eatenAt, latitude = 25.05, longitude = 121.53)
+        assertEquals(LocationFix(25.05, 121.53), draft.location)
+        assertNull(draft.copy(longitude = null).location)
+    }
+
+    @Test
+    fun `a saved meal's location round trips, with the switch on`() {
+        val located = meal.copy(latitude = 25.05, longitude = 121.53)
+        val draft = MealDraft.from(located)
+
+        assertTrue(draft.saveLocation)
+        assertEquals(LocationSource.Saved, draft.locationSource)
+        assertEquals(located, draft.toMeal(located.id))
+        assertFalse(draft.hasChangesFrom(located))
+    }
+
+    @Test
+    fun `turning the switch off drops the location`() {
+        val located = meal.copy(latitude = 25.05, longitude = 121.53)
+        val off = MealDraft.from(located).copy(saveLocation = false, saveLocationTouched = true)
+
+        assertTrue(off.hasChangesFrom(located))
+        assertNull(off.toMeal(located.id).latitude)
+        assertNull(off.toMeal(located.id).longitude)
+    }
+
+    @Test
+    fun `the switch follows the location's source until it is tapped`() {
+        val draft = MealDraft(eatenAt = meal.eatenAt)
+        val here = LocationFix(25.05, 121.53)
+
+        assertTrue(draft.withLocation(LocationSource.Camera, here).saveLocation)
+        assertTrue(draft.withLocation(LocationSource.Gallery, here).saveLocation)
+        assertFalse(draft.withLocation(LocationSource.Phone, here).saveLocation)
+        val tapped = draft.withLocation(LocationSource.Phone, here).copy(saveLocation = true, saveLocationTouched = true)
+        assertTrue(tapped.withLocation(LocationSource.Phone, LocationFix(25.06, 121.54)).saveLocation)
+    }
+
+    @Test
+    fun `a location is saved only while the row shows`() {
+        val draft = MealDraft(eatenAt = meal.eatenAt, photo = "a.jpg", priceText = "80")
+            .withLocation(LocationSource.Gallery, LocationFix(25.05, 121.53))
+
+        assertEquals(25.05, draft.toMeal(0).latitude!!, 0.0)
+        assertNull(draft.toMeal(0, keepLocation = false).latitude)
     }
 }

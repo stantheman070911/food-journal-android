@@ -34,6 +34,8 @@
     <string name="meal_unfavorite">Remove from favorites</string>
     <string name="meal_delete">Delete</string>
     <string name="meal_place">Place</string>
+    <string name="meal_save_location">Save location</string>
+    <string name="meal_location">Location</string>
 
     <string name="place_search">Search or add a place</string>
     <string name="place_add">Add “%1$s”</string>

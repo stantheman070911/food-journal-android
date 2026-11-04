@@ -33,6 +33,7 @@ Two records, Meal and Place. A meal belongs to at most one place.
 | isFavorite | Boolean | Default false |
 | note | Text | |
 | placeId | Long | Optional link to Place. Set to empty when the place is deleted. |
+| latitude, longitude | Double | Where the meal was eaten, when saved with it. Empty otherwise. |
 
 **Place**
 
@@ -48,10 +49,10 @@ Two records, Meal and Place. A meal belongs to at most one place.
 - **A meal's day** is the date of `eatenAt`, so a 01:00 snack counts toward that day. Weeks run Monday to Sunday.
 - **`photo` is a file name**, not a path, so a restored backup works on a fresh install.
 - **Place names are cleaned** before they are saved or compared: Unicode NFKC (full-width letters become plain), ends trimmed, runs of spaces collapsed. Comparison ignores case, so `Café` and `CAFÉ` match. A case-insensitive unique index in the database is the backstop.
-- **Coordinates** come from a gallery photo's location when the place is created for that meal. Places created any other way have none.
+- **Coordinates.** A meal's are where it was eaten, kept only while its Save location switch is on (see Where it was eaten). A place takes the location of the meal it is created for, or of the first meal saved with one while the place has none, and keeps its coordinates after that. Without location permission, only a new gallery meal's photo location gives a new place coordinates.
 - **A place with no meals left is removed**, once any undo bar closes.
 - **Nothing derived is stored.** Visits, totals, last visit, and time of day are computed from meals.
-- **Schema.** Room exports each schema version to `app/schemas/`, kept in Git for migrations. The current version is 1.
+- **Schema.** Room exports each schema version to `app/schemas/`, kept in Git for migrations. The current version is 2, which added the meal's coordinates. Room migrates version 1 on its own, since the new columns may be empty.
 
 ## Navigation
 
@@ -72,7 +73,7 @@ Two records, Meal and Place. A meal belongs to at most one place.
 
 **Camera**
 
-- The camera permission is asked when the camera stage opens. It is asked again on later Adds while it is refused, as often as Android allows.
+- The camera permission is asked when the camera stage opens. It is asked again on later Adds while it is refused, as often as Android allows. The first Add also asks for location, once (see Where it was eaten).
 - Refused, the stage shows "Camera access is off" with "Open settings". Gallery and Skip still work. Access is checked again on resume.
 - Capture aims for 2048 × 1536 at 4:3, with minimum latency.
 - The close button sits on a dark grey disc.
@@ -89,7 +90,7 @@ Two records, Meal and Place. A meal belongs to at most one place.
   - **Segments.** A row of thin segments between the date and the photo shows the week's meals, oldest on the left, with this meal's in ink and the others grey.
   - **Motion.** Each step crossfades in 150 ms, without the usual rise. Back returns to where the first meal was opened.
 - **Price.** Typed in the serif display style.
-- **Card.** Name, Place, Time, and Note sit on one grey card, divided by hairlines.
+- **Card.** Name, Place, Save location when there is a location, Time, and Note sit on one grey card, divided by hairlines.
 - **Time.** Written with the date and weekday, as Search writes them: "Tue, Nov 3 · 18:03", or "Mon, Oct 27, 2025 · 19:05" outside the current year.
 - **A saved meal's date.** A saved meal has no Time row. Its date heads the screen instead, between the top bar and the photo, in grey sans from the photo's left edge. Tapping it opens the date and time dialogs, and its action reads "Change time".
 - **Name suggestions.** Recent names, as borderless pills, scroll into view as they appear.
@@ -116,7 +117,24 @@ Two records, Meal and Place. A meal belongs to at most one place.
 - **Android 16.** The picker has no location option, so gallery meals there get a date and time but no location.
 - **Ignored coordinates.** Exactly 0, 0, or out of range, count as no location. The emulator's picker withholds location that way.
 - **Timing.** The gallery date and place apply once resizing finishes, about a second after picking.
-- **The photo's location is where the meal was eaten.** A camera photo, or any saved meal, has no location. The phone's own location is never used, since it is wherever the meal is logged, not where it was eaten.
+
+**Where it was eaten**
+
+- **Sources.**
+  - A photo taken in the app: the phone's location when the photo is taken, or the first fix after it.
+  - A gallery photo with a location: the photo's own.
+  - Anything else, such as Skip or a gallery photo without a location: the phone's location while the form is filled in, following the latest fix.
+- **The row.** "Save location" sits on the card below Place, with the county and district in grey and a switch. It shows only once there is a location.
+  - The switch starts on for a camera photo or a gallery photo's location. It starts off for the phone's location while typing, since the meal may be logged later, somewhere else. Once tapped, it stays as set.
+  - On, the meal keeps the location, and places use it: the new meal's place is filled in, the picker lists places nearest first, and a new place, or one without coordinates, takes it. A place with coordinates keeps its own.
+  - Off, the location is dropped, along with any place it filled in.
+  - The whole row takes the tap. The switch is ink when on and outlined in ink when off.
+- **Saved meals.** The row reads "Location", with the switch on. Turning it off removes the location once the meal is saved. A saved meal never gains a location, since the phone is no longer where it was eaten.
+- **Permission.** Fine and coarse location are asked for together, once, on the first Add, with the camera.
+  - Refused, the row never shows. A gallery photo's location still fills in the place and gives coordinates to a new one, as it does without the row.
+  - With approximate location only, the phone's location isn't used, since it can be kilometres off. A gallery photo's location still is.
+- **Finding it.** Android's fused provider starts when the camera opens: a fix under two minutes old at once, then a current one at high accuracy, for up to 30 seconds. Fixes worse than 100 m are not used. It never holds up the form or Save. A meal saved before a fix arrives has no location.
+- **Privacy.** The location is stored in the database, never written into the photo, and never leaves the phone except in a backup.
 
 ## Places
 
@@ -125,15 +143,15 @@ Places have no screen of their own. The Place row, between Name and Time, opens 
 **The picker**
 
 - **Layout.** A full-height sheet with a centered title and a close button. Swiping down also closes it. The search field is a grey pill, and it has focus when the sheet opens.
-- **Order.** Places are listed by most recent visit. For a new meal with a gallery location, they are listed nearest first, with distances such as "1,240 km".
+- **Order.** Places are listed by most recent visit. For a meal with a location it will keep, or a new gallery meal with a photo location, they are listed nearest first, with distances such as "1,240 km".
 - **Typing.**
   - Names that start with the text come first, then names that contain it. Typing 林 lists 林家乾麵 before 小林拉麵.
   - Typing an existing name in full picks that place.
-  - A new name is listed first, marked "New", and is created when the meal is saved, with the photo's coordinates if there are any.
+  - A new name is listed first, marked "New", and is created when the meal is saved, with the meal's location if there is one.
 - **"No place"** shows before anything is typed. An empty place saves the meal without one.
 - **The ✓** picks the saved place typed in full, adds a new name, or keeps a pending new place typed again. With nothing typed, it only closes the keyboard.
 
-**Prefill.** A new meal with a gallery location is given the one saved place within 150 m of the photo, if exactly one is that close. It stops once a place is chosen by hand. Camera and Skip meals are never prefilled.
+**Prefill.** A new meal is given the one saved place within 150 m of its location, if exactly one is that close, while the location is to be kept. It stops once a place is chosen by hand.
 
 **Rename, merge, and delete**
 
@@ -416,9 +434,10 @@ A recap turns a period in Spending into one image. It leaves the phone only when
 | Database | Room 2.8 (SQLite) | Room 3 moves to `androidx.room3`; moving later is a dependency change, not a data migration |
 | Lists | LazyColumn, LazyRow, HorizontalPager | About a thousand meals a year needs no paging |
 | Charts | Compose Canvas | |
-| Settings | DataStore (Preferences) | Theme, last backup day, recap figures |
+| Settings | DataStore (Preferences) | Theme, last backup day, recap figures, whether location was asked |
 | Camera | CameraX | In-app capture |
 | Gallery | Android Photo Picker | No storage permission |
+| Location | Framework `LocationManager` | The fused provider, with no library |
 | Photo metadata | Framework `ExifInterface` | |
 | Images | Coil 3 | Local files only, no network module |
 | Backup | kotlinx.serialization (JSON) and ZIP | |
@@ -451,7 +470,7 @@ A recap turns a period in Spending into one image. It leaves the phone only when
 
 - `data/`: Room entities and DAOs.
 - `logic/`: pure rules with JVM tests: `Spending.kt`, `Search.kt`, `Recap.kt`, `Weeks.kt`, `Places.kt`, `PlaceNames.kt`, `PlacePicker.kt`, `Districts.kt`, `MealForm.kt`, `TileNames.kt`, `PhotoSizing.kt`, and `Backup.kt`.
-- `photos/`, `backup/`, `recap/`, `edits/`, `settings/`: photo files, backup and restore, recap drawing and sharing, undo, and DataStore.
+- `photos/`, `backup/`, `recap/`, `edits/`, `settings/`, `location/`: photo files, backup and restore, recap drawing and sharing, undo, DataStore, and the phone's location.
 - `ui/`: one folder per screen, plus `components/`, `theme/`, `icons/`, `navigation/`, and `preview/`.
 
 **Photos**
@@ -479,13 +498,13 @@ A recap turns a period in Spending into one image. It leaves the phone only when
 
 **Backup file.** One ZIP:
 
-- `backup.json`: a format version (currently 1), the time of the export, the places, and the meals, with their ids.
+- `backup.json`: a format version (currently 2), the time of the export, the places, and the meals, with their ids and locations. Version 2 added the meals' locations; a version 1 backup restores without them.
 - `photos/`: the stored 1600 px photos, uncompressed, since JPEGs don't shrink further. Camera originals are never kept, and thumbnails are left out.
 
 **Import checks**, before anything changes:
 
 - The format version is read before the records, so a newer backup is called newer even if its records can't be read.
-- Every meal has a photo or a name, a price from 0 to 999,999, and a time that reads.
+- Every meal has a photo or a name, a price from 0 to 999,999, and a time that reads. A location has both coordinates, within range, or neither.
 - Ids are unique, and every place a meal names is in the file.
 - Place names are present and unique, ignoring case.
 - Every photo a meal names is in the file.
@@ -501,9 +520,9 @@ A recap turns a period in Spending into one image. It leaves the phone only when
 
 **Privacy and permissions**
 
-- The only permission is the camera. The manifest strips INTERNET in case a library adds it; Gradle prints an expected merge warning. AndroidX's internal `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` is the only merged permission, and it is private to the app.
+- The only permissions are the camera and location, fine and coarse. The manifest strips INTERNET in case a library adds it; Gradle prints an expected merge warning. AndroidX's internal `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` is the only merged permission, and it is private to the app.
 - `allowBackup` is false, and data extraction rules exclude everything from both cloud backup and device-to-device transfer. The exported ZIP is the only backup, so the database and photos never return out of step.
-- Stored photos carry no metadata. A recap leaves the phone only through the share sheet.
+- Stored photos carry no metadata. A meal's location is kept in the database only. A recap leaves the phone only through the share sheet.
 
 ## Development
 
@@ -553,7 +572,7 @@ ANDROID_SERIAL=emulator-5560 ./gradlew :app:connectedDebugAndroidTest
 
 - **JVM tests** cover everything in `logic/`, the backup format, the converters, `PhotoStore`, and the meal draft.
 - **Device tests** use AndroidX Test and Compose's UI test library. They cover:
-  - the database
+  - the database, and its migration from schema 1, through Room's `room-testing`
   - `UndoableEdits`
   - photo processing on real JPEG files
   - backup and restore
@@ -564,7 +583,7 @@ ANDROID_SERIAL=emulator-5560 ./gradlew :app:connectedDebugAndroidTest
   - the Meal screen's date line, camera icon, and stepping gestures
   - the chart's bars
   - closing and stepping through a meal in the whole app, adding and removing their own test meals
-- **Fakes.** The Meal and Spending ViewModels take photo processing and recap drawing through small interfaces, `PhotoProcessing` and `RecapDrawing`, so tests drive them with fakes.
+- **Fakes.** The Meal and Spending ViewModels take photo processing, the phone's location, and recap drawing through small interfaces, `PhotoProcessing`, `PhoneLocation`, and `RecapDrawing`, so tests drive them with fakes.
 - **Test-only code.** Test libraries never ship. Only an empty activity for hosting UI tests is in debug builds.
 - **Previews.** `ui/preview/` holds Compose previews of the theme and type, in light and dark.
 
@@ -573,6 +592,7 @@ ANDROID_SERIAL=emulator-5560 ./gradlew :app:connectedDebugAndroidTest
 **Not yet tested**
 
 - Photo Picker location on a real phone. On the emulator it arrives as 0, 0, so gallery prefill is tested only through the database and unit tests.
+- The phone's location on a real phone, and the precise and approximate choices in the permission dialog. The ViewModel tests use a fake location.
 - HEIC date and location.
 - A capture that fails: the emulator's camera doesn't fail on demand, so its message hasn't been seen on screen.
 - `tools/build-districts.sh` on the ministry's shapefile. The bundled districts come from taiwan-atlas's 2021 copy until the ministry's download is back.

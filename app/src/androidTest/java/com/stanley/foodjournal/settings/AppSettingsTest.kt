@@ -62,6 +62,16 @@ class AppSettingsTest {
         withSettings { settings -> assertEquals(chosen, settings.recapOptions.first()) }
     }
 
+    @Test
+    fun locationIsAskedForOnce() = runBlocking {
+        withSettings { settings ->
+            assertEquals(false, settings.locationAsked.first())
+            settings.setLocationAsked()
+        }
+
+        withSettings { settings -> assertEquals(true, settings.locationAsked.first()) }
+    }
+
     /** One DataStore at a time per file, as in the app: each launch opens it afresh. */
     private suspend fun withSettings(block: suspend (AppSettings) -> Unit) {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
