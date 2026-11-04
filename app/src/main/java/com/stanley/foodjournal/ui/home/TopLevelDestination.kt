@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import com.stanley.foodjournal.R
 import com.stanley.foodjournal.ui.icons.FoodJournalIcons
 import com.stanley.foodjournal.ui.navigation.JournalRoute
+import com.stanley.foodjournal.ui.navigation.MapRoute
 import com.stanley.foodjournal.ui.navigation.SearchRoute
 import com.stanley.foodjournal.ui.navigation.SpendingRoute
 
@@ -16,5 +17,6 @@ enum class TopLevelDestination(
 ) {
     Journal(JournalRoute, FoodJournalIcons.Journal, R.string.tab_journal),
     Spending(SpendingRoute, FoodJournalIcons.Spending, R.string.tab_spending),
+    Map(MapRoute, FoodJournalIcons.Map, R.string.tab_map),
     Search(SearchRoute(), FoodJournalIcons.Search, R.string.tab_search),
 }

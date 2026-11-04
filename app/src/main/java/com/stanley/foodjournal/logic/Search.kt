@@ -9,6 +9,8 @@ import java.util.Locale
 data class SearchFilter(
     val text: String = "",
     val placeId: Long? = null,
+    /** A district's code. A search holds a place or a district, not both. */
+    val districtCode: String? = null,
     /** The first day, included. */
     val from: LocalDate? = null,
     /** The last day, included. */
@@ -19,14 +21,21 @@ data class SearchFilter(
 /**
  * The meals [filter] finds, newest first. Each typed word must appear in the meal's name, its
  * note, or its place's name, ignoring case and full-width letters, as place names are compared.
- * [placeNames] maps place ids to names.
+ * [placeNames] maps place ids to names, and [mealDistricts] meal ids to the code of the district
+ * each was eaten in, as [mealDistricts] in MealMap.kt finds them.
  */
-fun searchMeals(meals: List<Meal>, placeNames: Map<Long, String>, filter: SearchFilter): List<Meal> {
+fun searchMeals(
+    meals: List<Meal>,
+    placeNames: Map<Long, String>,
+    filter: SearchFilter,
+    mealDistricts: Map<Long, String> = emptyMap(),
+): List<Meal> {
     val words = searchWords(filter.text)
     return meals
         .filter { meal ->
             val day = meal.eatenAt.toLocalDate()
             (filter.placeId == null || meal.placeId == filter.placeId) &&
+                (filter.districtCode == null || mealDistricts[meal.id] == filter.districtCode) &&
                 (filter.from == null || day >= filter.from) &&
                 (filter.to == null || day <= filter.to) &&
                 (!filter.favoritesOnly || meal.isFavorite) &&

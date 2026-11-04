@@ -31,6 +31,16 @@ object FoodJournalIcons {
         )
     }
 
+    /** A folded map: three panels, as the Spending icon has three bars. */
+    val Map: ImageVector by lazy {
+        strokeIcon(
+            "Map",
+            "M3.5,6.5L9,4.5L15,6.5L20.5,4.5V17.5L15,19.5L9,17.5L3.5,19.5Z",
+            "M9,4.5V17.5",
+            "M15,6.5V19.5",
+        )
+    }
+
     val Search: ImageVector by lazy {
         strokeIcon(
             "Search",

@@ -31,7 +31,9 @@ import com.stanley.foodjournal.ui.components.UndoBar
 import com.stanley.foodjournal.ui.icons.FoodJournalIcons
 import com.stanley.foodjournal.ui.journal.JournalScreen
 import com.stanley.foodjournal.ui.journal.JournalUiState
+import com.stanley.foodjournal.ui.map.MapScreen
 import com.stanley.foodjournal.ui.navigation.JournalRoute
+import com.stanley.foodjournal.ui.navigation.MapRoute
 import com.stanley.foodjournal.ui.navigation.SearchRoute
 import com.stanley.foodjournal.ui.navigation.SpendingRoute
 import com.stanley.foodjournal.ui.preview.PreviewSurface
@@ -91,6 +93,13 @@ fun HomeScreen(
                     onOpenDays = { from, to ->
                         tabNavController.openSearch(SearchRoute(fromDay = from.toEpochDay(), toDay = to.toEpochDay()))
                     },
+                )
+            }
+            composable<MapRoute> {
+                MapScreen(
+                    onOpenMeal = onOpenMeal,
+                    onOpenPlace = { placeId -> tabNavController.openSearch(SearchRoute(placeId = placeId)) },
+                    onOpenDistrict = { code -> tabNavController.openSearch(SearchRoute(districtCode = code)) },
                 )
             }
             composable<SearchRoute> { SearchScreen(onAddMeal = onAddMeal, onOpenMeal = onOpenMeal) }

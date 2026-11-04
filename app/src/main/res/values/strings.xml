@@ -3,6 +3,7 @@
 
     <string name="tab_journal">Journal</string>
     <string name="tab_spending">Spending</string>
+    <string name="tab_map">Map</string>
     <string name="tab_search">Search</string>
 
     <string name="add_meal">Add meal</string>
@@ -133,10 +134,19 @@
     <string name="search_no_results">No meals found</string>
     <string name="search_clear_text">Clear search</string>
     <string name="search_clear_place">Clear place</string>
+    <string name="search_clear_district">Clear district</string>
     <string name="search_clear_dates">Clear dates</string>
 
     <string name="empty_journal">No meals yet</string>
     <string name="empty_search">Nothing to search yet</string>
     <string name="empty_spending">No meals</string>
+    <string name="map_empty">No meals with a location yet</string>
+    <string name="map_no_meals">No meals</string>
+    <string name="map_district_line">%1$s  ·  %2$s</string>
+    <string name="map_pin">%1$s, %2$s</string>
+    <plurals name="map_outside">
+        <item quantity="one">%1$s meal outside Taiwan</item>
+        <item quantity="other">%1$s meals outside Taiwan</item>
+    </plurals>
     <string name="log_first_meal">Log your first meal</string>
 </resources>

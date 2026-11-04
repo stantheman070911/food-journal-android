@@ -25,13 +25,18 @@ data object JournalRoute
 data object SpendingRoute
 
 /**
- * The Search tab. A [placeId], and a first and last day as epoch days, open a fresh search with
- * just them; they are passed explicitly, so the tab's saved state never brings back an older
- * search in their place.
+ * The Search tab. A [placeId] or a district's [districtCode], and a first and last day as epoch
+ * days, open a fresh search with just them; they are passed explicitly, so the tab's saved state
+ * never brings back an older search in their place.
  */
 @Serializable
 data class SearchRoute(
     val placeId: Long? = null,
     val fromDay: Long? = null,
     val toDay: Long? = null,
+    val districtCode: String? = null,
 )
+
+/** The Map tab: Taiwan, its districts, and where meals were eaten. */
+@Serializable
+data object MapRoute

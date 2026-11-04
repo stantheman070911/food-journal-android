@@ -2,7 +2,9 @@ package com.stanley.foodjournal.logic
 
 import com.stanley.foodjournal.data.Place
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
@@ -48,6 +50,39 @@ class DistrictsTest {
     }
 
     @Test
+    fun `every district has a unique code and a label point inside it`() {
+        assertEquals(368, map.districts.size)
+        assertEquals(368, map.districts.map { it.code }.toSet().size)
+        for (district in map.districts) {
+            assertTrue(district.name, district.contains(district.label.longitude, district.label.latitude))
+        }
+    }
+
+    @Test
+    fun `a district is found again by its code`() {
+        val daan = map.districtContaining(25.0174, 121.5340)!!
+
+        assertEquals("臺北市 大安區", map.district(daan.code)?.name)
+        assertNull(map.district("not a code"))
+    }
+
+    @Test
+    fun `every county has a label point inside one of its districts`() {
+        assertEquals(22, map.counties.size)
+        for (county in map.counties) {
+            val district = map.districtContaining(county.label.latitude, county.label.longitude)
+            assertEquals(county.name, district?.county)
+            assertTrue(county.area > 0)
+        }
+    }
+
+    @Test
+    fun `county lines are fewer than all the lines`() {
+        assertTrue(map.countyLines.isNotEmpty())
+        assertTrue(map.countyLines.size < map.lines.size)
+    }
+
+    @Test
     fun `a small map reads polygons, multipolygons, holes, and arcs run backwards`() {
         // Two squares sharing an edge: arc 0 is that edge, which B runs backwards. B has a hole,
         // and C has two parts.
@@ -84,5 +119,13 @@ class DistrictsTest {
         assertEquals("D E", small.districtAt(21.0, 131.0))
         assertEquals("D E", small.districtAt(21.0, 141.0))
         assertNull("Between E's parts", small.districtAt(21.0, 135.0))
+
+        // A and B share arc 0 within one county; every other arc is someone's edge alone.
+        assertFalse(0 in small.countyLines)
+        assertEquals(setOf(1, 2, 3, 4, 5), small.countyLines)
+        // Without codes or label points, the name stands in for the code, and the middle for the label.
+        assertEquals("C A", small.district("C A")?.name)
+        assertEquals(LngLat(105.0, 25.0), small.district("C A")?.label)
+        assertTrue(small.counties.isEmpty())
     }
 }

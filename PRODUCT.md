@@ -56,7 +56,7 @@ Two records, Meal and Place. A meal belongs to at most one place.
 
 ## Navigation
 
-- **Tabs.** Journal, Spending, and Search sit in an icon-only bottom bar, 56 dp tall. The selected tab is ink (black, or white in dark), the others grey. There is no highlight pill. A hairline separates the bar from the content.
+- **Tabs.** Journal, Spending, Map, and Search sit in an icon-only bottom bar, 56 dp tall. The selected tab is ink (black, or white in dark), the others grey. There is no highlight pill. A hairline separates the bar from the content.
 - **Add.** A round button, ink on every tab, opens a new meal.
 - **Screens above the tabs.** The Meal and Settings screens cover the bottom bar.
 - **Back.** From a tab, Back returns to Journal, then exits. Each tab keeps its state while switching tabs, but not across a cold start.
@@ -275,9 +275,33 @@ The Spending tab answers how much, where, and when, for a week, a month, or a ye
 - With no meals at all, the tab shows only "No meals", with no switch.
 - An empty period keeps the switch and swiping, and shows its name above "No meals". The Add button is already on the tab, so there is no button.
 
+## Map
+
+The Map tab shows where meals were eaten: Taiwan with its county and district (鄉鎮市區) boundaries, drawn by the app, offline.
+
+- **The view.** It opens framed on the main island and Penghu. Kinmen and Matsu, near the mainland coast, are reached by panning. Pinch to zoom and drag to pan. The view is kept while switching tabs.
+- **Look.** The background is white, or black in dark. District lines are a light grey, and county lines and the coast a darker one. Pins are ink. There are no map tiles, roads, or color.
+- **Names.**
+  - Zoomed out, county names show, such as "臺北市". Zoomed in, about six times the opening view, district names show, such as "大安區".
+  - Names are small grey sans, centered at a point inside their area. Larger areas are named first, and a name that would overlap another is left out until there is room.
+- **Where a meal is.** Its own location (see Where it was eaten), or else its place's coordinates.
+- **Pins.**
+  - One pin per place with coordinates in Taiwan, counting all its meals. A place with more meals gets a slightly larger pin.
+  - A meal with a location but no place, or at a place without coordinates, gets its own smaller pin, named by the meal, or its day without a name.
+  - A pin is an ink dot with a ring in the background color, so it reads over the lines.
+  - Tapping a pin within its 48 dp target opens Search with that place, as Spending's place rows do, or opens the lone meal.
+  - Screen readers get each pin as a button: "滷三塊, 12 meals".
+- **Districts.**
+  - Tapping away from a pin selects the district there: its area fills in light grey, and a line at the bottom reads "臺北市 大安區 · 12 meals".
+  - Tapping the same district again, or the line, opens Search with that district. A district with no meals can be selected, reads "No meals", and opens nothing.
+  - Tapping another district moves the selection, and tapping outside Taiwan clears it. The selection is kept while switching tabs.
+- **Meals outside Taiwan** have no pin. A grey line at the bottom counts them: "4 meals outside Taiwan".
+- **Layout.** The lines at the bottom leave room for the Add button.
+- **Empty state.** "No meals with a location yet". The Add button is already on the tab, so there is no button.
+
 ## Search
 
-- **Layout.** The search field is a grey pill, with the place chip inside it before the text. Below it sit two pill filters, "Dates" and "★ Favorites". Then the total, "42 meals · 12,340", in sans. Then the results, newest first.
+- **Layout.** The search field is a grey pill, with the place or district chip inside it before the text. Below it sit two pill filters, "Dates" and "★ Favorites". Then the total, "42 meals · 12,340", in sans. Then the results, newest first.
 - **Before typing,** Search lists every meal, newest first, with the total.
 - **Matching.**
   - Ignores case and full-width letters, cleaned as place names are.
@@ -289,7 +313,8 @@ The Spending tab answers how much, where, and when, for a week, a month, or a ye
 - **The place chip.**
   - With a chip, the text searches within that place. Its × clears it.
   - A chip whose place is merged away or deleted disappears and filters nothing out. It comes back if the change is undone.
-- **Opening Search from elsewhere.** "Meals here" and Spending's place rows and bars open the Search tab with a fresh search: only that place, or Spending's dates, or both.
+- **The district chip,** "臺北市 大安區", opened from the Map tab, holds the meals eaten in that district: by the meal's own location, or else its place's coordinates. Text, dates, and Favorites filter within it, and its × clears it. A search holds a place chip or a district chip, not both. A chip whose district is no longer in the bundled data disappears and filters nothing out.
+- **Opening Search from elsewhere.** "Meals here", Spending's place rows and bars, and the Map tab's pins and districts open the Search tab with a fresh search: only that place or district, or Spending's dates, or a place with dates.
   - The new search replaces the one showing, and survives tab switches.
   - Back returns to Journal and drops it, as Back drops any tab's state.
 - **Result rows.**
@@ -434,6 +459,7 @@ A recap turns a period in Spending into one image. It leaves the phone only when
 | Database | Room 2.8 (SQLite) | Room 3 moves to `androidx.room3`; moving later is a dependency change, not a data migration |
 | Lists | LazyColumn, LazyRow, HorizontalPager | About a thousand meals a year needs no paging |
 | Charts | Compose Canvas | |
+| Map | Compose Canvas | Boundaries from a bundled file; no map library, tiles, or network |
 | Settings | DataStore (Preferences) | Theme, last backup day, recap figures, whether location was asked |
 | Camera | CameraX | In-app capture |
 | Gallery | Android Photo Picker | No storage permission |
@@ -469,7 +495,7 @@ A recap turns a period in Spending into one image. It leaves the phone only when
 **Code layout**, under `app/src/main/java/com/stanley/foodjournal/`:
 
 - `data/`: Room entities and DAOs.
-- `logic/`: pure rules with JVM tests: `Spending.kt`, `Search.kt`, `Recap.kt`, `Weeks.kt`, `Places.kt`, `PlaceNames.kt`, `PlacePicker.kt`, `Districts.kt`, `MealForm.kt`, `TileNames.kt`, `PhotoSizing.kt`, and `Backup.kt`.
+- `logic/`: pure rules with JVM tests: `Spending.kt`, `Search.kt`, `Recap.kt`, `Weeks.kt`, `Places.kt`, `PlaceNames.kt`, `PlacePicker.kt`, `Districts.kt`, `MealMap.kt`, `MealForm.kt`, `TileNames.kt`, `PhotoSizing.kt`, and `Backup.kt`.
 - `photos/`, `backup/`, `recap/`, `edits/`, `settings/`, `location/`: photo files, backup and restore, recap drawing and sharing, undo, DataStore, and the phone's location.
 - `ui/`: one folder per screen, plus `components/`, `theme/`, `icons/`, `navigation/`, and `preview/`.
 
@@ -492,7 +518,11 @@ A recap turns a period in Spending into one image. It leaves the phone only when
 
 **Search's route.** `SearchRoute` carries an optional place and first and last days. The Meal screen hands its place to the tabs, which open Search once they show again. This replaces the tab's saved search.
 
-**Districts.** `app/src/main/assets/districts.json` holds Taiwan's 368 districts as simplified TopoJSON, each with its county and district name, about 0.44 MB, or 0.13 MB compressed in the APK. It is taken from taiwan-atlas 2021.9.20, the Ministry of the Interior's [鄉鎮市區界線](https://data.gov.tw/dataset/7441) with 臺 restored, since the ministry's download was down when it was built. `tools/build-districts.sh` rebuilds it from either source with mapshaper. `DistrictMap` reads it once, off the main thread, the first time a place with coordinates is shown, and `AppContainer` holds it. A bounding box per district skips most of the checks.
+**Districts.** `app/src/main/assets/districts.json` holds Taiwan's 368 districts as simplified TopoJSON, about 0.46 MB, or 0.14 MB compressed in the APK.
+- **Layers.** `districts` gives each district's outline, county and district name, code (`TOWNCODE`), and a label point inside it. `counties` gives each of the 22 counties' name and label point. County lines aren't stored: the app draws them where districts of two counties meet, and along the coast.
+- **Source.** It is taken from taiwan-atlas 2021.9.20, the Ministry of the Interior's [鄉鎮市區界線](https://data.gov.tw/dataset/7441) with 臺 restored, since the ministry's download was down when it was built. That copy's districts can't be merged by county, so its own county layer gives the counties' label points. `tools/build-districts.sh` rebuilds it from either source with mapshaper.
+- **Reading it.** `DistrictMap` reads it once, off the main thread, the first time a place with coordinates, the Map tab, or a district search needs it, and `AppContainer` holds it. A bounding box per district skips most of the checks.
+- **Drawing it.** The Map tab builds its boundary paths once, each shared border drawn a single time, and applies pinch and pan as one transform. The projection shortens longitude by the cosine of 23.7°, Taiwan's middle latitude.
 
 **Places in SQL.** Empty places are found with `NOT EXISTS (SELECT 1 FROM meal WHERE meal.placeId = place.id)`. `NOT IN` matches nothing once any meal has no place.
 

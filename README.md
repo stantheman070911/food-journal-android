@@ -36,6 +36,12 @@ It's a diary, not a diet tracker. There are no calories, goals, streaks, or scor
 - A bar chart, your top five places, spending by time of day (morning, midday, evening, and late), and the three priciest meals.
 - Numbers are shown, never judged: no budgets, targets, or warnings.
 
+### Map
+
+- See Taiwan with its counties and districts, and a pin for every place you've eaten, drawn on the phone with no map service.
+- Tap a pin to see that place's meals, or tap a district, then tap it again, to see every meal eaten there.
+- Meals outside Taiwan are counted at the bottom.
+
 ### Search
 
 - Search meal names, notes, and places, and filter by dates or favorites.

@@ -16,10 +16,12 @@ import com.stanley.foodjournal.data.Meal
 import com.stanley.foodjournal.data.MealDao
 import com.stanley.foodjournal.data.Place
 import com.stanley.foodjournal.data.PlaceDao
+import com.stanley.foodjournal.logic.DistrictMap
 import com.stanley.foodjournal.logic.SearchFilter
 import com.stanley.foodjournal.logic.formatDateRange
 import com.stanley.foodjournal.logic.formatPrice
 import com.stanley.foodjournal.logic.formatResultDate
+import com.stanley.foodjournal.logic.mealDistricts
 import com.stanley.foodjournal.logic.searchMeals
 import com.stanley.foodjournal.photos.PhotoStore
 import com.stanley.foodjournal.ui.navigation.SearchRoute
@@ -50,6 +52,8 @@ data class SearchUiState(
     val hasMeals: Boolean = false,
     /** The place chip, or null without one. */
     val placeName: String? = null,
+    /** The district chip, "臺北市 大安區", or null without one. A search has one chip at most. */
+    val districtName: String? = null,
     val from: LocalDate? = null,
     val to: LocalDate? = null,
     /** The dates pill's label once dates are set: "Oct 1 – Nov 4". */
@@ -63,9 +67,9 @@ data class SearchUiState(
 }
 
 /**
- * Search over every meal, with a place chip, dates, and favorites. Each part is kept in the saved
- * state, so a search survives switching tabs. A [SearchRoute] with a place or dates starts with
- * just them.
+ * Search over every meal, with a place or district chip, dates, and favorites. Each part is kept in
+ * the saved state, so a search survives switching tabs. A [SearchRoute] with a place, a district,
+ * or dates starts with just them.
  */
 class SearchViewModel(
     private val savedState: SavedStateHandle,
@@ -73,6 +77,8 @@ class SearchViewModel(
     mealDao: MealDao,
     placeDao: PlaceDao,
     private val photos: PhotoStore,
+    /** Taiwan's districts, read only once a district chip needs them. */
+    private val districtMap: suspend () -> DistrictMap?,
     private val today: () -> LocalDate = LocalDate::now,
 ) : ViewModel() {
     /**
@@ -86,6 +92,7 @@ class SearchViewModel(
     private val text = MutableStateFlow(query)
 
     private val placeId = savedState.getStateFlow(PLACE, route.placeId)
+    private val districtCode = savedState.getStateFlow(DISTRICT, route.districtCode)
 
     /** The first and last day as epoch days, kept as one value so they always change together. */
     private val days = savedState.getStateFlow(
@@ -97,12 +104,14 @@ class SearchViewModel(
     private val filter = combine(
         text,
         placeId,
+        districtCode,
         days,
         favoritesOnly,
-    ) { text, place, days, favorites ->
+    ) { text, place, district, days, favorites ->
         SearchFilter(
             text = text,
             placeId = place,
+            districtCode = district,
             from = days?.let { LocalDate.ofEpochDay(it[0]) },
             to = days?.let { LocalDate.ofEpochDay(it[1]) },
             favoritesOnly = favorites,
@@ -126,6 +135,10 @@ class SearchViewModel(
         savedState[PLACE] = null
     }
 
+    fun clearDistrict() {
+        savedState[DISTRICT] = null
+    }
+
     /** Sets the dates, both included, or clears them with nulls. */
     fun setDates(from: LocalDate?, to: LocalDate?) {
         savedState[DAYS] = from?.let { longArrayOf(it.toEpochDay(), (to ?: it).toEpochDay()) }
@@ -135,17 +148,31 @@ class SearchViewModel(
         savedState[FAVORITES] = !favoritesOnly.value
     }
 
-    private fun uiState(meals: List<Meal>, places: List<Place>, filter: SearchFilter): SearchUiState {
+    private suspend fun uiState(meals: List<Meal>, places: List<Place>, filter: SearchFilter): SearchUiState {
         val names = places.associate { it.id to it.name }
-        // A place merged away or deleted leaves no chip, and filters nothing out.
+        // A place merged away or deleted leaves no chip, and filters nothing out. So does a
+        // district the bundled data no longer has.
         val placeName = filter.placeId?.let(names::get)
-        val effective = if (placeName == null) filter.copy(placeId = null) else filter
-        val found = searchMeals(meals, names, effective)
+        val map = filter.districtCode?.let { districtMap() }
+        val district = filter.districtCode?.let { code -> map?.district(code) }
+        val effective = filter.copy(
+            placeId = filter.placeId.takeIf { placeName != null },
+            districtCode = filter.districtCode.takeIf { district != null },
+        )
+        val inDistricts = if (map != null && district != null) {
+            mealDistricts(meals, places.associateBy { it.id }) { latitude, longitude ->
+                map.districtContaining(latitude, longitude)?.code
+            }
+        } else {
+            emptyMap()
+        }
+        val found = searchMeals(meals, names, effective, inDistricts)
         val now = today()
         return SearchUiState(
             isLoading = false,
             hasMeals = meals.isNotEmpty(),
             placeName = placeName,
+            districtName = district?.name,
             from = filter.from,
             to = filter.to,
             dates = filter.from?.let { from -> formatDateRange(from, filter.to ?: from, now) },
@@ -172,6 +199,7 @@ class SearchViewModel(
     companion object {
         private const val TEXT = "text"
         private const val PLACE = "place"
+        private const val DISTRICT = "district"
         private const val DAYS = "days"
         private const val FAVORITES = "favorites"
 
@@ -185,6 +213,7 @@ class SearchViewModel(
                     mealDao = container.mealDao,
                     placeDao = container.placeDao,
                     photos = container.photoStore,
+                    districtMap = container::districtMap,
                 )
             }
         }
