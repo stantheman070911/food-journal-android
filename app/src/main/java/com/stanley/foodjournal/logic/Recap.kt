@@ -52,15 +52,54 @@ fun collageTiles(count: Int, width: Float, height: Float, gap: Float): List<Tile
 }
 
 /**
- * The words under a recap's collage. [title] is the period, "Nov 2 – 8", "November", or "2026";
- * [year] stands beside it, or is null when the title is the year. [stats] reads
- * "24 meals · 12 places · 3,450". [comparison], such as "120 less than last week", shows only
- * when Spending would show its change line.
+ * The figures a recap can show, each of which can be left off: how many meals, at how many
+ * places, what they cost, and how that compares with the period before.
+ */
+data class RecapOptions(
+    val meals: Boolean = true,
+    val places: Boolean = true,
+    val total: Boolean = true,
+    val comparison: Boolean = true,
+)
+
+/**
+ * Everything a recap could say about its period. [title] is the period, "Nov 2 – 8", "November",
+ * or "2026"; [year] stands beside it, or is null when the title is the year. [places] is null
+ * when no meal has a place, and [comparison] when Spending would show no change line.
+ */
+data class RecapFigures(
+    val title: String,
+    val year: String?,
+    /** "24 meals" */
+    val meals: String,
+    /** "12 places" */
+    val places: String?,
+    /** "3,450" */
+    val total: String,
+    /** "120 less than last week" */
+    val comparison: String?,
+) {
+    /** The words the image shows, with only the figures [options] keeps. */
+    fun text(options: RecapOptions): RecapText = RecapText(
+        title = title,
+        year = year,
+        stats = listOfNotNull(
+            meals.takeIf { options.meals },
+            places?.takeIf { options.places },
+            total.takeIf { options.total },
+        ).joinToString(" · ").ifEmpty { null },
+        comparison = comparison?.takeIf { options.comparison },
+    )
+}
+
+/**
+ * The words under a recap's collage: [title] and [year] as in [RecapFigures], [stats] such as
+ * "24 meals · 12 places · 3,450", and [comparison] below it. Either can be left off.
  */
 data class RecapText(
     val title: String,
     val year: String?,
-    val stats: String,
+    val stats: String?,
     val comparison: String?,
 )
 
@@ -70,11 +109,11 @@ private val MonthName = DateTimeFormatter.ofPattern("MMMM", Locale.ENGLISH)
 private val ShortMonth = DateTimeFormatter.ofPattern("MMM", Locale.ENGLISH)
 
 /**
- * The recap's words for [period], from [meals], those eaten in it, and [previousMeals], those of
- * the period before. The comparison follows Spending's rules for an unfinished period, and states
- * the difference plainly, never as a judgment.
+ * What a recap of [period] could say, from [meals], those eaten in it, and [previousMeals], those
+ * of the period before. The comparison follows Spending's rules for an unfinished period, and
+ * states the difference plainly, never as a judgment.
  */
-fun recapText(period: Period, meals: List<Meal>, previousMeals: List<Meal>, today: LocalDate): RecapText {
+fun recapFigures(period: Period, meals: List<Meal>, previousMeals: List<Meal>, today: LocalDate): RecapFigures {
     val start = period.start
     val end = period.end
     val title = when (period.kind) {
@@ -91,11 +130,6 @@ fun recapText(period: Period, meals: List<Meal>, previousMeals: List<Meal>, toda
 
     val total = meals.sumOf { it.price }
     val places = meals.mapNotNull { it.placeId }.distinct().size
-    val stats = listOfNotNull(
-        count(meals.size, "meal"),
-        places.takeIf { it > 0 }?.let { count(it, "place") },
-        formatPrice(total),
-    ).joinToString(" · ")
 
     val comparison = comparedTotal(period, previousMeals, today)?.let { before ->
         val previous = when (period.kind) {
@@ -110,7 +144,23 @@ fun recapText(period: Period, meals: List<Meal>, previousMeals: List<Meal>, toda
             else -> "The same as $previous"
         }
     }
-    return RecapText(title, year, stats, comparison)
+    return RecapFigures(
+        title = title,
+        year = year,
+        meals = count(meals.size, "meal"),
+        places = places.takeIf { it > 0 }?.let { count(it, "place") },
+        total = formatPrice(total),
+        comparison = comparison,
+    )
 }
+
+/** The recap's words for [period] with the figures [options] keeps, all of them by default. */
+fun recapText(
+    period: Period,
+    meals: List<Meal>,
+    previousMeals: List<Meal>,
+    today: LocalDate,
+    options: RecapOptions = RecapOptions(),
+): RecapText = recapFigures(period, meals, previousMeals, today).text(options)
 
 private fun count(n: Int, noun: String) = "${formatPrice(n)} $noun${if (n == 1) "" else "s"}"

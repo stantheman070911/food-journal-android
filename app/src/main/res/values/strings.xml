@@ -101,6 +101,11 @@
     <string name="recap_share">Share</string>
     <string name="recap_making">Making…</string>
     <string name="recap_share_label">Share a recap of %1$s</string>
+    <string name="recap_title">Share recap</string>
+    <string name="recap_meals">Meals</string>
+    <string name="recap_places">Places</string>
+    <string name="recap_total">Total spent</string>
+    <string name="recap_change">Change</string>
     <string name="spending_show_amount">Show amount</string>
     <string name="spending_show_meals">Show meals</string>
     <string name="spending_morning">Morning</string>

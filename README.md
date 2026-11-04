@@ -53,7 +53,8 @@ It's a diary, not a diet tracker. There are no calories, goals, streaks, or scor
 
 ### Share a recap
 
-- Tap Share in Spending to turn the week, month, or year in view into one image: a collage of every meal in it, with the period, the number of meals and places, the total, and how it compares with the period before.
+- Tap Share in Spending to turn the week, month, or year in view into one image: a collage of every meal in it, with the period and the year.
+- Choose what else it shows: the number of meals, the number of places, the total, and how it compares with the period before. Each has its own switch, and your choice is remembered.
 - The image is a high-resolution PNG, sized for Instagram Stories, and goes to Android's share sheet, so you can post it, send it to a friend, or save it.
 - Meals without a photo appear as plain tiles with their name, as in the Journal.
 

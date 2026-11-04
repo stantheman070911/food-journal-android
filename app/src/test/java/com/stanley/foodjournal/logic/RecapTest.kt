@@ -76,6 +76,23 @@ class RecapTest {
     }
 
     @Test
+    fun `each figure can be left off`() {
+        val meals = listOf(meal(1, day = 2, price = 180, place = 1), meal(2, day = 2, price = 20))
+        val lastWeek = listOf(meal(10, day = -4, price = 300))
+        fun text(options: RecapOptions) = recapText(week, meals, lastWeek, today, options)
+
+        assertEquals("2 meals · 1 place · 200", text(RecapOptions()).stats)
+        assertEquals("1 place · 200", text(RecapOptions(meals = false)).stats)
+        assertEquals("2 meals · 200", text(RecapOptions(places = false)).stats)
+        assertEquals("2 meals · 1 place", text(RecapOptions(total = false)).stats)
+        assertNull(text(RecapOptions(meals = false, places = false, total = false)).stats)
+        assertEquals("100 less than last week", text(RecapOptions(total = false)).comparison)
+        assertNull(text(RecapOptions(comparison = false)).comparison)
+        // The title and year always show.
+        assertEquals("Nov 2 – 8" to "2026", text(RecapOptions(false, false, false, false)).let { it.title to it.year })
+    }
+
+    @Test
     fun `titles for a month, a year, and a week across New Year`() {
         assertEquals("October" to "2026", recapText(october, listOf(meal(1)), emptyList(), today).let { it.title to it.year })
         val year = Period(PeriodKind.Year, LocalDate.of(2026, 1, 1))

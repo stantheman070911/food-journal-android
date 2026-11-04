@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.stanley.foodjournal.logic.RecapOptions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -48,6 +49,17 @@ class AppSettingsTest {
             assertEquals(ThemeChoice.Dark, settings.theme.first())
             assertEquals(LocalDate.of(2026, 10, 2), settings.lastBackup.first())
         }
+    }
+
+    @Test
+    fun aRecapShowsEveryFigureUntilAChoiceIsMadeAndThenKeepsIt() = runBlocking {
+        val chosen = RecapOptions(meals = false, comparison = false)
+        withSettings { settings ->
+            assertEquals(RecapOptions(), settings.recapOptions.first())
+            settings.setRecapOptions(chosen)
+        }
+
+        withSettings { settings -> assertEquals(chosen, settings.recapOptions.first()) }
     }
 
     /** One DataStore at a time per file, as in the app: each launch opens it afresh. */

@@ -5,10 +5,12 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStoreFile
+import com.stanley.foodjournal.logic.RecapOptions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -19,8 +21,9 @@ import java.time.LocalDate
 enum class ThemeChoice { System, Light, Dark }
 
 /**
- * The few things the app remembers outside the database: the theme chosen in Settings, and the
- * day of the last backup. Kept in DataStore, in the file "settings".
+ * The few things the app remembers outside the database: the theme chosen in Settings, the day
+ * of the last backup, and which figures a recap last showed. Kept in DataStore, in the file
+ * "settings".
  */
 class AppSettings(private val store: DataStore<Preferences>) {
     val theme: Flow<ThemeChoice> = store.data
@@ -31,6 +34,27 @@ class AppSettings(private val store: DataStore<Preferences>) {
     val lastBackup: Flow<LocalDate?> = store.data
         .map { prefs -> prefs[LAST_BACKUP]?.let(LocalDate::ofEpochDay) }
         .distinctUntilChanged()
+
+    /** The figures the last recap was shared with; all of them before the first. */
+    val recapOptions: Flow<RecapOptions> = store.data
+        .map { prefs ->
+            RecapOptions(
+                meals = prefs[RECAP_MEALS] ?: true,
+                places = prefs[RECAP_PLACES] ?: true,
+                total = prefs[RECAP_TOTAL] ?: true,
+                comparison = prefs[RECAP_COMPARISON] ?: true,
+            )
+        }
+        .distinctUntilChanged()
+
+    suspend fun setRecapOptions(options: RecapOptions) {
+        store.edit {
+            it[RECAP_MEALS] = options.meals
+            it[RECAP_PLACES] = options.places
+            it[RECAP_TOTAL] = options.total
+            it[RECAP_COMPARISON] = options.comparison
+        }
+    }
 
     suspend fun setTheme(choice: ThemeChoice) {
         store.edit { it[THEME] = choice.name }
@@ -43,6 +67,10 @@ class AppSettings(private val store: DataStore<Preferences>) {
     companion object {
         private val THEME = stringPreferencesKey("theme")
         private val LAST_BACKUP = longPreferencesKey("lastBackupDay")
+        private val RECAP_MEALS = booleanPreferencesKey("recapMeals")
+        private val RECAP_PLACES = booleanPreferencesKey("recapPlaces")
+        private val RECAP_TOTAL = booleanPreferencesKey("recapTotal")
+        private val RECAP_COMPARISON = booleanPreferencesKey("recapComparison")
 
         fun create(context: Context, scope: CoroutineScope) = AppSettings(
             PreferenceDataStoreFactory.create(scope = scope) { context.preferencesDataStoreFile("settings") },

@@ -25,12 +25,15 @@ import com.stanley.foodjournal.logic.formatPrice
 import com.stanley.foodjournal.logic.periodOf
 import com.stanley.foodjournal.logic.periodSpending
 import com.stanley.foodjournal.logic.periodsThrough
+import com.stanley.foodjournal.logic.RecapFigures
+import com.stanley.foodjournal.logic.RecapOptions
 import com.stanley.foodjournal.logic.recapMeals
-import com.stanley.foodjournal.logic.recapText
+import com.stanley.foodjournal.logic.recapFigures
 import com.stanley.foodjournal.photos.PhotoStore
 import com.stanley.foodjournal.recap.RecapDrawing
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -112,11 +115,25 @@ data class SpendingUiState(
     val kind: PeriodKind = PeriodKind.Month,
     val pages: List<SpendingPage> = emptyList(),
     val selectedIndex: Int = 0,
-    /** The period whose recap is being drawn, if any. Its Share button waits meanwhile. */
-    val recapping: Period? = null,
+    /** The Share sheet, while it is open. */
+    val recap: RecapSheet? = null,
 ) {
     val isEmpty: Boolean get() = !isLoading && pages.isEmpty()
 }
+
+/**
+ * The Share sheet for [period]'s recap: everything it could show, [options] for which of it it
+ * will, and whether the image [isMaking] now.
+ */
+data class RecapSheet(
+    val period: Period,
+    val figures: RecapFigures,
+    val options: RecapOptions,
+    val isMaking: Boolean = false,
+)
+
+/** An open Share sheet, with the meals its recap is drawn from. */
+private data class OpenRecap(val sheet: RecapSheet, val meals: List<Meal>)
 
 /** Which kind of period is shown, and a date inside the period in view. */
 private data class Selection(val kind: PeriodKind, val anchor: LocalDate)
@@ -132,11 +149,15 @@ class SpendingViewModel(
     placeDao: PlaceDao,
     private val photos: PhotoStore,
     private val recapDrawing: RecapDrawing,
+    /** The figures the last recap was shared with, remembered across launches. */
+    private val savedRecapOptions: Flow<RecapOptions>,
+    private val saveRecapOptions: suspend (RecapOptions) -> Unit,
     private val clock: () -> LocalDate = LocalDate::now,
 ) : ViewModel() {
     private val today = MutableStateFlow(clock())
     private val selection = MutableStateFlow(Selection(PeriodKind.Month, today.value))
-    private val recapping = MutableStateFlow<Period?>(null)
+    private val recap = MutableStateFlow<OpenRecap?>(null)
+    private var recapJob: Job? = null
     private val recapFiles = Channel<File>(Channel.BUFFERED)
 
     /** Each recap image once it is drawn, for the screen to hand to the share sheet. */
@@ -150,38 +171,67 @@ class SpendingViewModel(
     ) { meals, places, today, kind -> Pages(kind, pages(meals, places, today, kind)) }
         .flowOn(Dispatchers.Default)
 
-    val uiState: StateFlow<SpendingUiState> = combine(pages, selection, recapping) { built, selection, recapping ->
+    val uiState: StateFlow<SpendingUiState> = combine(pages, selection, recap) { built, selection, recap ->
         SpendingUiState(
             isLoading = false,
             kind = built.kind,
             pages = built.pages,
             selectedIndex = indexOf(periodOf(built.kind, selection.anchor), built.pages),
-            recapping = recapping,
+            recap = recap?.sheet,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SpendingUiState())
 
     /**
-     * Draws the recap of [period]: a collage of its meals, favorites first past the cap, above the
-     * period, its figures, and the change from the period before. One recap at a time. A recap
-     * that can't be drawn is logged, and the button simply comes back.
+     * Opens the Share sheet for [period], with the figures the last recap was shared with. Its
+     * meals are read now, so the sheet shows what the image will.
      */
-    fun shareRecap(period: Period, dark: Boolean) {
-        if (!recapping.compareAndSet(null, period)) return
-        viewModelScope.launch {
+    fun openRecap(period: Period) {
+        if (recap.value != null || recapJob?.isActive == true) return
+        recapJob = viewModelScope.launch {
+            val meals = mealDao.observeAll().first()
+            val inPeriod = meals.filter { it.eatenAt.toLocalDate() in period }
+            val previous = period.plus(-1)
+            val figures = recapFigures(period, inPeriod, meals.filter { it.eatenAt.toLocalDate() in previous }, today.value)
+            recap.value = OpenRecap(RecapSheet(period, figures, savedRecapOptions.first()), inPeriod)
+        }
+    }
+
+    /** Chooses which figures the recap shows, and remembers the choice for the next one. */
+    fun setRecapOptions(options: RecapOptions) {
+        val open = recap.value ?: return
+        if (open.sheet.isMaking) return
+        recap.value = open.copy(sheet = open.sheet.copy(options = options))
+        viewModelScope.launch { saveRecapOptions(options) }
+    }
+
+    /**
+     * Draws the open sheet's recap: every meal of the period as a collage, above the period and
+     * the chosen figures, then closes the sheet as the image goes to the share sheet. A recap that
+     * can't be drawn is logged, and the sheet stays open to try again.
+     */
+    fun shareRecap(dark: Boolean) {
+        val open = recap.value ?: return
+        if (open.sheet.isMaking) return
+        recap.value = open.copy(sheet = open.sheet.copy(isMaking = true))
+        recapJob = viewModelScope.launch {
             try {
-                val meals = mealDao.observeAll().first()
-                val previous = period.plus(-1)
-                val inPeriod = meals.filter { it.eatenAt.toLocalDate() in period }
-                val text = recapText(period, inPeriod, meals.filter { it.eatenAt.toLocalDate() in previous }, today.value)
-                recapFiles.send(recapDrawing.draw(recapMeals(inPeriod), text, dark))
+                val text = open.sheet.figures.text(open.sheet.options)
+                recapFiles.send(recapDrawing.draw(recapMeals(open.meals), text, dark))
+                recap.value = null
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Log.w(TAG, "Recap failed", e)
-            } finally {
-                recapping.value = null
+                recap.update { it?.copy(sheet = it.sheet.copy(isMaking = false)) }
             }
         }
+    }
+
+    /** Closes the Share sheet, dropping a recap still being drawn. */
+    fun closeRecap() {
+        recapJob?.cancel()
+        recapJob = null
+        recap.value = null
     }
 
     /**
@@ -266,7 +316,14 @@ class SpendingViewModel(
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
-                SpendingViewModel(appContainer.mealDao, appContainer.placeDao, appContainer.photoStore, appContainer.recaps)
+                SpendingViewModel(
+                    mealDao = appContainer.mealDao,
+                    placeDao = appContainer.placeDao,
+                    photos = appContainer.photoStore,
+                    recapDrawing = appContainer.recaps,
+                    savedRecapOptions = appContainer.settings.recapOptions,
+                    saveRecapOptions = appContainer.settings::setRecapOptions,
+                )
             }
         }
     }

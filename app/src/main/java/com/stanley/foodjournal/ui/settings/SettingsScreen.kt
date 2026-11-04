@@ -47,6 +47,8 @@ import com.stanley.foodjournal.backup.BackupProblem
 import com.stanley.foodjournal.backup.BackupWork
 import com.stanley.foodjournal.logic.formatPrice
 import com.stanley.foodjournal.settings.ThemeChoice
+import com.stanley.foodjournal.ui.components.CardDivider
+import com.stanley.foodjournal.ui.components.GroupedCard
 import com.stanley.foodjournal.ui.components.SegmentedPill
 import com.stanley.foodjournal.ui.icons.FoodJournalIcons
 import com.stanley.foodjournal.ui.preview.PreviewSurface
@@ -125,7 +127,7 @@ fun SettingsScreen(uiState: SettingsUiState, actions: SettingsActions, modifier:
                     onSelect = actions.onSelectTheme,
                 )
                 SectionLabel(stringResource(R.string.settings_backup))
-                Card {
+                GroupedCard {
                     SettingsRow(
                         title = stringResource(
                             if (uiState.work == BackupWork.Exporting) R.string.backup_exporting else R.string.backup_export,
@@ -150,7 +152,7 @@ fun SettingsScreen(uiState: SettingsUiState, actions: SettingsActions, modifier:
                     )
                 }
                 SectionLabel(stringResource(R.string.settings_about))
-                Card {
+                GroupedCard {
                     SettingsRow(title = stringResource(R.string.settings_version), value = uiState.version)
                     CardDivider()
                     SettingsRow(
@@ -232,27 +234,6 @@ private fun SectionLabel(text: String) {
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(start = 4.dp, top = 28.dp, bottom = 8.dp),
-    )
-}
-
-@Composable
-private fun Card(content: @Composable ColumnScope.() -> Unit) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainer),
-        content = content,
-    )
-}
-
-/** Rows on a card are divided as the Meal form's are: a line of the background, inset. */
-@Composable
-private fun CardDivider() {
-    HorizontalDivider(
-        modifier = Modifier.padding(start = 16.dp),
-        thickness = 1.dp,
-        color = MaterialTheme.colorScheme.background,
     )
 }
 

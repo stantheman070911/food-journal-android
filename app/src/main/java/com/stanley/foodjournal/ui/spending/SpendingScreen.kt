@@ -98,9 +98,17 @@ fun SpendingScreen(
         onShowPeriod = viewModel::showPeriod,
         onOpenMeal = onOpenMeal,
         onOpenPlace = onOpenPlace,
-        onShareRecap = { viewModel.shareRecap(it, dark) },
+        onShareRecap = viewModel::openRecap,
         modifier = modifier,
     )
+    uiState.recap?.let { sheet ->
+        RecapSheet(
+            sheet = sheet,
+            onOptionsChange = viewModel::setRecapOptions,
+            onShare = { viewModel.shareRecap(dark) },
+            onDismiss = viewModel::closeRecap,
+        )
+    }
 }
 
 /**
@@ -190,8 +198,6 @@ private fun PeriodPager(
             page = page,
             onOpenMeal = onOpenMeal,
             onOpenPlace = onOpenPlace,
-            recapping = uiState.recapping == page.period,
-            canRecap = uiState.recapping == null,
             onShareRecap = { onShareRecap(page.period) },
         )
     }
@@ -202,8 +208,6 @@ private fun PeriodPage(
     page: SpendingPage,
     onOpenMeal: (Long) -> Unit,
     onOpenPlace: (placeId: Long, from: LocalDate, to: LocalDate) -> Unit,
-    recapping: Boolean = false,
-    canRecap: Boolean = true,
     onShareRecap: () -> Unit = {},
 ) {
     val figures = page.figures
@@ -233,8 +237,6 @@ private fun PeriodPage(
                 )
             }
             ShareRecapButton(
-                recapping = recapping,
-                enabled = canRecap,
                 periodName = page.name,
                 onClick = onShareRecap,
                 modifier = Modifier.padding(top = 16.dp, end = 16.dp),
@@ -291,14 +293,9 @@ private fun PeriodPage(
     }
 }
 
-/**
- * "Share", a small outlined pill that makes a recap image of the period and opens the share
- * sheet. It reads "Making…" while the image is drawn, and waits while another recap is.
- */
+/** "Share", a small outlined pill that opens the sheet for sharing a recap of the period. */
 @Composable
 private fun ShareRecapButton(
-    recapping: Boolean,
-    enabled: Boolean,
     periodName: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -307,20 +304,16 @@ private fun ShareRecapButton(
     val description = stringResource(R.string.recap_share_label, periodName)
     OutlinedButton(
         onClick = onClick,
-        enabled = enabled,
         shape = CircleShape,
-        border = BorderStroke(1.dp, if (enabled || recapping) colors.onSurface else colors.outline),
-        colors = ButtonDefaults.outlinedButtonColors(
-            contentColor = colors.onSurface,
-            disabledContentColor = if (recapping) colors.onSurface else colors.outline,
-        ),
+        border = BorderStroke(1.dp, colors.onSurface),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.onSurface),
         contentPadding = PaddingValues(horizontal = 16.dp),
         modifier = modifier
             .height(ShareHeight)
             .semantics { contentDescription = description },
     ) {
         Text(
-            text = stringResource(if (recapping) R.string.recap_making else R.string.recap_share),
+            text = stringResource(R.string.recap_share),
             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
         )
     }

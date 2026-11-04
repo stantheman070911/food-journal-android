@@ -13,9 +13,13 @@ import com.stanley.foodjournal.data.Place
 import com.stanley.foodjournal.logic.ComparedWith
 import com.stanley.foodjournal.logic.Period
 import com.stanley.foodjournal.logic.PeriodKind
+import com.stanley.foodjournal.logic.RecapOptions
+import com.stanley.foodjournal.logic.RecapText
 import com.stanley.foodjournal.photos.PhotoStore
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -27,8 +31,10 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.io.IOException
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.util.concurrent.CopyOnWriteArrayList
 
 @RunWith(AndroidJUnit4::class)
 class SpendingViewModelTest {
@@ -38,6 +44,14 @@ class SpendingViewModelTest {
 
     // A Wednesday, so the current week is Nov 2 – 8.
     private var today = LocalDate.of(2026, 11, 4)
+
+    private var savedOptions = RecapOptions()
+    private val saves = CopyOnWriteArrayList<RecapOptions>()
+    private val drawn = CopyOnWriteArrayList<RecapText>()
+    private var drawingFails = false
+
+    @Volatile
+    private var drawingFailed = false
 
     @Before
     fun open() {
@@ -231,9 +245,79 @@ class SpendingViewModelTest {
         assertEquals("Latte", tiles[1].name)
     }
 
+    @Test
+    fun theShareSheetOpensWithTheFiguresLastChosen() = runBlocking {
+        db.mealDao().insert(meal(LocalDateTime.of(2026, 11, 2, 12, 0), price = 450))
+        savedOptions = RecapOptions(total = false)
+        val vm = viewModel()
+        val page = vm.state { it.pages.isNotEmpty() }.pages.last()
+
+        vm.openRecap(page.period)
+        val sheet = vm.state { it.recap != null }.recap!!
+
+        assertEquals(page.period, sheet.period)
+        assertEquals(RecapOptions(total = false), sheet.options)
+        assertEquals("1 meal", sheet.figures.meals)
+        assertEquals("450", sheet.figures.total)
+        assertEquals(emptyList<RecapText>(), drawn)
+    }
+
+    @Test
+    fun theRecapShowsOnlyTheChosenFiguresAndTheChoiceIsSaved() = runBlocking {
+        db.mealDao().insert(meal(LocalDateTime.of(2026, 11, 2, 12, 0), price = 450))
+        val vm = viewModel()
+        val page = vm.state { it.pages.isNotEmpty() }.pages.last()
+        vm.openRecap(page.period)
+        vm.state { it.recap != null }
+
+        val chosen = RecapOptions(total = false)
+        vm.setRecapOptions(chosen)
+        vm.state { it.recap?.options == chosen }
+        vm.shareRecap(dark = false)
+
+        assertEquals(File("/spending-test/recap.png"), withTimeout(3_000) { vm.recaps.first() })
+        assertNull(vm.state { it.recap == null }.recap)
+        assertEquals("1 meal", drawn.single().stats)
+        withTimeout(3_000) { while (saves.isEmpty()) delay(20) }
+        assertEquals(chosen, saves.single())
+    }
+
+    @Test
+    fun aRecapThatCantBeDrawnLeavesTheSheetOpen() = runBlocking {
+        db.mealDao().insert(meal(LocalDateTime.of(2026, 11, 2, 12, 0)))
+        drawingFails = true
+        val vm = viewModel()
+        vm.openRecap(vm.state { it.pages.isNotEmpty() }.pages.last().period)
+        vm.state { it.recap != null }
+
+        vm.shareRecap(dark = false)
+        withTimeout(3_000) { while (!drawingFailed) delay(20) }
+
+        assertTrue(vm.state { it.recap?.isMaking == false }.recap != null)
+        vm.closeRecap()
+        assertNull(vm.state { it.recap == null }.recap)
+    }
+
     private suspend fun viewModel(): SpendingViewModel {
         val factory = viewModelFactory {
-            initializer { SpendingViewModel(db.mealDao(), db.placeDao(), photos, recapDrawing = { _, _, _ -> File("/spending-test/recap.png") }, clock = { today }) }
+            initializer {
+                SpendingViewModel(
+                    mealDao = db.mealDao(),
+                    placeDao = db.placeDao(),
+                    photos = photos,
+                    recapDrawing = { _, text, _ ->
+                        if (drawingFails) {
+                            drawingFailed = true
+                            throw IOException("No room")
+                        }
+                        drawn += text
+                        File("/spending-test/recap.png")
+                    },
+                    savedRecapOptions = flowOf(savedOptions),
+                    saveRecapOptions = { saves += it },
+                    clock = { today },
+                )
+            }
         }
         return withContext(Dispatchers.Main) {
             ViewModelProvider.create(store, factory)["spending-${System.nanoTime()}", SpendingViewModel::class]

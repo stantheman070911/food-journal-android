@@ -170,15 +170,19 @@ class RecapImages(private val context: Context, private val photos: PhotoStore) 
             textSize = STATS_SIZE
             fontFeatureSettings = "tnum"
         }
-        val statsBaseline = titleBaseline + STATS_GAP
-        canvas.drawText(text.stats, MARGIN, statsBaseline, stats)
+        // Either line may be left off; the comparison then takes the figures' place.
+        var baseline = titleBaseline + STATS_GAP
+        text.stats?.let { line ->
+            canvas.drawText(line, MARGIN, baseline, stats)
+            baseline += COMPARISON_GAP
+        }
         text.comparison?.let { comparison ->
             val paint = TextPaint(stats).apply {
                 color = colors.grey
                 typeface = sans
                 textSize = COMPARISON_SIZE
             }
-            canvas.drawText(comparison, MARGIN, statsBaseline + COMPARISON_GAP, paint)
+            canvas.drawText(comparison, MARGIN, baseline, paint)
         }
     }
 
