@@ -19,6 +19,35 @@ data class Week(
 /** The Monday of the week [date] falls in. Weeks run Monday to Sunday. */
 fun weekStart(date: LocalDate): LocalDate = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
 
+/** The Journal's strips run in this order. Meals saved at the same moment keep their saved order. */
+private val OrderEaten = compareBy<Meal> { it.eatenAt }.thenBy { it.id }
+
+/**
+ * Where a meal stands among all meals: the meal before and after it in the order eaten, across
+ * weeks, and its place among the [weekCount] meals of its own week.
+ */
+data class MealSteps(
+    val previous: Long?,
+    val next: Long?,
+    val weekCount: Int,
+    val weekIndex: Int,
+)
+
+/** The steps from the meal with [mealId], in the Journal's order, or null when it isn't in [meals]. */
+fun mealSteps(meals: List<Meal>, mealId: Long): MealSteps? {
+    val ordered = meals.sortedWith(OrderEaten)
+    val index = ordered.indexOfFirst { it.id == mealId }
+    if (index < 0) return null
+    val week = weekStart(ordered[index].eatenAt.toLocalDate())
+    val inWeek = ordered.filter { weekStart(it.eatenAt.toLocalDate()) == week }
+    return MealSteps(
+        previous = ordered.getOrNull(index - 1)?.id,
+        next = ordered.getOrNull(index + 1)?.id,
+        weekCount = inWeek.size,
+        weekIndex = inWeek.indexOfFirst { it.id == mealId },
+    )
+}
+
 /**
  * Meals grouped into weeks, newest week first, and within a week from Monday to Sunday. A
  * meal's day is the calendar date it was eaten, so a 01:00 snack counts toward that day.
@@ -26,7 +55,7 @@ fun weekStart(date: LocalDate): LocalDate = date.with(TemporalAdjusters.previous
  */
 fun groupIntoWeeks(meals: List<Meal>): List<Week> =
     meals
-        .sortedWith(compareBy<Meal> { it.eatenAt }.thenBy { it.id })
+        .sortedWith(OrderEaten)
         .groupBy { weekStart(it.eatenAt.toLocalDate()) }
         .map { (start, inWeek) -> Week(start, inWeek) }
         .sortedByDescending { it.start }

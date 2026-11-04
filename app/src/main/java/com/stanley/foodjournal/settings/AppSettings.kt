@@ -22,8 +22,8 @@ enum class ThemeChoice { System, Light, Dark }
 
 /**
  * The few things the app remembers outside the database: the theme chosen in Settings, the day
- * of the last backup, and the figures last chosen for a recap. Kept in DataStore, in the file
- * "settings".
+ * of the last backup, the figures last chosen for a recap, and whether location has been asked
+ * for. Kept in DataStore, in the file "settings".
  */
 class AppSettings(private val store: DataStore<Preferences>) {
     val theme: Flow<ThemeChoice> = store.data
@@ -46,6 +46,15 @@ class AppSettings(private val store: DataStore<Preferences>) {
             )
         }
         .distinctUntilChanged()
+
+    /** Whether location has been asked for. It is asked once, on the first Add. */
+    val locationAsked: Flow<Boolean> = store.data
+        .map { prefs -> prefs[LOCATION_ASKED] ?: false }
+        .distinctUntilChanged()
+
+    suspend fun setLocationAsked() {
+        store.edit { it[LOCATION_ASKED] = true }
+    }
 
     suspend fun setRecapOptions(options: RecapOptions) {
         store.edit {
@@ -71,6 +80,7 @@ class AppSettings(private val store: DataStore<Preferences>) {
         private val RECAP_PLACES = booleanPreferencesKey("recapPlaces")
         private val RECAP_TOTAL = booleanPreferencesKey("recapTotal")
         private val RECAP_COMPARISON = booleanPreferencesKey("recapComparison")
+        private val LOCATION_ASKED = booleanPreferencesKey("locationAsked")
 
         fun create(context: Context, scope: CoroutineScope) = AppSettings(
             PreferenceDataStoreFactory.create(scope = scope) { context.preferencesDataStoreFile("settings") },

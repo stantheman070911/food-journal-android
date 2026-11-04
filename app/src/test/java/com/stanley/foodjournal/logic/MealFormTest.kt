@@ -66,12 +66,12 @@ class MealFormTest {
     }
 
     @Test
-    fun `formats meal times relative to today`() {
+    fun `formats meal times with the date and weekday`() {
         val today = LocalDate.of(2026, 11, 3)
-        assertEquals("Today · 12:40", formatMealTime(LocalDateTime.of(2026, 11, 3, 12, 40), today))
-        assertEquals("Yesterday · 01:05", formatMealTime(LocalDateTime.of(2026, 11, 2, 1, 5), today))
+        assertEquals("Tue, Nov 3 · 12:40", formatMealTime(LocalDateTime.of(2026, 11, 3, 12, 40), today))
+        assertEquals("Mon, Nov 2 · 01:05", formatMealTime(LocalDateTime.of(2026, 11, 2, 1, 5), today))
         assertEquals("Tue, Oct 27 · 19:05", formatMealTime(LocalDateTime.of(2026, 10, 27, 19, 5), today))
-        assertEquals("Dec 31, 2025 · 23:30", formatMealTime(LocalDateTime.of(2025, 12, 31, 23, 30), today))
+        assertEquals("Wed, Dec 31, 2025 · 23:30", formatMealTime(LocalDateTime.of(2025, 12, 31, 23, 30), today))
     }
 
     @Test

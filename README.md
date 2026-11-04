@@ -6,7 +6,7 @@ A quiet Android app for remembering what you ate, where you ate it, and what it 
 
 It's a diary, not a diet tracker. There are no calories, goals, streaks, or scores, and nothing leaves your phone unless you export a backup or share a recap yourself.
 
-> **Version 1.01.01** · Android 16 or later · English interface · Prices in New Taiwan dollars (NTD)
+> **Version 1.02.00** · Android 16 or later · English interface · Prices in New Taiwan dollars (NTD)
 
 ## Features
 
@@ -15,17 +15,19 @@ It's a diary, not a diet tracker. There are no calories, goals, streaks, or scor
 - Tap Add and the camera opens. Take the photo, type the price, and tap Save.
 - A meal needs only a photo or a name, plus its price. A name, note, place, and favorite star are there whenever you want them.
 - Names you've used before and your saved places come up as you type.
+- Save where you ate: a photo taken in the app keeps the phone's location, with a switch on the form to leave it off. A meal logged later keeps the phone's location only if you turn the switch on. The district shows beside it.
 
 ### Backfill from the gallery
 
 - Forgot to log lunch? Pick the photo from your gallery, and the meal takes the date and time the photo was taken.
-- On Android 17, if the photo picker shares the photo's location, and exactly one of your saved places is within 150 m of it, the meal is placed there. On Android 16, you pick the place yourself. The phone's own location is never used.
+- On Android 17, if the photo picker shares the photo's location, and exactly one of your saved places is within 150 m of it, the meal is placed there. On Android 16, you pick the place yourself.
 
 ### Journal
 
 - One row per week, Monday to Sunday, newest first, with the week's total.
 - Each week is a filmstrip of photo tiles. Swipe sideways through a week, and scroll down through earlier ones.
 - A meal without a photo shows as a plain tile with its name.
+- Open a meal, then tap or swipe its photo to step to the next or previous one, across weeks.
 
 ### Spending
 
@@ -34,16 +36,23 @@ It's a diary, not a diet tracker. There are no calories, goals, streaks, or scor
 - A bar chart, your top five places, spending by time of day (morning, midday, evening, and late), and the three priciest meals.
 - Numbers are shown, never judged: no budgets, targets, or warnings.
 
+### Map
+
+- See Taiwan with its counties and districts, and a pin for every place you've eaten, drawn on the phone with no map service.
+- Tap a pin to see that place's meals, or tap a district, then tap it again, to see every meal eaten there.
+- Meals outside Taiwan are counted at the bottom.
+
 ### Search
 
 - Search meal names, notes, and places, and filter by dates or favorites.
 - Results show how many meals were found and what they cost in total.
-- Tap a place in Spending to see its meals in that period, or tap Meals here in a meal's place picker to see every meal eaten there.
+- Tap a place in Spending to see its meals in that period, or tap a bar twice to see that day's or month's meals. Tap Meals here in a meal's place picker to see every meal eaten there.
 
 ### Places
 
 - Rename a place, merge two by giving one the other's name, or delete one.
 - Deleting or merging a place, like deleting a meal, shows an Undo bar for a few seconds.
+- A place with a location in Taiwan shows its county and district, found on the phone from a boundary file bundled with the app.
 
 ### Backup and restore
 
@@ -67,7 +76,8 @@ It's a diary, not a diet tracker. There are no calories, goals, streaks, or scor
 
 - No account and no sign-in. The app works fully offline.
 - The app has no internet permission, so it can't send anything anywhere. It contains no analytics or ads.
-- The only permission it asks for is the camera, the first time you add a meal. Gallery photos come through Android's photo picker, which needs no storage permission, and the app never asks for your location.
+- It asks for the camera, and once for your location, the first time you add a meal. Gallery photos come through Android's photo picker, which needs no storage permission.
+- A meal's location is saved only while its switch is on, and only in the app's own database, never in the photo. With approximate location, the phone's location isn't used. Without location permission, no meal keeps a location.
 - Photos are stored resized, without their original metadata.
 - Android's cloud backup and device-to-device transfer are turned off for this app. The backup you export is the only copy of your meals off the phone.
 
@@ -76,7 +86,7 @@ It's a diary, not a diet tracker. There are no calories, goals, streaks, or scor
 
 ## Install
 
-1. On your Android phone, download [food-journal-1.01.01.apk](release/food-journal-1.01.01.apk).
+1. On your Android phone, download [food-journal-1.02.00.apk](release/food-journal-1.02.00.apk).
 2. Open it, and allow installs from that source when Android asks.
 
 The app needs Android 16 or later. It was built and tested on a Pixel 8a with Android 17, and hasn't been tested on Android 16 yet. A newer version signed with the same key installs over the old one and keeps your meals.

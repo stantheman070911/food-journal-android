@@ -1,5 +1,6 @@
 package com.stanley.foodjournal.ui
 
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -16,6 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.dropUnlessResumed
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -30,6 +32,7 @@ import com.stanley.foodjournal.ui.settings.LicensesScreen
 import com.stanley.foodjournal.ui.settings.SettingsScreen
 
 private const val SCREEN_MOTION_MILLIS = 220
+private const val STEP_FADE_MILLIS = 150
 
 /** The tabs, with the Meal and Settings screens rising over them. */
 @Composable
@@ -71,10 +74,28 @@ fun FoodJournalApp() {
                     },
                 )
             }
-            composable<MealRoute> {
+            composable<MealRoute>(
+                // A step to another meal crossfades in place, without the usual rise.
+                enterTransition = { if (initialState.destination.hasRoute<MealRoute>()) fadeIn(tween(STEP_FADE_MILLIS)) else null },
+                exitTransition = {
+                    if (targetState.destination.hasRoute<MealRoute>()) ExitTransition.KeepUntilTransitionsFinished else null
+                },
+            ) { entry ->
                 MealScreen(
-                    onClose = dropUnlessResumed { navController.popBackStack() },
+                    // Not dropped while the screen still opens: its ViewModel has already closed
+                    // and asks only once, so a dropped request would leave it stuck.
+                    onClose = {
+                        if (navController.currentBackStackEntry === entry) navController.popBackStack()
+                    },
                     onOpenPlace = { placeId -> searchPlaceId = placeId },
+                    // In this one's place, so Back still returns to wherever the first meal opened from.
+                    onStepTo = { mealId ->
+                        if (navController.currentBackStackEntry === entry) {
+                            navController.navigate(MealRoute(mealId)) {
+                                popUpTo<MealRoute> { inclusive = true }
+                            }
+                        }
+                    },
                 )
             }
             composable<SettingsRoute> {

@@ -61,6 +61,16 @@ class SearchTest {
     }
 
     @Test
+    fun `the district chip keeps meals eaten there, and text filters within it`() {
+        val districts = mapOf(1L to "63000030", 2L to "63000030", 4L to "65000010")
+        fun find(filter: SearchFilter) = searchMeals(all, places, filter, districts).map { it.id }
+
+        assertEquals(listOf(2L, 1L), find(SearchFilter(districtCode = "63000030")))
+        assertEquals(listOf(1L), find(SearchFilter(districtCode = "63000030", text = "soup")))
+        assertEquals(emptyList<Long>(), find(SearchFilter(districtCode = "10014020")))
+    }
+
+    @Test
     fun `dates include both days in full`() {
         val filter = SearchFilter(from = LocalDate.of(2026, 11, 2), to = LocalDate.of(2026, 11, 3))
         assertEquals(listOf(2L, 1L), ids(filter))

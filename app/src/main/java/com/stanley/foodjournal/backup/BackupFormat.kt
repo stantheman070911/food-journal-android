@@ -14,8 +14,11 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.util.Locale
 
-/** The version of the backup file this app writes. A newer one is refused, an older one read. */
-const val BACKUP_FORMAT = 1
+/**
+ * The version of the backup file this app writes. A newer one is refused, an older one read.
+ * Version 2 adds where each meal was eaten; a version 1 backup restores without it.
+ */
+const val BACKUP_FORMAT = 2
 
 /** The records, at the top of the ZIP. */
 const val BACKUP_JSON = "backup.json"
@@ -53,6 +56,8 @@ data class BackupMeal(
     val isFavorite: Boolean = false,
     val note: String? = null,
     val placeId: Long? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
 )
 
 /** Readable, and tolerant of fields a later version of the same format may add. */
@@ -69,7 +74,10 @@ fun backupOf(meals: List<Meal>, places: List<Place>, exportedAt: LocalDateTime) 
     exportedAt = times.fromLocalDateTime(exportedAt),
     places = places.map { BackupPlace(it.id, it.name, it.latitude, it.longitude) },
     meals = meals.map {
-        BackupMeal(it.id, times.fromLocalDateTime(it.eatenAt), it.photo, it.name, it.price, it.isFavorite, it.note, it.placeId)
+        BackupMeal(
+            it.id, times.fromLocalDateTime(it.eatenAt), it.photo, it.name, it.price, it.isFavorite, it.note, it.placeId,
+            it.latitude, it.longitude,
+        )
     },
 )
 
@@ -78,7 +86,7 @@ fun BackupFile.restoredPlaces(): List<Place> = places.map { Place(it.id, it.name
 
 /** The meals to put back, once [checkBackup] has passed. */
 fun BackupFile.restoredMeals(): List<Meal> = meals.map {
-    Meal(it.id, times.toLocalDateTime(it.eatenAt), it.photo, it.name, it.price, it.isFavorite, it.note, it.placeId)
+    Meal(it.id, times.toLocalDateTime(it.eatenAt), it.photo, it.name, it.price, it.isFavorite, it.note, it.placeId, it.latitude, it.longitude)
 }
 
 /** When the backup was made, or null if that can't be read. */
@@ -154,12 +162,20 @@ fun checkBackup(file: BackupFile, photos: Set<String>): BackupProblem? {
         if (runCatching { times.toLocalDateTime(meal.eatenAt) }.isFailure) return damaged("meal ${meal.id} has time ${meal.eatenAt}")
         if (meal.placeId != null && meal.placeId !in knownPlaces) return damaged("meal ${meal.id} names a missing place")
         if (meal.photo != null && meal.photo !in photos) return damaged("meal ${meal.id}'s photo is missing")
+        if (!validLocation(meal.latitude, meal.longitude)) return damaged("meal ${meal.id} has location ${meal.latitude}, ${meal.longitude}")
     }
     if (file.places.any { it.id <= 0 }) return damaged("a place has no usable id")
     return null
 }
 
 private fun damaged(reason: String) = BackupProblem.Damaged(reason)
+
+/** No location, or both coordinates within range. */
+private fun validLocation(latitude: Double?, longitude: Double?): Boolean = when {
+    latitude == null && longitude == null -> true
+    latitude == null || longitude == null -> false
+    else -> latitude in -90.0..90.0 && longitude in -180.0..180.0
+}
 
 /**
  * The photo name inside a ZIP entry such as "photos/1f3e.jpg", or null for any other entry. A

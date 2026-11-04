@@ -1,6 +1,6 @@
 # Food Journal
 
-This document describes Food Journal at version 1.01.01: what it does, how it looks, and how it is built.
+This document describes Food Journal at version 1.02.00: what it does, how it looks, and how it is built.
 
 ## Overview
 
@@ -33,6 +33,7 @@ Two records, Meal and Place. A meal belongs to at most one place.
 | isFavorite | Boolean | Default false |
 | note | Text | |
 | placeId | Long | Optional link to Place. Set to empty when the place is deleted. |
+| latitude, longitude | Double | Where the meal was eaten, when saved with it. Empty otherwise. |
 
 **Place**
 
@@ -48,18 +49,18 @@ Two records, Meal and Place. A meal belongs to at most one place.
 - **A meal's day** is the date of `eatenAt`, so a 01:00 snack counts toward that day. Weeks run Monday to Sunday.
 - **`photo` is a file name**, not a path, so a restored backup works on a fresh install.
 - **Place names are cleaned** before they are saved or compared: Unicode NFKC (full-width letters become plain), ends trimmed, runs of spaces collapsed. Comparison ignores case, so `Café` and `CAFÉ` match. A case-insensitive unique index in the database is the backstop.
-- **Coordinates** come from a gallery photo's location when the place is created for that meal. Places created any other way have none.
+- **Coordinates.** A meal's are where it was eaten, kept only while its Save location switch is on (see Where it was eaten). A place takes the location of the meal it is created for, or of the first meal saved with one while the place has none, and keeps its coordinates after that. Without location permission, only a new gallery meal's photo location gives a new place coordinates.
 - **A place with no meals left is removed**, once any undo bar closes.
 - **Nothing derived is stored.** Visits, totals, last visit, and time of day are computed from meals.
-- **Schema.** Room exports each schema version to `app/schemas/`, kept in Git for migrations. The current version is 1.
+- **Schema.** Room exports each schema version to `app/schemas/`, kept in Git for migrations. The current version is 2, which added the meal's coordinates. Room migrates version 1 on its own, since the new columns may be empty.
 
 ## Navigation
 
-- **Tabs.** Journal, Spending, and Search sit in an icon-only bottom bar, 56 dp tall. The selected tab is ink (black, or white in dark), the others grey. There is no highlight pill. A hairline separates the bar from the content.
+- **Tabs.** Journal, Spending, Map, and Search sit in an icon-only bottom bar, 56 dp tall. The selected tab is ink (black, or white in dark), the others grey. There is no highlight pill. A hairline separates the bar from the content.
 - **Add.** A round button, ink on every tab, opens a new meal.
 - **Screens above the tabs.** The Meal and Settings screens cover the bottom bar.
 - **Back.** From a tab, Back returns to Journal, then exits. Each tab keeps its state while switching tabs, but not across a cold start.
-- **Motion.** Tabs crossfade in 150 ms. The Meal and Settings screens fade in with a slight rise over 220 ms. Nothing slows logging.
+- **Motion.** Tabs crossfade in 150 ms, as does a step from one saved meal to another. The Meal and Settings screens fade in with a slight rise over 220 ms. Nothing slows logging.
 
 ## Logging a meal
 
@@ -72,17 +73,26 @@ Two records, Meal and Place. A meal belongs to at most one place.
 
 **Camera**
 
-- The camera permission is asked when the camera stage opens. It is asked again on later Adds while it is refused, as often as Android allows.
+- The camera permission is asked when the camera stage opens. It is asked again on later Adds while it is refused, as often as Android allows. The first Add also asks for location, once (see Where it was eaten).
 - Refused, the stage shows "Camera access is off" with "Open settings". Gallery and Skip still work. Access is checked again on resume.
 - Capture aims for 2048 × 1536 at 4:3, with minimum latency.
 - The close button sits on a dark grey disc.
+- A capture that fails leaves the camera open, with "That photo couldn't be read. Try another." below the viewfinder.
 
 **The Meal screen** adds, reads, and edits a meal, and is always editable.
 
-- **Top.** Back, Favorite, and Delete.
-- **Photo.** Shown at 3:4, inset 16 dp with 20 dp corners. Tap it to retake or pick another; Back from that camera returns to the form. Without a photo, a short grey tile reads "+ Add photo".
+- **Top.** Back, Favorite, and Delete. A saved meal also has a camera icon before Favorite, which opens the camera to retake the photo or add one; Back from that camera returns to the form.
+- **A new meal's photo.** Shown at 3:4, inset 16 dp with 20 dp corners. Tap it to retake or pick another; Back from that camera returns to the form. Without a photo, a short grey tile reads "+ Add photo".
+- **A saved meal's photo.** Shown the same way. Without a photo, it is a plain 3:4 grey tile with the meal's name. Either way, it steps between meals:
+  - **Taps and swipes.** Tapping the left third opens the previous meal, and the rest opens the next. Swiping left opens the next meal, and swiping right the previous. Screen readers get "Previous meal" and "Next meal" actions.
+  - **Order.** The Journal's strips, in time eaten, from wherever the meal was opened. Next is the tile to the right, continuing to the following week; Previous is the tile to the left, continuing to the week before. At the newest meal Next does nothing, and at the oldest Previous does nothing.
+  - **Edits.** Stepping away keeps edits as Back does: valid edits are saved, and others are dropped. It waits for the save, so coming back always reads the saved meal. An edited date moves the meal only once saved, so the next step still follows from where it was.
+  - **Segments.** A row of thin segments between the date and the photo shows the week's meals, oldest on the left, with this meal's in ink and the others grey.
+  - **Motion.** Each step crossfades in 150 ms, without the usual rise. Back returns to where the first meal was opened.
 - **Price.** Typed in the serif display style.
-- **Card.** Name, Place, Time, and Note sit on one grey card, divided by hairlines.
+- **Card.** Name, Place, Save location when there is a location, Time, and Note sit on one grey card, divided by hairlines.
+- **Time.** Written with the date and weekday, as Search writes them: "Tue, Nov 3 · 18:03", or "Mon, Oct 27, 2025 · 19:05" outside the current year.
+- **A saved meal's date.** A saved meal has no Time row. Its date heads the screen instead, between the top bar and the photo, in grey sans from the photo's left edge. Tapping it opens the date and time dialogs, and its action reads "Change time".
 - **Name suggestions.** Recent names, as borderless pills, scroll into view as they appear.
 - **Keyboard.** With the number pad up, the form scrolls so the price and Save stay above it.
 - **Save.**
@@ -107,7 +117,24 @@ Two records, Meal and Place. A meal belongs to at most one place.
 - **Android 16.** The picker has no location option, so gallery meals there get a date and time but no location.
 - **Ignored coordinates.** Exactly 0, 0, or out of range, count as no location. The emulator's picker withholds location that way.
 - **Timing.** The gallery date and place apply once resizing finishes, about a second after picking.
-- **The photo's location is where the meal was eaten.** A camera photo, or any saved meal, has no location. The phone's own location is never used, since it is wherever the meal is logged, not where it was eaten.
+
+**Where it was eaten**
+
+- **Sources.**
+  - A photo taken in the app: the phone's location when the photo is taken, or the first fix after it.
+  - A gallery photo with a location: the photo's own.
+  - Anything else, such as Skip, a gallery photo without a location, or a first photo that can't be read: the phone's location while the form is filled in, following the latest fix.
+- **The row.** "Save location" sits on the card below Place, with the county and district in grey and a switch. It shows only once there is a location.
+  - The switch starts on for a camera photo or a gallery photo's location. It starts off for the phone's location while typing, since the meal may be logged later, somewhere else. Once tapped, it stays as set.
+  - On, the meal keeps the location, and places use it: the new meal's place is filled in, the picker lists places nearest first, and a new place, or one without coordinates, takes it. A place with coordinates keeps its own.
+  - Off, the location is dropped, along with any place it filled in.
+  - The whole row takes the tap. The switch is ink when on and outlined in ink when off.
+- **Saved meals.** The row reads "Location", with the switch on. Turning it off removes the location once the meal is saved. A saved meal never gains a location, since the phone is no longer where it was eaten.
+- **Permission.** Fine and coarse location are asked for together, once, on the first Add, with the camera. It counts as asked only once the request goes to Android, so an Add closed before then asks on the next one.
+  - Refused, the row never shows. A gallery photo's location still fills in the place and gives coordinates to a new one, as it does without the row.
+  - With approximate location only, the phone's location isn't used, since it can be kilometres off. A gallery photo's location still is.
+- **Finding it.** Android's fused provider starts when the camera opens: a fix under two minutes old at once, then a current one at high accuracy, for up to 30 seconds. Fixes worse than 100 m are not used. A phone without the fused provider finds no location. It never holds up the form or Save. A meal saved before a fix arrives has no location.
+- **Privacy.** The location is stored in the database, never written into the photo, and never leaves the phone except in a backup.
 
 ## Places
 
@@ -116,15 +143,15 @@ Places have no screen of their own. The Place row, between Name and Time, opens 
 **The picker**
 
 - **Layout.** A full-height sheet with a centered title and a close button. Swiping down also closes it. The search field is a grey pill, and it has focus when the sheet opens.
-- **Order.** Places are listed by most recent visit. For a new meal with a gallery location, they are listed nearest first, with distances such as "1,240 km".
+- **Order.** Places are listed by most recent visit. For a meal with a location it will keep, or a new gallery meal with a photo location, they are listed nearest first, with distances such as "1,240 km".
 - **Typing.**
   - Names that start with the text come first, then names that contain it. Typing 林 lists 林家乾麵 before 小林拉麵.
   - Typing an existing name in full picks that place.
-  - A new name is listed first, marked "New", and is created when the meal is saved, with the photo's coordinates if there are any.
+  - A new name is listed first, marked "New", and is created when the meal is saved, with the meal's location if there is one.
 - **"No place"** shows before anything is typed. An empty place saves the meal without one.
 - **The ✓** picks the saved place typed in full, adds a new name, or keeps a pending new place typed again. With nothing typed, it only closes the keyboard.
 
-**Prefill.** A new meal with a gallery location is given the one saved place within 150 m of the photo, if exactly one is that close. It stops once a place is chosen by hand. Camera and Skip meals are never prefilled.
+**Prefill.** A new meal is given the one saved place within 150 m of its location, if exactly one is that close, while the location is to be kept. It stops once a place is chosen by hand.
 
 **Rename, merge, and delete**
 
@@ -140,6 +167,13 @@ Places have no screen of their own. The Place row, between Name and Time, opens 
 - It closes the Meal screen as Back does, then opens Search with that place.
 
 A place removed before Save, such as an empty place whose undo bar closed, is left off the meal rather than failing the save.
+
+**County and district**
+
+- A place with coordinates in Taiwan shows its county and district (縣市 and 鄉鎮市區) in grey beside its name: in the picker as the row's detail, "臺北市 大安區", or "臺北市 大安區 · 80 m" when a distance shows, and on a saved meal's Place row. A new meal's Place row keeps to the name.
+- The county is always shown, since some district names repeat across counties. Names are spelled as the ministry's data spells them.
+- A place without coordinates, or with coordinates outside Taiwan, shows only its name. So does a place on the water's edge that falls just outside the simplified coastline.
+- They are found on the phone, from a file bundled with the app, and never stored, so a data update applies to every place at once. Nothing leaves the phone.
 
 ## Undo
 
@@ -223,14 +257,15 @@ The Spending tab answers how much, where, and when, for a week, a month, or a ye
 
 - Grey bars on a hairline baseline. There is no y-axis.
 - Axis labels: "M T W T F S S" for a week, "1 8 15 22 29" for a month, and month initials for a year.
-- **Tapping.** A tap shows the amount above the bar in small sans and turns the bar ink. A second tap clears it, and changing period resets it.
-- **Empty and future days.** Days with nothing spent can be tapped and show "0". Future days have no bar and no amount, so they never set the scale.
-- **Targets.** Each bar is one tap target the full height of the chart, read aloud as "Nov 12, 340" with the action "Show amount". The targets cover the chart with no gaps.
+- **Tapping.** A tap shows the amount above the bar in small sans and turns the bar ink. A second tap on the same bar opens its meals in Search: that day in a week or month, that month in a year. Tapping another bar moves the amount there, and changing period clears it.
+- **Empty and future days.** Days with nothing spent can be tapped and show "0", and a second tap opens nothing. Future days have no bar and no amount, so they never set the scale.
+- **Targets.** Each bar is one tap target the full height of the chart, read aloud as "Nov 12, 340" with the action "Show amount", then "Show meals" once its amount shows. The targets cover the chart with no gaps.
 - **Large fonts.** The chart measures its labels, so at large font sizes the amount and the axis stay inside it.
 
 **Taps**
 
 - A place row is a "Show meals" button. It opens Search with that place, and with the period as the dates, so the totals match. The dates end at today, or at the period's end once it is over, or at a later meal's day if one is dated after today. Other can't be tapped.
+- A bar's second tap opens Search with its dates and no place. A month's bar ends its dates the same way as a place row, so the totals match there too.
 - A Priciest tile opens its meal.
 
 **Priciest tiles** use the Journal's tile, three across, with the price in the lower left where the Journal shows the weekday. Meals priced 0 are left out. The section is hidden when no meal costs anything.
@@ -240,9 +275,33 @@ The Spending tab answers how much, where, and when, for a week, a month, or a ye
 - With no meals at all, the tab shows only "No meals", with no switch.
 - An empty period keeps the switch and swiping, and shows its name above "No meals". The Add button is already on the tab, so there is no button.
 
+## Map
+
+The Map tab shows where meals were eaten: Taiwan with its county and district (鄉鎮市區) boundaries, drawn by the app, offline.
+
+- **The view.** It opens framed on the main island and Penghu. Kinmen and Matsu, near the mainland coast, are reached by panning. Pinch to zoom and drag to pan. The view is kept while switching tabs.
+- **Look.** The background is white, or black in dark. District lines are a light grey, and county lines and the coast a darker one. Pins are ink. There are no map tiles, roads, or color.
+- **Names.**
+  - Zoomed out, county names show, such as "臺北市". Zoomed in, about six times the opening view, district names show, such as "大安區".
+  - Names are small grey sans, centered at a point inside their area. Larger areas are named first, and a name that would overlap another is left out until there is room.
+- **Where a meal is.** Its own location (see Where it was eaten), or else its place's coordinates.
+- **Pins.**
+  - One pin per place with coordinates in Taiwan, counting all its meals. A place with more meals gets a slightly larger pin.
+  - A meal with a location but no place, at a place without coordinates, or eaten in Taiwan at a place outside it, gets its own smaller pin, named by the meal, or its day without a name.
+  - A pin is an ink dot with a ring in the background color, so it reads over the lines.
+  - Tapping a pin within its 48 dp target opens Search with that place, as Spending's place rows do, or opens the lone meal.
+  - Screen readers get each pin as a button: "滷三塊, 12 meals".
+- **Districts.**
+  - Tapping away from a pin selects the district there: its area fills in light grey, and a line at the bottom reads "臺北市 大安區 · 12 meals".
+  - Tapping the same district again, or the line, opens Search with that district. A district with no meals can be selected, reads "No meals", and opens nothing.
+  - Tapping another district moves the selection, and tapping outside Taiwan clears it. The selection is kept while switching tabs.
+- **Meals outside Taiwan** have no pin. A grey line at the bottom counts them: "4 meals outside Taiwan".
+- **Layout.** The lines at the bottom leave room for the Add button.
+- **Empty state.** "No meals with a location yet". The Add button is already on the tab, so there is no button. If the bundled boundary file can't be read, the tab says "The map couldn't be read" instead.
+
 ## Search
 
-- **Layout.** The search field is a grey pill, with the place chip inside it before the text. Below it sit two pill filters, "Dates" and "★ Favorites". Then the total, "42 meals · 12,340", in sans. Then the results, newest first.
+- **Layout.** The search field is a grey pill, with the place or district chip inside it before the text. Below it sit two pill filters, "Dates" and "★ Favorites". Then the total, "42 meals · 12,340", in sans. Then the results, newest first.
 - **Before typing,** Search lists every meal, newest first, with the total.
 - **Matching.**
   - Ignores case and full-width letters, cleaned as place names are.
@@ -254,7 +313,8 @@ The Spending tab answers how much, where, and when, for a week, a month, or a ye
 - **The place chip.**
   - With a chip, the text searches within that place. Its × clears it.
   - A chip whose place is merged away or deleted disappears and filters nothing out. It comes back if the change is undone.
-- **Opening Search with a place.** "Meals here" and Spending's place rows open the Search tab with a fresh search: only that place, plus Spending's dates.
+- **The district chip,** "臺北市 大安區", opened from the Map tab, holds the meals eaten in that district: by the meal's own location, or else its place's coordinates. Text, dates, and Favorites filter within it, and its × clears it. A search holds a place chip or a district chip, not both. A chip whose district is no longer in the bundled data disappears and filters nothing out.
+- **Opening Search from elsewhere.** "Meals here", Spending's place rows and bars, and the Map tab's pins and districts open the Search tab with a fresh search: only that place or district, or Spending's dates, or a place with dates.
   - The new search replaces the one showing, and survives tab switches.
   - Back returns to Journal and drops it, as Back drops any tab's state.
 - **Result rows.**
@@ -351,6 +411,7 @@ A recap turns a period in Spending into one image. It leaves the phone only when
   - Fraunces' Open Font License
   - the Apache License 2.0 for AndroidX, Coil, Dagger, Guava, Kotlin, kotlinx.coroutines, kotlinx.serialization, and Okio
   - the BSD license of Protocol Buffers, which DataStore carries inside it
+  - the district boundaries: the Ministry of the Interior's data under the 政府資料開放授權條款 v1, and taiwan-atlas's MIT license, the copy they were taken from
 - **Keeping it current.** The Fraunces license in `licenses/Fraunces-OFL.txt` is repeated in that file. When a library is added, list what the release build ships and update the file.
 
 ## Design
@@ -398,9 +459,11 @@ A recap turns a period in Spending into one image. It leaves the phone only when
 | Database | Room 2.8 (SQLite) | Room 3 moves to `androidx.room3`; moving later is a dependency change, not a data migration |
 | Lists | LazyColumn, LazyRow, HorizontalPager | About a thousand meals a year needs no paging |
 | Charts | Compose Canvas | |
-| Settings | DataStore (Preferences) | Theme, last backup day, recap figures |
+| Map | Compose Canvas | Boundaries from a bundled file; no map library, tiles, or network |
+| Settings | DataStore (Preferences) | Theme, last backup day, recap figures, whether location was asked |
 | Camera | CameraX | In-app capture |
 | Gallery | Android Photo Picker | No storage permission |
+| Location | Framework `LocationManager` | The fused provider, with no library |
 | Photo metadata | Framework `ExifInterface` | |
 | Images | Coil 3 | Local files only, no network module |
 | Backup | kotlinx.serialization (JSON) and ZIP | |
@@ -432,8 +495,8 @@ A recap turns a period in Spending into one image. It leaves the phone only when
 **Code layout**, under `app/src/main/java/com/stanley/foodjournal/`:
 
 - `data/`: Room entities and DAOs.
-- `logic/`: pure rules with JVM tests: `Spending.kt`, `Search.kt`, `Recap.kt`, `Weeks.kt`, `Places.kt`, `PlaceNames.kt`, `PlacePicker.kt`, `MealForm.kt`, `TileNames.kt`, `PhotoSizing.kt`, and `Backup.kt`.
-- `photos/`, `backup/`, `recap/`, `edits/`, `settings/`: photo files, backup and restore, recap drawing and sharing, undo, and DataStore.
+- `logic/`: pure rules with JVM tests: `Spending.kt`, `Search.kt`, `Recap.kt`, `Weeks.kt`, `Places.kt`, `PlaceNames.kt`, `PlacePicker.kt`, `Districts.kt`, `MealMap.kt`, `MealForm.kt`, `TileNames.kt`, `PhotoSizing.kt`, and `Backup.kt`.
+- `photos/`, `backup/`, `recap/`, `edits/`, `settings/`, `location/`: photo files, backup and restore, recap drawing and sharing, undo, DataStore, and the phone's location.
 - `ui/`: one folder per screen, plus `components/`, `theme/`, `icons/`, `navigation/`, and `preview/`.
 
 **Photos**
@@ -455,17 +518,23 @@ A recap turns a period in Spending into one image. It leaves the phone only when
 
 **Search's route.** `SearchRoute` carries an optional place and first and last days. The Meal screen hands its place to the tabs, which open Search once they show again. This replaces the tab's saved search.
 
+**Districts.** `app/src/main/assets/districts.json` holds Taiwan's 368 districts as simplified TopoJSON, about 0.46 MB, or 0.14 MB compressed in the APK.
+- **Layers.** `districts` gives each district's outline, county and district name, code (`TOWNCODE`), and a label point inside it. `counties` gives each of the 22 counties' name and label point. County lines aren't stored: the app draws them where districts of two counties meet, and along the coast.
+- **Source.** It is taken from taiwan-atlas 2021.9.20, the Ministry of the Interior's [鄉鎮市區界線](https://data.gov.tw/dataset/7441) with 臺 restored, since the ministry's download was down when it was built. That copy's districts can't be merged by county, so its own county layer gives the counties' label points. `tools/build-districts.sh` rebuilds it from either source with mapshaper.
+- **Reading it.** `DistrictMap` reads it once, off the main thread, the first time a place with coordinates, the Map tab, or a district search needs it, and `AppContainer` holds it. A bounding box per district skips most of the checks.
+- **Drawing it.** The Map tab builds its boundary paths once, each shared border drawn a single time, and applies pinch and pan as one transform. The projection shortens longitude by the cosine of 23.7°, Taiwan's middle latitude.
+
 **Places in SQL.** Empty places are found with `NOT EXISTS (SELECT 1 FROM meal WHERE meal.placeId = place.id)`. `NOT IN` matches nothing once any meal has no place.
 
 **Backup file.** One ZIP:
 
-- `backup.json`: a format version (currently 1), the time of the export, the places, and the meals, with their ids.
+- `backup.json`: a format version (currently 2), the time of the export, the places, and the meals, with their ids and locations. Version 2 added the meals' locations; a version 1 backup restores without them.
 - `photos/`: the stored 1600 px photos, uncompressed, since JPEGs don't shrink further. Camera originals are never kept, and thumbnails are left out.
 
 **Import checks**, before anything changes:
 
 - The format version is read before the records, so a newer backup is called newer even if its records can't be read.
-- Every meal has a photo or a name, a price from 0 to 999,999, and a time that reads.
+- Every meal has a photo or a name, a price from 0 to 999,999, and a time that reads. A location has both coordinates, within range, or neither.
 - Ids are unique, and every place a meal names is in the file.
 - Place names are present and unique, ignoring case.
 - Every photo a meal names is in the file.
@@ -481,9 +550,9 @@ A recap turns a period in Spending into one image. It leaves the phone only when
 
 **Privacy and permissions**
 
-- The only permission is the camera. The manifest strips INTERNET in case a library adds it; Gradle prints an expected merge warning. AndroidX's internal `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` is the only merged permission, and it is private to the app.
+- The only permissions are the camera and location, fine and coarse. The manifest strips INTERNET in case a library adds it; Gradle prints an expected merge warning. AndroidX's internal `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` is the only merged permission, and it is private to the app.
 - `allowBackup` is false, and data extraction rules exclude everything from both cloud backup and device-to-device transfer. The exported ZIP is the only backup, so the database and photos never return out of step.
-- Stored photos carry no metadata. A recap leaves the phone only through the share sheet.
+- Stored photos carry no metadata. A meal's location is kept in the database only. A recap leaves the phone only through the share sheet.
 
 ## Development
 
@@ -533,7 +602,7 @@ ANDROID_SERIAL=emulator-5560 ./gradlew :app:connectedDebugAndroidTest
 
 - **JVM tests** cover everything in `logic/`, the backup format, the converters, `PhotoStore`, and the meal draft.
 - **Device tests** use AndroidX Test and Compose's UI test library. They cover:
-  - the database
+  - the database, and its migration from schema 1, through Room's `room-testing`
   - `UndoableEdits`
   - photo processing on real JPEG files
   - backup and restore
@@ -541,7 +610,10 @@ ANDROID_SERIAL=emulator-5560 ./gradlew :app:connectedDebugAndroidTest
   - DataStore
   - each screen's ViewModel
   - the recap sheet
-- **Fakes.** The Meal and Spending ViewModels take photo processing and recap drawing through small interfaces, `PhotoProcessing` and `RecapDrawing`, so tests drive them with fakes.
+  - the Meal screen's date line, camera icon, and stepping gestures
+  - the chart's bars
+  - closing and stepping through a meal in the whole app, adding and removing their own test meals
+- **Fakes.** The Meal and Spending ViewModels take photo processing, the phone's location, and recap drawing through small interfaces, `PhotoProcessing`, `PhoneLocation`, and `RecapDrawing`, so tests drive them with fakes.
 - **Test-only code.** Test libraries never ship. Only an empty activity for hosting UI tests is in debug builds.
 - **Previews.** `ui/preview/` holds Compose previews of the theme and type, in light and dark.
 
@@ -550,7 +622,10 @@ ANDROID_SERIAL=emulator-5560 ./gradlew :app:connectedDebugAndroidTest
 **Not yet tested**
 
 - Photo Picker location on a real phone. On the emulator it arrives as 0, 0, so gallery prefill is tested only through the database and unit tests.
+- The phone's location on a real phone, and the precise and approximate choices in the permission dialog. The ViewModel tests use a fake location.
 - HEIC date and location.
+- A capture that fails: the emulator's camera doesn't fail on demand, so its message hasn't been seen on screen.
+- `tools/build-districts.sh` on the ministry's shapefile. The bundled districts come from taiwan-atlas's 2021 copy until the ministry's download is back.
 - Photo orientation with auto-rotate off.
 - Anything on Android 16, on a device or an emulator.
 

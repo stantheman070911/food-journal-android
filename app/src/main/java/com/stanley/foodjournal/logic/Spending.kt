@@ -75,9 +75,21 @@ fun timeBand(time: LocalTime): TimeBand = when (time.hour) {
 
 /**
  * One bar: a day of a week or month, or a month of a year. A future bar has no amount, so a meal
- * dated later never sets the chart's scale.
+ * dated later never sets the chart's scale. [lastDay] is where its meals in Search end.
  */
-data class SpendingBar(val start: LocalDate, val amount: Int, val isFuture: Boolean)
+data class SpendingBar(
+    val start: LocalDate,
+    val amount: Int,
+    val isFuture: Boolean,
+    val lastDay: LocalDate = start,
+)
+
+/**
+ * The last day a run of days ending at [end] shows in Search: today, or [end] once it is over, or
+ * [latestMeal]'s day when a meal is dated after today, so Search's total matches Spending's.
+ */
+fun lastDayInSearch(end: LocalDate, today: LocalDate, latestMeal: LocalDate?): LocalDate =
+    listOfNotNull(minOf(end, today), latestMeal).max()
 
 /** A place's spend in a period. [visits] counts its meals. [lastVisit] breaks ties. */
 data class PlaceSpend(val placeId: Long, val total: Int, val visits: Int, val lastVisit: LocalDateTime)
@@ -194,7 +206,17 @@ private fun bars(period: Period, meals: List<Meal>, today: LocalDate): List<Spen
         (1..12).map { month ->
             val start = period.start.withMonth(month)
             val isFuture = start > today
-            SpendingBar(start, if (isFuture) 0 else byMonth[month].orEmpty().sumOf { it.price }, isFuture)
+            val inMonth = byMonth[month].orEmpty()
+            SpendingBar(
+                start = start,
+                amount = if (isFuture) 0 else inMonth.sumOf { it.price },
+                isFuture = isFuture,
+                lastDay = lastDayInSearch(
+                    end = start.plusMonths(1).minusDays(1),
+                    today = today,
+                    latestMeal = inMonth.maxOfOrNull { it.eatenAt.toLocalDate() },
+                ),
+            )
         }
     } else {
         val byDay = meals.groupBy { it.eatenAt.toLocalDate() }

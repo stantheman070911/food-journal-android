@@ -113,10 +113,48 @@ fun mergedPlace(survivor: Place, mergedAway: Place): Place =
         survivor.copy(latitude = mergedAway.latitude, longitude = mergedAway.longitude)
     }
 
+/** Where a meal's location came from, which decides whether it is saved until the switch is tapped. */
+enum class LocationSource {
+    /** The phone's location as a photo is taken in the app, which is taken where you eat. */
+    Camera,
+
+    /** A gallery photo's own location, where the photo was taken. */
+    Gallery,
+
+    /** The phone's location while the form is filled in, which may be far from the meal. */
+    Phone,
+
+    /** A saved meal's location. */
+    Saved,
+}
+
 /**
- * Where a meal is, for matching and creating places: only a new gallery meal's photo location,
- * and none without one. The phone's own location is never used, since a meal is often logged
- * away from where it was eaten. A saved meal has none either.
+ * The Save location switch starts on for a camera photo, a gallery photo's location, and a saved
+ * meal's. It starts off for the phone's location while typing: the meal may be logged later,
+ * somewhere else, so saving it takes a deliberate tap.
  */
-fun mealLocation(isNew: Boolean, fromGallery: Boolean, photoLocation: LocationFix?): LocationFix? =
-    if (isNew && fromGallery) photoLocation else null
+fun savesLocationByDefault(source: LocationSource): Boolean = source != LocationSource.Phone
+
+/**
+ * Whether the Save location row shows: for a saved meal that has a location, or for a new meal
+ * that has one while location is allowed. Without permission, a new meal never keeps a location.
+ */
+fun showsLocationRow(isNew: Boolean, location: LocationFix?, locationAllowed: Boolean): Boolean =
+    location != null && (!isNew || locationAllowed)
+
+/**
+ * Where a meal is, for matching and creating places. While the Save location row shows, the
+ * location it saves, and none with its switch off. Without the row, as when location is refused,
+ * a new gallery meal's photo location still places it, and nothing else does.
+ */
+fun placeLocation(
+    isNew: Boolean,
+    source: LocationSource?,
+    location: LocationFix?,
+    saveLocation: Boolean,
+    locationAllowed: Boolean,
+): LocationFix? = when {
+    showsLocationRow(isNew, location, locationAllowed) -> location.takeIf { saveLocation }
+    isNew && source == LocationSource.Gallery -> location
+    else -> null
+}

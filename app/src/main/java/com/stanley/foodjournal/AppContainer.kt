@@ -7,6 +7,9 @@ import com.stanley.foodjournal.data.FoodJournalDatabase
 import com.stanley.foodjournal.data.MealDao
 import com.stanley.foodjournal.data.PlaceDao
 import com.stanley.foodjournal.edits.UndoableEdits
+import com.stanley.foodjournal.location.LocationTracker
+import com.stanley.foodjournal.location.PhoneLocation
+import com.stanley.foodjournal.logic.DistrictMap
 import com.stanley.foodjournal.photos.PhotoProcessor
 import com.stanley.foodjournal.photos.PhotoStore
 import com.stanley.foodjournal.recap.RecapImages
@@ -15,10 +18,13 @@ import com.stanley.foodjournal.settings.ThemeChoice
 import com.stanley.foodjournal.settings.applyNightMode
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Holds the app's long-lived objects. Built once by [FoodJournalApplication]. */
 class AppContainer(context: Context) {
@@ -48,6 +54,23 @@ class AppContainer(context: Context) {
     val edits: UndoableEdits by lazy { UndoableEdits(mealDao, placeDao, photoStore, appScope) }
 
     val settings = AppSettings.create(context, appScope)
+
+    // Read once, off the main thread, the first time a place with coordinates is shown. Without it,
+    // places show only their names.
+    private val districts = appScope.async(start = CoroutineStart.LAZY) {
+        try {
+            DistrictMap.parse(withContext(Dispatchers.IO) { context.assets.open(DISTRICTS_FILE).use { it.readBytes().decodeToString() } })
+        } catch (e: Exception) {
+            Log.w(TAG, "Districts couldn't be read", e)
+            null
+        }
+    }
+
+    /** Taiwan's districts, or null if the bundled file can't be read. */
+    suspend fun districtMap(): DistrictMap? = districts.await()
+
+    /** Finds where the phone is, for one Meal screen. Each screen starts afresh. */
+    val newPhoneLocation: () -> PhoneLocation = { LocationTracker(context) }
 
     /** Applies a theme choice for the whole app, as Settings makes it. */
     val applyTheme: (ThemeChoice) -> Unit = { applyNightMode(context, it) }
@@ -83,3 +106,4 @@ class AppContainer(context: Context) {
 }
 
 private const val TAG = "FoodJournal"
+private const val DISTRICTS_FILE = "districts.json"

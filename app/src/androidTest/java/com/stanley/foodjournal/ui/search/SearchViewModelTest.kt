@@ -1,5 +1,6 @@
 package com.stanley.foodjournal.ui.search
 
+import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
@@ -11,6 +12,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.stanley.foodjournal.data.FoodJournalDatabase
 import com.stanley.foodjournal.data.Meal
 import com.stanley.foodjournal.data.Place
+import com.stanley.foodjournal.logic.DistrictMap
 import com.stanley.foodjournal.photos.PhotoStore
 import com.stanley.foodjournal.ui.navigation.SearchRoute
 import kotlinx.coroutines.Dispatchers
@@ -43,6 +45,8 @@ class SearchViewModelTest {
             ApplicationProvider.getApplicationContext(),
             FoodJournalDatabase::class.java,
         ).build()
+        // Read before any test waits on a district chip, off the main thread, as the app reads it.
+        districts
     }
 
     @After
@@ -174,7 +178,8 @@ class SearchViewModelTest {
         assertEquals(2, vm.state { it.placeName == null }.count)
 
         db.placeDao().restore(place, moved)
-        val back = vm.state { it.placeName != null }
+        // The places and the meals are read apart, so the chip may come back a moment before its meal.
+        val back = vm.state { it.placeName != null && it.count == 1 }
         assertEquals("林家乾麵", back.placeName)
         assertEquals(1, back.count)
     }
@@ -192,12 +197,51 @@ class SearchViewModelTest {
         assertTrue(state.favoritesOnly)
     }
 
+    @Test
+    fun aDistrictChipKeepsTheMealsEatenThere() = runBlocking {
+        // NTU's main gate is in 大安區; Taipei 101 is in 信義區.
+        val noodles = db.placeDao().insert(Place(name = "Noodles", latitude = 25.0174, longitude = 121.5340))
+        val tower = db.placeDao().insert(Place(name = "Food court", latitude = 25.0339, longitude = 121.5645))
+        db.mealDao().insert(meal(LocalDateTime.of(2026, 11, 1, 12, 0), "Soup", 180, placeId = noodles))
+        db.mealDao().insert(meal(LocalDateTime.of(2026, 11, 2, 12, 0), "Dumplings", 120, placeId = tower))
+        // At the food court's place, but saved where it was eaten: in 大安區.
+        db.mealDao().insert(meal(LocalDateTime.of(2026, 11, 3, 12, 0), "Tea", 60, placeId = tower).copy(latitude = 25.0170, longitude = 121.5350))
+        db.mealDao().insert(meal(LocalDateTime.of(2026, 11, 3, 19, 0), "Noodles again", 200, placeId = noodles))
+        val daan = districts.districtContaining(25.0174, 121.5340)!!.code
+
+        val vm = viewModel(route = SearchRoute(districtCode = daan))
+        val state = vm.state { it.districtName != null }
+
+        assertEquals("臺北市 大安區", state.districtName)
+        assertNull(state.placeName)
+        assertEquals(listOf("Noodles again", "Tea", "Soup"), state.results.map { it.name })
+        assertEquals("440", state.total)
+
+        withContext(Dispatchers.Main) { vm.onQueryChange("tea") }
+        assertEquals(listOf("Tea"), vm.state { it.count == 1 }.results.map { it.name })
+
+        withContext(Dispatchers.Main) { vm.clearDistrict() }
+        assertEquals(1, vm.state { it.districtName == null }.count)
+    }
+
+    @Test
+    fun aDistrictTheDataNoLongerHasLeavesNoChipAndFiltersNothing() = runBlocking {
+        db.mealDao().insert(meal(LocalDateTime.of(2026, 11, 2, 12, 0), "Soup", 180))
+
+        val state = viewModel(route = SearchRoute(districtCode = "gone")).state { true }
+
+        assertNull(state.districtName)
+        assertEquals(1, state.count)
+    }
+
     private suspend fun viewModel(
         route: SearchRoute = SearchRoute(),
         savedState: SavedStateHandle = SavedStateHandle(),
     ): SearchViewModel {
         val factory = viewModelFactory {
-            initializer { SearchViewModel(savedState, route, db.mealDao(), db.placeDao(), photos, today = { today }) }
+            initializer {
+                SearchViewModel(savedState, route, db.mealDao(), db.placeDao(), photos, districtMap = { districts }, today = { today })
+            }
         }
         return withContext(Dispatchers.Main) {
             ViewModelProvider.create(store, factory)["search-${System.nanoTime()}", SearchViewModel::class]
@@ -206,6 +250,14 @@ class SearchViewModelTest {
 
     private suspend fun SearchViewModel.state(until: (SearchUiState) -> Boolean): SearchUiState =
         withTimeout(3_000) { uiState.first { !it.isLoading && until(it) } }
+
+    private companion object {
+        /** The bundled districts, read once for all the tests. */
+        val districts: DistrictMap by lazy {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            DistrictMap.parse(context.assets.open("districts.json").use { it.readBytes().decodeToString() })
+        }
+    }
 
     private fun meal(
         eatenAt: LocalDateTime,

@@ -9,7 +9,12 @@ data class PickerPlace(
     /** "80 m", or null without a usable location on either side. */
     val distance: String?,
     val isSelected: Boolean,
-)
+    /** "臺北市 大安區", or null without coordinates in Taiwan. */
+    val district: String? = null,
+) {
+    /** The row's grey detail: "臺北市 大安區 · 80 m", or either part alone, or null. */
+    val detail: String? get() = listOfNotNull(district, distance).joinToString(" · ").ifEmpty { null }
+}
 
 /** What the place picker shows for what has been typed. */
 data class PlacePickerContent(
@@ -27,7 +32,8 @@ data class PlacePickerContent(
  * The picker's rows. Saved places matching [query], with distances from [location]. While
  * typing, names that start with the query come first, then names that contain it, so typing
  * 林 lists 林家乾麵 before 小林拉麵; each group keeps [orderForPicker] order. A typed name that
- * no saved or pending place has is offered as a new place.
+ * no saved or pending place has is offered as a new place. [districts] holds each place's county
+ * and district, by place id.
  */
 fun placePickerContent(
     places: List<PlaceSummary>,
@@ -35,6 +41,7 @@ fun placePickerContent(
     location: LocationFix?,
     selectedPlaceId: Long?,
     newPlaceName: String?,
+    districts: Map<Long, String> = emptyMap(),
 ): PlacePickerContent {
     val typed = normalizePlaceName(query)
     // A pending name that a saved place has since taken is that place now; save reuses it.
@@ -53,6 +60,7 @@ fun placePickerContent(
                 } else {
                     summary.place.id == selectedPlaceId
                 },
+                district = districts[summary.place.id],
             )
         }
     val taken = places.any { sameName(it.place.name, typed) } || (pending != null && sameName(pending, typed))

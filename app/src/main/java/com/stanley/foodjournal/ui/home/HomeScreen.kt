@@ -31,7 +31,9 @@ import com.stanley.foodjournal.ui.components.UndoBar
 import com.stanley.foodjournal.ui.icons.FoodJournalIcons
 import com.stanley.foodjournal.ui.journal.JournalScreen
 import com.stanley.foodjournal.ui.journal.JournalUiState
+import com.stanley.foodjournal.ui.map.MapScreen
 import com.stanley.foodjournal.ui.navigation.JournalRoute
+import com.stanley.foodjournal.ui.navigation.MapRoute
 import com.stanley.foodjournal.ui.navigation.SearchRoute
 import com.stanley.foodjournal.ui.navigation.SpendingRoute
 import com.stanley.foodjournal.ui.preview.PreviewSurface
@@ -42,7 +44,7 @@ import com.stanley.foodjournal.ui.spending.SpendingScreen
 private const val TAB_FADE_MILLIS = 150
 
 /**
- * The three tabs, the bottom bar, and the Add button. A [searchRequest], from a screen above the
+ * The four tabs, the bottom bar, and the Add button. A [searchRequest], from a screen above the
  * tabs, opens Search with it once the tabs show again.
  */
 @Composable
@@ -88,6 +90,16 @@ fun HomeScreen(
                     onOpenPlace = { placeId, from, to ->
                         tabNavController.openSearch(SearchRoute(placeId, from.toEpochDay(), to.toEpochDay()))
                     },
+                    onOpenDays = { from, to ->
+                        tabNavController.openSearch(SearchRoute(fromDay = from.toEpochDay(), toDay = to.toEpochDay()))
+                    },
+                )
+            }
+            composable<MapRoute> {
+                MapScreen(
+                    onOpenMeal = onOpenMeal,
+                    onOpenPlace = { placeId -> tabNavController.openSearch(SearchRoute(placeId = placeId)) },
+                    onOpenDistrict = { code -> tabNavController.openSearch(SearchRoute(districtCode = code)) },
                 )
             }
             composable<SearchRoute> { SearchScreen(onAddMeal = onAddMeal, onOpenMeal = onOpenMeal) }

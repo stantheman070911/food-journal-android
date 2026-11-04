@@ -53,22 +53,31 @@ abstract class MealDao {
     @Insert
     protected abstract suspend fun insertPlace(place: Place): Long
 
-    @Query("SELECT EXISTS (SELECT 1 FROM place WHERE id = :id)")
-    protected abstract suspend fun placeExists(id: Long): Boolean
+    @Query("SELECT * FROM place WHERE id = :id")
+    protected abstract suspend fun place(id: Long): Place?
+
+    @Update
+    protected abstract suspend fun updatePlace(place: Place)
 
     /**
      * Saves [meal] in one step. With [newPlace], the meal goes to the saved place of that name,
      * or to [newPlace] itself when no place has the name yet. A place removed while the meal was
-     * open, such as an empty one whose undo bar closed, is left off. Returns the meal's id.
+     * open, such as an empty one whose undo bar closed, is left off. A meal saved with its
+     * location gives it to its place, if the place has no coordinates yet. Returns the meal's id.
      */
     @Transaction
     open suspend fun save(meal: Meal, newPlace: Place? = null): Long {
-        val placeId = if (newPlace != null) {
-            places().firstOrNull { sameName(it.name, newPlace.name) }?.id ?: insertPlace(newPlace)
+        val place = if (newPlace != null) {
+            places().firstOrNull { sameName(it.name, newPlace.name) } ?: newPlace.copy(id = insertPlace(newPlace))
         } else {
-            meal.placeId?.takeIf { placeExists(it) }
+            meal.placeId?.let { place(it) }
         }
-        val saved = meal.copy(placeId = placeId)
+        val latitude = meal.latitude
+        val longitude = meal.longitude
+        if (place != null && latitude != null && longitude != null && (place.latitude == null || place.longitude == null)) {
+            updatePlace(place.copy(latitude = latitude, longitude = longitude))
+        }
+        val saved = meal.copy(placeId = place?.id)
         return if (saved.id == 0L) {
             insert(saved)
         } else {

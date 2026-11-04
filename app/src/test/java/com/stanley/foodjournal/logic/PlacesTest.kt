@@ -3,7 +3,9 @@ package com.stanley.foodjournal.logic
 import com.stanley.foodjournal.data.Place
 import com.stanley.foodjournal.data.PlaceSummary
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDateTime
 
@@ -110,20 +112,40 @@ class PlacesTest {
     }
 
     @Test
-    fun `a meal from the camera or Skip has no location`() {
-        assertNull(mealLocation(isNew = true, fromGallery = false, photoLocation = null))
+    fun `the switch starts off only for the phone's location while typing`() {
+        assertTrue(savesLocationByDefault(LocationSource.Camera))
+        assertTrue(savesLocationByDefault(LocationSource.Gallery))
+        assertTrue(savesLocationByDefault(LocationSource.Saved))
+        assertFalse(savesLocationByDefault(LocationSource.Phone))
     }
 
     @Test
-    fun `a gallery meal uses its photo's location, and none without one`() {
+    fun `the row shows once there is a location, and for a new meal only while location is allowed`() {
+        val here = LocationFix(25.04, 121.55)
+        assertTrue(showsLocationRow(isNew = true, location = here, locationAllowed = true))
+        assertFalse(showsLocationRow(isNew = true, location = here, locationAllowed = false))
+        assertFalse(showsLocationRow(isNew = true, location = null, locationAllowed = true))
+        assertTrue(showsLocationRow(isNew = false, location = here, locationAllowed = false))
+        assertFalse(showsLocationRow(isNew = false, location = null, locationAllowed = true))
+    }
+
+    @Test
+    fun `places use the saved location, and none with the switch off`() {
+        val here = LocationFix(25.04, 121.55)
+        for (source in LocationSource.entries) {
+            assertEquals(here, placeLocation(true, source, here, saveLocation = true, locationAllowed = true))
+            assertNull(placeLocation(true, source, here, saveLocation = false, locationAllowed = true))
+        }
+        assertEquals(here, placeLocation(false, LocationSource.Saved, here, saveLocation = true, locationAllowed = false))
+    }
+
+    @Test
+    fun `without location allowed, only a new gallery meal's photo places it`() {
         val photo = LocationFix(25.04, 121.55)
-        assertEquals(photo, mealLocation(isNew = true, fromGallery = true, photoLocation = photo))
-        assertNull(mealLocation(isNew = true, fromGallery = true, photoLocation = null))
-    }
-
-    @Test
-    fun `a saved meal has no location`() {
-        assertNull(mealLocation(isNew = false, fromGallery = true, photoLocation = LocationFix(25.04, 121.55)))
+        assertEquals(photo, placeLocation(true, LocationSource.Gallery, photo, saveLocation = false, locationAllowed = false))
+        assertNull(placeLocation(true, LocationSource.Gallery, null, saveLocation = true, locationAllowed = false))
+        assertNull(placeLocation(true, LocationSource.Camera, photo, saveLocation = true, locationAllowed = false))
+        assertNull(placeLocation(true, null, null, saveLocation = false, locationAllowed = false))
     }
 
     @Test

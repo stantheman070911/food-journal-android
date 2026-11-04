@@ -143,6 +143,36 @@ class PlacePickerTest {
         )
     }
 
+    @Test
+    fun `a row's detail is its district, then its distance`() {
+        val rows = placePickerContent(
+            places,
+            query = "",
+            location = LocationFix(25.0330, 121.5654),
+            selectedPlaceId = null,
+            newPlaceName = null,
+            districts = mapOf(1L to "臺北市 信義區"),
+        ).places.associateBy { it.place.id }
+
+        assertEquals("臺北市 信義區 · 80 m", rows.getValue(1L).detail)
+        assertEquals("1.2 km", rows.getValue(2L).detail)
+        assertEquals(null, rows.getValue(3L).detail)
+    }
+
+    @Test
+    fun `without a distance a row's detail is its district alone`() {
+        val row = placePickerContent(
+            places,
+            query = "",
+            location = null,
+            selectedPlaceId = null,
+            newPlaceName = null,
+            districts = mapOf(1L to "臺北市 信義區"),
+        ).places.first { it.place.id == 1L }
+
+        assertEquals("臺北市 信義區", row.detail)
+    }
+
     private fun content(
         query: String = "",
         location: LocationFix? = here,

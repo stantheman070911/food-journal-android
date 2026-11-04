@@ -1,5 +1,6 @@
 package com.stanley.foodjournal.ui.search
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -86,6 +87,7 @@ fun SearchScreen(
         actions = SearchActions(
             onQueryChange = viewModel::onQueryChange,
             onClearPlace = viewModel::clearPlace,
+            onClearDistrict = viewModel::clearDistrict,
             onSetDates = viewModel::setDates,
             onToggleFavorites = viewModel::toggleFavorites,
             onOpenMeal = onOpenMeal,
@@ -99,6 +101,7 @@ fun SearchScreen(
 class SearchActions(
     val onQueryChange: (String) -> Unit = {},
     val onClearPlace: () -> Unit = {},
+    val onClearDistrict: () -> Unit = {},
     val onSetDates: (LocalDate?, LocalDate?) -> Unit = { _, _ -> },
     val onToggleFavorites: () -> Unit = {},
     val onOpenMeal: (Long) -> Unit = {},
@@ -129,8 +132,8 @@ fun SearchScreen(
             SearchField(
                 query = query,
                 onQueryChange = actions.onQueryChange,
-                placeName = uiState.placeName,
-                onClearPlace = actions.onClearPlace,
+                chip = uiState.placeName?.let { SearchChip(it, R.string.search_clear_place, actions.onClearPlace) }
+                    ?: uiState.districtName?.let { SearchChip(it, R.string.search_clear_district, actions.onClearDistrict) },
             )
             Filters(uiState = uiState, actions = actions)
             if (uiState.results.isEmpty()) {
@@ -147,8 +150,7 @@ fun SearchScreen(
 private fun SearchField(
     query: String,
     onQueryChange: (String) -> Unit,
-    placeName: String?,
-    onClearPlace: () -> Unit,
+    chip: SearchChip?,
 ) {
     val colors = MaterialTheme.colorScheme
     val focus = LocalFocusManager.current
@@ -169,8 +171,8 @@ private fun SearchField(
             modifier = Modifier.size(20.dp),
         )
         Spacer(Modifier.width(10.dp))
-        if (placeName != null) {
-            PlaceChip(name = placeName, onClear = onClearPlace)
+        if (chip != null) {
+            PlaceChip(chip)
             Spacer(Modifier.width(8.dp))
         }
         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
@@ -208,16 +210,23 @@ private fun SearchField(
     }
 }
 
-/** The place, as a pill on the field's grey, with × to clear it. A tap anywhere on it clears it. */
+/** The place or district a search holds, with what clearing it reads aloud. */
+private class SearchChip(val name: String, @param:StringRes val clearLabel: Int, val onClear: () -> Unit)
+
+/**
+ * The place or district, as a pill on the field's grey, with × to clear it. A tap anywhere on it
+ * clears it.
+ */
 @Composable
-private fun PlaceChip(name: String, onClear: () -> Unit) {
+private fun PlaceChip(chip: SearchChip) {
+    val name = chip.name
     val colors = MaterialTheme.colorScheme
     // The whole field's height takes the tap, though the pill drawn is smaller.
     Row(
         Modifier
             .height(FieldHeight)
             .clip(CircleShape)
-            .clickable(onClickLabel = stringResource(R.string.search_clear_place), role = Role.Button, onClick = onClear)
+            .clickable(onClickLabel = stringResource(chip.clearLabel), role = Role.Button, onClick = chip.onClear)
             .drawBehind {
                 val height = ChipHeight.toPx()
                 drawRoundRect(

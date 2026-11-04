@@ -11,6 +11,7 @@ import java.time.LocalDateTime
  *
  * [eatenAt] is wall-clock time where the meal was eaten, so its day and time of day never shift
  * when the phone changes time zone. [photo] is a file name inside the app's photo folder.
+ * [latitude] and [longitude] are where it was eaten, when that was saved with it.
  */
 @Entity(
     tableName = "meal",
@@ -33,4 +34,6 @@ data class Meal(
     val isFavorite: Boolean = false,
     val note: String? = null,
     val placeId: Long? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
 )

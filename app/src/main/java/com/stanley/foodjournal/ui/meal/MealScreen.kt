@@ -12,7 +12,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.aspectRatio
@@ -26,6 +29,7 @@ import java.io.File
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -39,7 +43,9 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -54,6 +60,8 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.SuggestionChipDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -61,6 +69,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -69,9 +78,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
@@ -87,28 +105,36 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.stanley.foodjournal.R
+import com.stanley.foodjournal.logic.MealSteps
 import com.stanley.foodjournal.logic.formatMealTime
 import com.stanley.foodjournal.logic.groupDigits
 import com.stanley.foodjournal.logic.groupedToOriginal
 import com.stanley.foodjournal.logic.originalToGrouped
 import com.stanley.foodjournal.ui.components.PillButton
+import com.stanley.foodjournal.ui.components.tileNameStyle
 import com.stanley.foodjournal.ui.icons.FoodJournalIcons
 import com.stanley.foodjournal.ui.preview.PreviewSurface
 import com.stanley.foodjournal.ui.preview.ThemePreviews
 import java.time.LocalDate
 import java.time.LocalDateTime
 
-/** Adds, shows, and edits one meal. [onOpenPlace] opens a place's meals in Search. */
+/**
+ * Adds, shows, and edits one meal. [onOpenPlace] opens a place's meals in Search, and [onStepTo]
+ * opens another meal in this one's place.
+ */
 @Composable
 fun MealScreen(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
     onOpenPlace: (placeId: Long) -> Unit = {},
+    onStepTo: (mealId: Long) -> Unit = {},
     viewModel: MealViewModel = viewModel(factory = MealViewModel.Factory),
 ) {
     val uiState = viewModel.uiState
     val finished by viewModel.finished.collectAsStateWithLifecycle()
     LaunchedEffect(finished) { if (finished) onClose() }
+    val stepTo by viewModel.stepTo.collectAsStateWithLifecycle()
+    LaunchedEffect(stepTo) { stepTo?.let(onStepTo) }
     BackHandler(enabled = !finished) {
         if (uiState?.stage == MealStage.Camera) viewModel.onCameraBack() else viewModel.onBack()
     }
@@ -117,19 +143,31 @@ fun MealScreen(
     }
     var pickingPlace by rememberSaveable { mutableStateOf(false) }
 
-    // Opening the camera asks for it while it is off; Android limits how often it shows.
+    // Opening the camera asks for it while it is off, and on the first Add for location too;
+    // Android limits how often each shows. Finding the location starts then, so it is usually
+    // ready by the time the form shows.
     val context = LocalContext.current
     var hasCamera by remember { mutableStateOf(context.isGranted(Manifest.permission.CAMERA)) }
-    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        hasCamera = it
+    val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        hasCamera = context.isGranted(Manifest.permission.CAMERA)
+        viewModel.onPermissionsChecked()
     }
     val stage = uiState?.stage
     LaunchedEffect(stage) {
-        if (stage == MealStage.Camera && !hasCamera) permission.launch(Manifest.permission.CAMERA)
+        if (stage != MealStage.Camera) return@LaunchedEffect
+        val request = viewModel.permissionsToRequest(hasCamera)
+        if (request.isEmpty()) {
+            viewModel.onPermissionsChecked()
+        } else {
+            // Nothing suspends between the two, so location is marked asked only once it is.
+            viewModel.onPermissionsRequested(request)
+            permissions.launch(request.toTypedArray())
+        }
     }
-    // Camera access may have been turned on in Settings.
+    // Camera or location access may have been turned on in Settings.
     LifecycleResumeEffect(Unit) {
         hasCamera = context.isGranted(Manifest.permission.CAMERA)
+        viewModel.onPermissionsChecked()
         onPauseOrDispose {}
     }
 
@@ -156,6 +194,7 @@ fun MealScreen(
                         actions = MealActions(
                             onBack = viewModel::onBack,
                             onToggleFavorite = viewModel::onToggleFavorite,
+                            onSaveLocationChange = viewModel::onSaveLocationChange,
                             onDelete = viewModel::delete,
                             onReplacePhoto = viewModel::onRetakePhoto,
                             onPriceChange = viewModel::onPriceChange,
@@ -164,6 +203,8 @@ fun MealScreen(
                             onEatenAtChange = viewModel::onEatenAtChange,
                             onPickPlace = { pickingPlace = true },
                             onSave = viewModel::save,
+                            onPreviousMeal = viewModel::stepToPrevious,
+                            onNextMeal = viewModel::stepToNext,
                         ),
                     )
                 }
@@ -195,6 +236,7 @@ private const val STAGE_FADE_MILLIS = 150
 class MealActions(
     val onBack: () -> Unit = {},
     val onToggleFavorite: () -> Unit = {},
+    val onSaveLocationChange: (Boolean) -> Unit = {},
     val onDelete: () -> Unit = {},
     val onReplacePhoto: () -> Unit = {},
     val onPriceChange: (String) -> Unit = {},
@@ -203,6 +245,8 @@ class MealActions(
     val onEatenAtChange: (LocalDateTime) -> Unit = {},
     val onPickPlace: () -> Unit = {},
     val onSave: () -> Unit = {},
+    val onPreviousMeal: () -> Unit = {},
+    val onNextMeal: () -> Unit = {},
 )
 
 @Composable
@@ -229,17 +273,33 @@ fun MealScreen(
             onBack = actions.onBack,
             onToggleFavorite = actions.onToggleFavorite,
             onDelete = actions.onDelete,
+            // A new meal's photo opens the camera itself.
+            camera = if (uiState.isNew) null else CameraButton(hasPhoto = draft.photo != null, onClick = actions.onReplacePhoto),
         )
         Column(
             Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState()),
         ) {
-            PhotoArea(
-                photoFile = uiState.photoFile,
-                processing = uiState.photoProcessing,
-                onClick = actions.onReplacePhoto,
-            )
+            if (uiState.isNew) {
+                PhotoArea(
+                    photoFile = uiState.photoFile,
+                    processing = uiState.photoProcessing,
+                    onClick = actions.onReplacePhoto,
+                )
+            } else {
+                // On a saved meal the time is mostly read, so it heads the screen.
+                DateLine(text = formatMealTime(draft.eatenAt, today), enabled = !uiState.closing, onClick = { editingTime = true })
+                WeekSegments(steps = uiState.steps)
+                SteppingPhoto(
+                    photoFile = uiState.photoFile,
+                    processing = uiState.photoProcessing,
+                    name = draft.name,
+                    steps = uiState.steps,
+                    onPrevious = actions.onPreviousMeal,
+                    onNext = actions.onNextMeal,
+                )
+            }
             if (uiState.photoFailed) {
                 Text(
                     text = stringResource(R.string.meal_photo_failed),
@@ -273,16 +333,44 @@ fun MealScreen(
                         style = MaterialTheme.typography.bodyLarge,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .alignByBaseline(),
                     )
+                    uiState.placeDistrict?.let { district ->
+                        // At a large font size, this still leaves the place's name some room.
+                        Text(
+                            text = district,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .padding(start = 8.dp)
+                                .widthIn(max = DistrictMaxWidth)
+                                .alignByBaseline(),
+                        )
+                    }
                 }
                 Divider()
-                FieldRow(
-                    label = stringResource(R.string.meal_time),
-                    modifier = Modifier.clickable { editingTime = true },
-                ) {
-                    Text(formatMealTime(draft.eatenAt, today), style = MaterialTheme.typography.bodyLarge)
+                uiState.locationRow?.let { row ->
+                    SaveLocationRow(
+                        title = stringResource(if (uiState.isNew) R.string.meal_save_location else R.string.meal_location),
+                        row = row,
+                        enabled = !uiState.closing,
+                        onChange = actions.onSaveLocationChange,
+                    )
+                    Divider()
                 }
-                Divider()
+                if (uiState.isNew) {
+                    FieldRow(
+                        label = stringResource(R.string.meal_time),
+                        modifier = Modifier.clickable { editingTime = true },
+                    ) {
+                        Text(formatMealTime(draft.eatenAt, today), style = MaterialTheme.typography.bodyLarge)
+                    }
+                    Divider()
+                }
                 NoteField(note = draft.note, onNoteChange = actions.onNoteChange)
             }
             Spacer(Modifier.height(16.dp))
@@ -313,6 +401,9 @@ fun MealScreen(
     }
 }
 
+/** A saved meal's way to the camera, now its photo steps between meals. */
+private class CameraButton(val hasPhoto: Boolean, val onClick: () -> Unit)
+
 @Composable
 private fun MealTopBar(
     isFavorite: Boolean,
@@ -320,6 +411,7 @@ private fun MealTopBar(
     onBack: () -> Unit,
     onToggleFavorite: () -> Unit,
     onDelete: () -> Unit,
+    camera: CameraButton?,
 ) {
     Row(
         modifier = Modifier
@@ -332,6 +424,14 @@ private fun MealTopBar(
             Icon(FoodJournalIcons.Back, contentDescription = stringResource(R.string.back))
         }
         Spacer(Modifier.weight(1f))
+        camera?.let {
+            IconButton(onClick = it.onClick, enabled = enabled, colors = closingIconColors()) {
+                Icon(
+                    FoodJournalIcons.Camera,
+                    contentDescription = stringResource(if (it.hasPhoto) R.string.meal_change_photo else R.string.meal_add_photo),
+                )
+            }
+        }
         IconButton(onClick = onToggleFavorite, enabled = enabled, colors = closingIconColors()) {
             Icon(
                 imageVector = if (isFavorite) FoodJournalIcons.FavoriteOn else FoodJournalIcons.Favorite,
@@ -352,8 +452,125 @@ private fun closingIconColors() = IconButtonDefaults.iconButtonColors(
     disabledContentColor = LocalContentColor.current,
 )
 
+/** A saved meal's date, in grey at the photo's left edge. A tap edits it, until the screen closes. */
+@Composable
+private fun DateLine(text: String, enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clickable(enabled = enabled, onClickLabel = stringResource(R.string.meal_change_time), role = Role.Button, onClick = onClick)
+            .padding(horizontal = 16.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
 /**
- * The photo on top, inset with rounded corners, at the camera's 3:4 frame so none of the shot
+ * A thin segment for each meal of the week, oldest on the left, with this meal's in ink. Its room
+ * is kept while the meals are read, so the photo below never jumps.
+ */
+@Composable
+private fun WeekSegments(steps: MealSteps?) {
+    val colors = MaterialTheme.colorScheme
+    Canvas(
+        Modifier
+            .padding(start = 16.dp, end = 16.dp, bottom = 4.dp)
+            .fillMaxWidth()
+            .height(SegmentHeight),
+    ) {
+        val count = steps?.weekCount ?: return@Canvas
+        val gap = SegmentGap.toPx()
+        val width = ((size.width - gap * (count - 1)) / count).coerceAtLeast(1f)
+        repeat(count) { index ->
+            drawRoundRect(
+                color = if (index == steps.weekIndex) colors.primary else colors.surfaceContainerHighest,
+                topLeft = Offset(index * (width + gap), 0f),
+                size = Size(width, size.height),
+                cornerRadius = CornerRadius(size.height / 2),
+            )
+        }
+    }
+}
+
+/**
+ * A saved meal's photo, or a plain tile with its name. The left third opens the previous meal and
+ * the rest the next; a swipe left opens the next and a swipe right the previous. A vertical drag
+ * still scrolls the form.
+ */
+@Composable
+private fun SteppingPhoto(
+    photoFile: File?,
+    processing: Boolean,
+    name: String,
+    steps: MealSteps?,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+) {
+    val previous by rememberUpdatedState(onPrevious)
+    val next by rememberUpdatedState(onNext)
+    val previousLabel = stringResource(R.string.meal_previous)
+    val nextLabel = stringResource(R.string.meal_next)
+    val colors = MaterialTheme.colorScheme
+    Box(
+        Modifier
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .fillMaxWidth()
+            .aspectRatio(3f / 4f)
+            .clip(PhotoShape)
+            .background(colors.surfaceContainer)
+            .pointerInput(Unit) {
+                detectTapGestures { offset -> if (offset.x < size.width / 3f) previous() else next() }
+            }
+            .pointerInput(Unit) {
+                var dragged = 0f
+                detectHorizontalDragGestures(
+                    onDragStart = { dragged = 0f },
+                    onDragEnd = {
+                        val swipe = SwipeDistance.toPx()
+                        if (dragged <= -swipe) next() else if (dragged >= swipe) previous()
+                    },
+                ) { change, amount ->
+                    change.consume()
+                    dragged += amount
+                }
+            }
+            .semantics(mergeDescendants = true) {
+                // Only the steps there are: at either end of the meals, one has nowhere to go.
+                customActions = listOfNotNull(
+                    steps?.previous?.let { CustomAccessibilityAction(previousLabel) { previous(); true } },
+                    steps?.next?.let { CustomAccessibilityAction(nextLabel) { next(); true } },
+                )
+            },
+    ) {
+        if (photoFile != null && !processing) {
+            MealPhoto(photoFile)
+        } else if (!processing) {
+            // Set as the Journal's plain tile sets it, so a long word shrinks, then hyphenates.
+            BoxWithConstraints {
+                Text(
+                    text = name,
+                    style = tileNameStyle(
+                        name = name,
+                        width = maxWidth,
+                        style = MaterialTheme.typography.titleLarge,
+                        padding = PlainTilePadding,
+                    ),
+                    color = colors.onSurface,
+                    modifier = Modifier.padding(PlainTilePadding),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * A new meal's photo, inset with rounded corners, at the camera's 3:4 frame so none of the shot
  * is cut away. With the number pad up, the form scrolls the price into view below it. Tapping
  * it retakes or picks another. Without a photo, a short grey tile offers to add one.
  */
@@ -392,17 +609,22 @@ private fun PhotoArea(photoFile: File?, processing: Boolean, onClick: () -> Unit
             .clickable(onClickLabel = stringResource(R.string.meal_change_photo), onClick = onClick),
     ) {
         if (!processing && photoFile != null) {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalPlatformContext.current)
-                    .data(photoFile)
-                    .crossfade(true)
-                    .build(),
-                contentDescription = stringResource(R.string.meal_photo),
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
+            MealPhoto(photoFile)
         }
     }
+}
+
+@Composable
+private fun MealPhoto(file: File) {
+    AsyncImage(
+        model = ImageRequest.Builder(LocalPlatformContext.current)
+            .data(file)
+            .crossfade(true)
+            .build(),
+        contentDescription = stringResource(R.string.meal_photo),
+        contentScale = ContentScale.Crop,
+        modifier = Modifier.fillMaxSize(),
+    )
 }
 
 /** The price, large, in Fraunces. Digits group as they are typed: "2,340". */
@@ -504,6 +726,54 @@ private fun NoteField(note: String, onNoteChange: (String) -> Unit) {
     }
 }
 
+/**
+ * "Save location", with the county and district in grey, and a switch. On, the meal keeps where it
+ * was eaten. The whole row takes the tap, as a switch row does in Settings.
+ */
+@Composable
+private fun SaveLocationRow(title: String, row: LocationRow, enabled: Boolean, onChange: (Boolean) -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .toggleable(value = row.isOn, enabled = enabled, role = Role.Switch, onValueChange = onChange)
+            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyLarge,
+            color = colors.onSurface,
+            maxLines = 1,
+        )
+        row.district?.let { district ->
+            Text(
+                text = district,
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 8.dp).weight(1f, fill = false),
+            )
+        }
+        Spacer(Modifier.weight(1f).widthIn(min = 12.dp))
+        // In ink, as Retro's switches are in color: filled when on, outlined when off.
+        Switch(
+            checked = row.isOn,
+            onCheckedChange = null,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = colors.onPrimary,
+                checkedTrackColor = colors.primary,
+                checkedBorderColor = colors.primary,
+                uncheckedThumbColor = colors.onSurface,
+                uncheckedTrackColor = Color.Transparent,
+                uncheckedBorderColor = colors.onSurface,
+            ),
+        )
+    }
+}
+
 private val LabelWidth = 72.dp
 
 /** A form row: a grey label on the left, the value beside it. */
@@ -556,6 +826,13 @@ private fun Divider() {
 
 private val PhotoShape = RoundedCornerShape(20.dp)
 private val GroupShape = RoundedCornerShape(16.dp)
+private val SegmentHeight = 3.dp
+private val SegmentGap = 2.dp
+private val DistrictMaxWidth = 150.dp
+private val PlainTilePadding = 20.dp
+
+/** How far a drag has to run to count as a swipe. */
+private val SwipeDistance = 48.dp
 
 /** Shows "2340" as "2,340" while keeping the cursor where it belongs. */
 private object GroupedDigits : VisualTransformation {
@@ -591,6 +868,7 @@ private fun MealNewPreview() {
                 nameSuggestions = emptyList(),
                 placeName = "Lin Dong Fang",
                 showSave = true,
+                locationRow = LocationRow(isOn = false, district = "臺北市 中山區"),
             ),
             actions = MealActions(),
             today = sampleToday,
@@ -621,6 +899,8 @@ private fun MealSavedPreview() {
                 nameSuggestions = emptyList(),
                 placeName = "Yongkang Beef Noodles",
                 showSave = false,
+                placeDistrict = "臺北市 大安區",
+                locationRow = LocationRow(isOn = true, district = "臺北市 大安區"),
             ),
             actions = MealActions(),
             today = sampleToday,

@@ -128,7 +128,7 @@ class BackupManagerTest {
         val cases = listOf(
             "not a ZIP".toByteArray() to BackupProblem.NotABackup,
             zipOf("photos/a.jpg" to "photo") to BackupProblem.NotABackup,
-            zipOf(BACKUP_JSON to """{"format":2}""") to BackupProblem.NewerVersion,
+            zipOf(BACKUP_JSON to """{"format":3}""") to BackupProblem.NewerVersion,
             // The records name a.jpg and b.jpg, but only a.jpg came along.
             withoutEntry(sound, "photos/b.jpg") to BackupProblem.Damaged("meal 2's photo is missing"),
         )
