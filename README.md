@@ -81,9 +81,9 @@ It's a diary, not a diet tracker. There are no calories, goals, streaks, or scor
 
 The app needs Android 16 or later. It was built and tested on a Pixel 8a with Android 17, and hasn't been tested on Android 16 yet. A newer version signed with the same key installs over the old one and keeps your meals.
 
-## Out of scope
+## Not included
 
-Calories, nutrition, diet goals, social feeds, multiple currencies, maps, and cloud sync. The app stays small on purpose.
+The app has no calories, nutrition, diet goals, social feeds, multiple currencies, maps, or cloud sync. It is kept small on purpose.
 
 ## For developers
 
@@ -116,8 +116,7 @@ Kotlin, Jetpack Compose with Material 3, Navigation Compose, Room, DataStore, Ca
 
 ### Documentation
 
-- [Product document](<Food Journal — Product Document.md>): what the app does, its data model, and its spending rules.
-- [Development notes](DECISIONS.md): how each open question was settled while building it.
+- [Product document](PRODUCT.md): what the app does, how it looks, and how it is built, as of the current version.
 
 ## License
 

@@ -7,7 +7,7 @@ plugins {
 }
 
 // The personal signing key lives outside the repo, in ~/.gradle/gradle.properties as
-// foodJournal.signing.storeFile, .storePassword, .keyAlias, and .keyPassword (see DECISIONS.md).
+// foodJournal.signing.storeFile, .storePassword, .keyAlias, and .keyPassword (see PRODUCT.md).
 // Without all four, release builds come out unsigned, so no build signed with another key can
 // ever replace the installed app and its data.
 val signingProperties: Map<String, String> =
