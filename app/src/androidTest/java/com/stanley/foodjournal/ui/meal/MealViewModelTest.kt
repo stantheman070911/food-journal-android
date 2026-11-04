@@ -54,9 +54,6 @@ class MealViewModelTest {
     private lateinit var edits: UndoableEdits
     private lateinit var processing: FakeProcessing
     private val store = ViewModelStore()
-    private val districts by lazy {
-        DistrictMap.parse(context.assets.open("districts.json").use { it.readBytes().decodeToString() })
-    }
 
     // One thousandth of a degree of latitude is about 111 m. Photo locations have no accuracy.
     private val noodlesSpot = LocationFix(25.0330, 121.5297)
@@ -71,6 +68,9 @@ class MealViewModelTest {
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         edits = UndoableEdits(db.mealDao(), db.placeDao(), photos, scope, window = 1_500.milliseconds)
         processing = FakeProcessing(photos)
+        // Read here, on the test's thread, as the app reads it off the main thread. Read on the
+        // main thread instead, it holds up every step a test waits for.
+        districts
     }
 
     @After
@@ -552,5 +552,13 @@ class MealViewModelTest {
         }
 
         private fun result(name: String) = results.getOrPut(name) { CompletableDeferred() }
+    }
+
+    private companion object {
+        /** The bundled districts, read once for all the tests. */
+        val districts: DistrictMap by lazy {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            DistrictMap.parse(context.assets.open("districts.json").use { it.readBytes().decodeToString() })
+        }
     }
 }

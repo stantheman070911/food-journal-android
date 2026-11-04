@@ -174,7 +174,8 @@ class SearchViewModelTest {
         assertEquals(2, vm.state { it.placeName == null }.count)
 
         db.placeDao().restore(place, moved)
-        val back = vm.state { it.placeName != null }
+        // The places and the meals are read apart, so the chip may come back a moment before its meal.
+        val back = vm.state { it.placeName != null && it.count == 1 }
         assertEquals("林家乾麵", back.placeName)
         assertEquals(1, back.count)
     }
