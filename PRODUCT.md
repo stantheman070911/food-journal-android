@@ -149,6 +149,13 @@ Places have no screen of their own. The Place row, between Name and Time, opens 
 
 A place removed before Save, such as an empty place whose undo bar closed, is left off the meal rather than failing the save.
 
+**County and district**
+
+- A place with coordinates in Taiwan shows its county and district (縣市 and 鄉鎮市區) in grey beside its name: in the picker as the row's detail, "臺北市 大安區", or "臺北市 大安區 · 80 m" when a distance shows, and on a saved meal's Place row. A new meal's Place row keeps to the name.
+- The county is always shown, since some district names repeat across counties. Names are spelled as the ministry's data spells them.
+- A place without coordinates, or with coordinates outside Taiwan, shows only its name. So does a place on the water's edge that falls just outside the simplified coastline.
+- They are found on the phone, from a file bundled with the app, and never stored, so a data update applies to every place at once. Nothing leaves the phone.
+
 ## Undo
 
 - **No confirmation.** Deleting a meal, deleting a place, and merging places ask for no confirmation.
@@ -360,6 +367,7 @@ A recap turns a period in Spending into one image. It leaves the phone only when
   - Fraunces' Open Font License
   - the Apache License 2.0 for AndroidX, Coil, Dagger, Guava, Kotlin, kotlinx.coroutines, kotlinx.serialization, and Okio
   - the BSD license of Protocol Buffers, which DataStore carries inside it
+  - the district boundaries: the Ministry of the Interior's data under the 政府資料開放授權條款 v1, and taiwan-atlas's MIT license, the copy they were taken from
 - **Keeping it current.** The Fraunces license in `licenses/Fraunces-OFL.txt` is repeated in that file. When a library is added, list what the release build ships and update the file.
 
 ## Design
@@ -441,7 +449,7 @@ A recap turns a period in Spending into one image. It leaves the phone only when
 **Code layout**, under `app/src/main/java/com/stanley/foodjournal/`:
 
 - `data/`: Room entities and DAOs.
-- `logic/`: pure rules with JVM tests: `Spending.kt`, `Search.kt`, `Recap.kt`, `Weeks.kt`, `Places.kt`, `PlaceNames.kt`, `PlacePicker.kt`, `MealForm.kt`, `TileNames.kt`, `PhotoSizing.kt`, and `Backup.kt`.
+- `logic/`: pure rules with JVM tests: `Spending.kt`, `Search.kt`, `Recap.kt`, `Weeks.kt`, `Places.kt`, `PlaceNames.kt`, `PlacePicker.kt`, `Districts.kt`, `MealForm.kt`, `TileNames.kt`, `PhotoSizing.kt`, and `Backup.kt`.
 - `photos/`, `backup/`, `recap/`, `edits/`, `settings/`: photo files, backup and restore, recap drawing and sharing, undo, and DataStore.
 - `ui/`: one folder per screen, plus `components/`, `theme/`, `icons/`, `navigation/`, and `preview/`.
 
@@ -463,6 +471,8 @@ A recap turns a period in Spending into one image. It leaves the phone only when
 **Spending's state.** The ViewModel groups meals by period once, and builds every page for the chosen kind off the main thread. The pager is keyed by period, so a backfilled older meal doesn't shift the period in view. The ViewModel holds the selection; the pager's page is not saved on its own.
 
 **Search's route.** `SearchRoute` carries an optional place and first and last days. The Meal screen hands its place to the tabs, which open Search once they show again. This replaces the tab's saved search.
+
+**Districts.** `app/src/main/assets/districts.json` holds Taiwan's 368 districts as simplified TopoJSON, each with its county and district name, about 0.44 MB, or 0.13 MB compressed in the APK. It is taken from taiwan-atlas 2021.9.20, the Ministry of the Interior's [鄉鎮市區界線](https://data.gov.tw/dataset/7441) with 臺 restored, since the ministry's download was down when it was built. `tools/build-districts.sh` rebuilds it from either source with mapshaper. `DistrictMap` reads it once, off the main thread, the first time a place with coordinates is shown, and `AppContainer` holds it. A bounding box per district skips most of the checks.
 
 **Places in SQL.** Empty places are found with `NOT EXISTS (SELECT 1 FROM meal WHERE meal.placeId = place.id)`. `NOT IN` matches nothing once any meal has no place.
 

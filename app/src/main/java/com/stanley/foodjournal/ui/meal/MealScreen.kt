@@ -42,6 +42,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -312,7 +313,24 @@ fun MealScreen(
                         style = MaterialTheme.typography.bodyLarge,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .alignByBaseline(),
                     )
+                    uiState.placeDistrict?.let { district ->
+                        // At a large font size, this still leaves the place's name some room.
+                        Text(
+                            text = district,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .padding(start = 8.dp)
+                                .widthIn(max = DistrictMaxWidth)
+                                .alignByBaseline(),
+                        )
+                    }
                 }
                 Divider()
                 if (uiState.isNew) {
@@ -725,6 +743,7 @@ private val PhotoShape = RoundedCornerShape(20.dp)
 private val GroupShape = RoundedCornerShape(16.dp)
 private val SegmentHeight = 3.dp
 private val SegmentGap = 2.dp
+private val DistrictMaxWidth = 150.dp
 
 /** How far a drag has to run to count as a swipe. */
 private val SwipeDistance = 48.dp
@@ -793,6 +812,7 @@ private fun MealSavedPreview() {
                 nameSuggestions = emptyList(),
                 placeName = "Yongkang Beef Noodles",
                 showSave = false,
+                placeDistrict = "臺北市 大安區",
             ),
             actions = MealActions(),
             today = sampleToday,

@@ -21,6 +21,7 @@ import com.stanley.foodjournal.data.PlaceSummary
 import com.stanley.foodjournal.edits.PendingEdit
 import com.stanley.foodjournal.edits.RenameResult
 import com.stanley.foodjournal.edits.UndoableEdits
+import com.stanley.foodjournal.logic.DistrictMap
 import com.stanley.foodjournal.logic.LocationFix
 import com.stanley.foodjournal.logic.MealSteps
 import com.stanley.foodjournal.logic.PlacePickerContent
@@ -73,6 +74,8 @@ data class MealUiState(
     val showSave: Boolean,
     /** Where a saved meal stands among all meals. Null for a new meal, or until they are read. */
     val steps: MealSteps? = null,
+    /** A saved meal's county and district, from its place's coordinates: "臺北市 大安區". */
+    val placeDistrict: String? = null,
 )
 
 /**
@@ -96,12 +99,16 @@ class MealViewModel(
     private val photos: PhotoStore,
     private val processor: PhotoProcessing,
     private val appScope: CoroutineScope,
+    private val districtMap: suspend () -> DistrictMap?,
 ) : ViewModel() {
     private val isNew = mealId == null
     private var original by mutableStateOf<Meal?>(null)
     private var recentNames by mutableStateOf<List<String>>(emptyList())
     private var places by mutableStateOf<List<PlaceSummary>>(emptyList())
     private var steps by mutableStateOf<MealSteps?>(null)
+
+    /** Each place's county and district, by place id. */
+    private var districts by mutableStateOf<Map<Long, String>>(emptyMap())
 
     /** The last merge that moved the draft to its survivor, so an undo can move it back. */
     private var mergedAway: Pair<Long, Long>? = null
@@ -152,6 +159,7 @@ class MealViewModel(
                     ?: current.placeId?.let { id -> places.firstOrNull { it.place.id == id }?.place?.name },
                 showSave = isNew || (saved != null && current.hasChangesFrom(saved)),
                 steps = steps,
+                placeDistrict = current.placeId?.takeIf { !isNew }?.let(districts::get),
             )
         }
 
@@ -181,6 +189,7 @@ class MealViewModel(
             placeDao.observeSummaries().collect {
                 places = it
                 prefill()
+                districts = findDistricts(it)
             }
         }
         viewModelScope.launch { edits.undone.collect { followUndo(it) } }
@@ -236,7 +245,19 @@ class MealViewModel(
             location = current?.let { location(it) },
             selectedPlaceId = current?.placeId,
             newPlaceName = current?.newPlaceName,
+            districts = districts,
         )
+    }
+
+    /**
+     * Worked out when the places change, off the main thread, rather than for every keystroke in
+     * the picker. The map is read only once a place has coordinates.
+     */
+    private suspend fun findDistricts(places: List<PlaceSummary>): Map<Long, String> {
+        val located = places.map { it.place }.filter { it.latitude != null && it.longitude != null }
+        if (located.isEmpty()) return emptyMap()
+        val map = districtMap() ?: return emptyMap()
+        return withContext(Dispatchers.Default) { map.districtsOf(located) }
     }
 
     /**
@@ -611,6 +632,7 @@ class MealViewModel(
                     photos = container.photoStore,
                     processor = container.photoProcessor,
                     appScope = container.appScope,
+                    districtMap = container::districtMap,
                 )
             }
         }

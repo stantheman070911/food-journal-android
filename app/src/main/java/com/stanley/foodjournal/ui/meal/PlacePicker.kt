@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -265,7 +266,7 @@ private fun PlaceRow(row: PickerPlace, onSelect: () -> Unit, onEdit: () -> Unit)
         trailingButton = true,
     ) {
         RowText(row.place.name)
-        row.distance?.let { Detail(it) }
+        row.detail?.let { Detail(it) }
         IconButton(onClick = onEdit) {
             Icon(
                 FoodJournalIcons.Edit,
@@ -361,17 +362,23 @@ private fun Detail(text: String) {
         text = text,
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 12.dp),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        // At a large font size, this still leaves the place's name some room.
+        modifier = Modifier
+            .padding(start = 12.dp)
+            .widthIn(max = DetailMaxWidth),
     )
 }
 
 // The icon column sits inside the search pill's inset, so icons and names line up below it.
 private val RowStart = 28.dp
 private val IconColumn = 36.dp
+private val DetailMaxWidth = 170.dp
 
 private val samplePlaces = listOf(
-    PickerPlace(Place(1, "Lin Dong Fang", 25.0526, 121.5395), "80 m", isSelected = true),
-    PickerPlace(Place(2, "Yongkang Beef Noodles", 25.0330, 121.5297), "140 m", isSelected = false),
+    PickerPlace(Place(1, "Lin Dong Fang", 25.0526, 121.5395), "80 m", isSelected = true, district = "臺北市 中山區"),
+    PickerPlace(Place(2, "Yongkang Beef Noodles", 25.0330, 121.5297), "140 m", isSelected = false, district = "臺北市 大安區"),
     PickerPlace(Place(3, "Simple Kaffa", 25.0418, 121.5490), "1.2 km", isSelected = false),
     PickerPlace(Place(4, "Night market"), null, isSelected = false),
 )

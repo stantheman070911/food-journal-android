@@ -13,6 +13,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.stanley.foodjournal.data.FoodJournalDatabase
 import com.stanley.foodjournal.data.Meal
 import com.stanley.foodjournal.data.Place
+import com.stanley.foodjournal.logic.DistrictMap
 import com.stanley.foodjournal.edits.PendingEdit
 import com.stanley.foodjournal.edits.UndoableEdits
 import com.stanley.foodjournal.logic.LocationFix
@@ -53,6 +54,9 @@ class MealViewModelTest {
     private lateinit var edits: UndoableEdits
     private lateinit var processing: FakeProcessing
     private val store = ViewModelStore()
+    private val districts by lazy {
+        DistrictMap.parse(context.assets.open("districts.json").use { it.readBytes().decodeToString() })
+    }
 
     // One thousandth of a degree of latitude is about 111 m. Photo locations have no accuracy.
     private val noodlesSpot = LocationFix(25.0330, 121.5297)
@@ -447,6 +451,34 @@ class MealViewModelTest {
         assertEquals(photo, db.mealDao().get(one)!!.photo)
     }
 
+    @Test
+    fun aSavedMealShowsItsPlacesDistrictFromTheBundledFile() = runBlocking {
+        val inTaipei = db.placeDao().insert(Place(name = "滷三塊", latitude = 25.0264, longitude = 121.5436))
+        val abroad = db.placeDao().insert(Place(name = "Tokyo Ramen", latitude = 35.68, longitude = 139.76))
+        val noCoordinates = db.placeDao().insert(Place(name = "Corner café"))
+        val meal = db.mealDao().insert(Meal(eatenAt = LocalDateTime.of(2026, 11, 2, 8, 0), name = "Soup", price = 100, placeId = inTaipei))
+
+        val vm = savedMeal(meal)
+        awaitTrue { main { vm.uiState?.placeDistrict } != null }
+        assertEquals("臺北市 大安區", main { vm.uiState!!.placeDistrict })
+
+        val rows = main { vm.placePicker("") }.places.associateBy { it.place.id }
+        assertEquals("臺北市 大安區", rows.getValue(inTaipei).detail)
+        assertNull(rows.getValue(abroad).detail)
+        assertNull(rows.getValue(noCoordinates).detail)
+    }
+
+    @Test
+    fun aNewMealsPlaceRowHasNoDistrict() = runBlocking {
+        val place = db.placeDao().insert(Place(name = "滷三塊", latitude = 25.0264, longitude = 121.5436))
+
+        val vm = newMeal()
+        awaitTrue { main { vm.placePicker("") }.places.singleOrNull()?.detail != null }
+        main { vm.onPlaceSelected(place) }
+
+        assertNull(main { vm.uiState!!.placeDistrict })
+    }
+
     private suspend fun insertMeal(eatenAt: LocalDateTime, name: String): Long =
         db.mealDao().insert(Meal(eatenAt = eatenAt, name = name, price = 100))
 
@@ -467,6 +499,7 @@ class MealViewModelTest {
                     photos = photos,
                     processor = processing,
                     appScope = scope,
+                    districtMap = { districts },
                 ) as T
             }
             ViewModelProvider.create(store, factory)["meal-${System.nanoTime()}", MealViewModel::class]

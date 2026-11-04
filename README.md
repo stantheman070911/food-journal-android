@@ -45,6 +45,7 @@ It's a diary, not a diet tracker. There are no calories, goals, streaks, or scor
 
 - Rename a place, merge two by giving one the other's name, or delete one.
 - Deleting or merging a place, like deleting a meal, shows an Undo bar for a few seconds.
+- A place with a location in Taiwan shows its county and district, found on the phone from a boundary file bundled with the app.
 
 ### Backup and restore
 
