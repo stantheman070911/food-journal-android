@@ -71,9 +71,13 @@ fun FoodJournalApp() {
                     },
                 )
             }
-            composable<MealRoute> {
+            composable<MealRoute> { entry ->
                 MealScreen(
-                    onClose = dropUnlessResumed { navController.popBackStack() },
+                    // Not dropped while the screen still opens: its ViewModel has already closed
+                    // and asks only once, so a dropped request would leave it stuck.
+                    onClose = {
+                        if (navController.currentBackStackEntry === entry) navController.popBackStack()
+                    },
                     onOpenPlace = { placeId -> searchPlaceId = placeId },
                 )
             }
