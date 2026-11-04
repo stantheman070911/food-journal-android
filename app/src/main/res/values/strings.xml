@@ -25,6 +25,7 @@
     <string name="meal_price">Price</string>
     <string name="meal_name">Name</string>
     <string name="meal_time">Time</string>
+    <string name="meal_change_time">Change time</string>
     <string name="meal_note">Note</string>
     <string name="meal_save">Save</string>
     <string name="meal_favorite">Favorite</string>

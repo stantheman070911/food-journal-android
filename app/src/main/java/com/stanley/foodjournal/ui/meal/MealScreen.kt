@@ -72,6 +72,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
@@ -235,6 +236,10 @@ fun MealScreen(
                 .weight(1f)
                 .verticalScroll(rememberScrollState()),
         ) {
+            // On a saved meal the time is mostly read, so it heads the screen.
+            if (!uiState.isNew) {
+                DateLine(text = formatMealTime(draft.eatenAt, today), onClick = { editingTime = true })
+            }
             PhotoArea(
                 photoFile = uiState.photoFile,
                 processing = uiState.photoProcessing,
@@ -276,13 +281,15 @@ fun MealScreen(
                     )
                 }
                 Divider()
-                FieldRow(
-                    label = stringResource(R.string.meal_time),
-                    modifier = Modifier.clickable { editingTime = true },
-                ) {
-                    Text(formatMealTime(draft.eatenAt, today), style = MaterialTheme.typography.bodyLarge)
+                if (uiState.isNew) {
+                    FieldRow(
+                        label = stringResource(R.string.meal_time),
+                        modifier = Modifier.clickable { editingTime = true },
+                    ) {
+                        Text(formatMealTime(draft.eatenAt, today), style = MaterialTheme.typography.bodyLarge)
+                    }
+                    Divider()
                 }
-                Divider()
                 NoteField(note = draft.note, onNoteChange = actions.onNoteChange)
             }
             Spacer(Modifier.height(16.dp))
@@ -351,6 +358,25 @@ private fun MealTopBar(
 private fun closingIconColors() = IconButtonDefaults.iconButtonColors(
     disabledContentColor = LocalContentColor.current,
 )
+
+/** A saved meal's date, in grey at the photo's left edge. A tap edits it. */
+@Composable
+private fun DateLine(text: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clickable(onClickLabel = stringResource(R.string.meal_change_time), role = Role.Button, onClick = onClick)
+            .padding(horizontal = 16.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
 
 /**
  * The photo on top, inset with rounded corners, at the camera's 3:4 frame so none of the shot

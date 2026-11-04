@@ -84,6 +84,7 @@ Two records, Meal and Place. A meal belongs to at most one place.
 - **Price.** Typed in the serif display style.
 - **Card.** Name, Place, Time, and Note sit on one grey card, divided by hairlines.
 - **Time.** Written with the date and weekday, as Search writes them: "Tue, Nov 3 · 18:03", or "Mon, Oct 27, 2025 · 19:05" outside the current year.
+- **A saved meal's date.** A saved meal has no Time row. Its date heads the screen instead, between the top bar and the photo, in grey sans from the photo's left edge. Tapping it opens the date and time dialogs, and its action reads "Change time".
 - **Name suggestions.** Recent names, as borderless pills, scroll into view as they appear.
 - **Keyboard.** With the number pad up, the form scrolls so the price and Save stay above it.
 - **Save.**
