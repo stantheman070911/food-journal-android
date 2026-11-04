@@ -6,7 +6,7 @@ A quiet Android app for remembering what you ate, where you ate it, and what it 
 
 It's a diary, not a diet tracker. There are no calories, goals, streaks, or scores, and nothing leaves your phone unless you export a backup or share a recap yourself.
 
-> **Version 1.01.00** · Android 16 or later · English interface · Prices in New Taiwan dollars (NTD)
+> **Version 1.01.01** · Android 16 or later · English interface · Prices in New Taiwan dollars (NTD)
 
 ## Features
 
@@ -76,7 +76,7 @@ It's a diary, not a diet tracker. There are no calories, goals, streaks, or scor
 
 ## Install
 
-1. On your Android phone, download [food-journal-1.01.00.apk](release/food-journal-1.01.00.apk).
+1. On your Android phone, download [food-journal-1.01.01.apk](release/food-journal-1.01.01.apk).
 2. Open it, and allow installs from that source when Android asks.
 
 The app needs Android 16 or later. It was built and tested on a Pixel 8a with Android 17, and hasn't been tested on Android 16 yet. A newer version signed with the same key installs over the old one and keeps your meals.
