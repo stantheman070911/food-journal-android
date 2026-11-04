@@ -1,17 +1,15 @@
 package com.stanley.foodjournal.ui.spending
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Switch
@@ -19,6 +17,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -26,17 +25,15 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.stanley.foodjournal.R
-import com.stanley.foodjournal.logic.Period
-import com.stanley.foodjournal.logic.PeriodKind
 import com.stanley.foodjournal.logic.RecapFigures
 import com.stanley.foodjournal.logic.RecapOptions
 import com.stanley.foodjournal.ui.components.CardDivider
 import com.stanley.foodjournal.ui.components.GroupedCard
 import com.stanley.foodjournal.ui.components.PillButton
-import com.stanley.foodjournal.ui.icons.FoodJournalIcons
+import com.stanley.foodjournal.ui.components.SheetHeader
 import com.stanley.foodjournal.ui.preview.PreviewSurface
 import com.stanley.foodjournal.ui.preview.ThemePreviews
-import java.time.LocalDate
+import kotlinx.coroutines.launch
 
 /**
  * Asks which figures a recap shows before it is made: meals, places, the total, and the change
@@ -46,69 +43,91 @@ import java.time.LocalDate
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecapSheet(
-    sheet: RecapSheet,
-    onOptionsChange: (RecapOptions) -> Unit,
+    sheet: RecapSheetUiState,
+    onChangeOptions: ((RecapOptions) -> RecapOptions) -> Unit,
     onShare: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.background,
         contentColor = MaterialTheme.colorScheme.onBackground,
         tonalElevation = 0.dp,
         dragHandle = null,
     ) {
-        RecapSheetContent(sheet, onOptionsChange, onShare, onClose = onDismiss)
+        RecapSheetContent(
+            sheet = sheet,
+            onChangeOptions = onChangeOptions,
+            onShare = onShare,
+            onClose = {
+                // A recap being drawn is dropped at once, so it can't reach Android's share sheet
+                // while this one slides away.
+                if (sheet.isMaking) {
+                    onDismiss()
+                } else {
+                    scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+                }
+            },
+        )
     }
 }
 
 @Composable
 private fun RecapSheetContent(
-    sheet: RecapSheet,
-    onOptionsChange: (RecapOptions) -> Unit,
+    sheet: RecapSheetUiState,
+    onChangeOptions: ((RecapOptions) -> RecapOptions) -> Unit,
     onShare: () -> Unit,
     onClose: () -> Unit,
 ) {
     val figures = sheet.figures
     val options = sheet.options
     Column(Modifier.navigationBarsPadding()) {
-        SheetHeader(onClose = onClose)
-        GroupedCard(Modifier.padding(horizontal = 16.dp)) {
-            OptionRow(
-                title = stringResource(R.string.recap_meals),
-                value = figures.meals,
-                checked = options.meals,
-                enabled = !sheet.isMaking,
-                onCheckedChange = { onOptionsChange(options.copy(meals = it)) },
-            )
-            figures.places?.let { places ->
+        SheetHeader(stringResource(R.string.recap_title), onClose = onClose)
+        // In a short window, such as a phone on its side, the rows scroll and Share stays in view.
+        GroupedCard(
+            Modifier
+                .padding(horizontal = 16.dp)
+                .weight(1f, fill = false),
+        ) {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                OptionRow(
+                    title = stringResource(R.string.recap_meals),
+                    value = figures.meals,
+                    checked = options.meals,
+                    enabled = !sheet.isMaking,
+                    onCheckedChange = { checked -> onChangeOptions { it.copy(meals = checked) } },
+                )
+                figures.places?.let { places ->
+                    CardDivider()
+                    OptionRow(
+                        title = stringResource(R.string.recap_places),
+                        value = places,
+                        checked = options.places,
+                        enabled = !sheet.isMaking,
+                        onCheckedChange = { checked -> onChangeOptions { it.copy(places = checked) } },
+                    )
+                }
                 CardDivider()
                 OptionRow(
-                    title = stringResource(R.string.recap_places),
-                    value = places,
-                    checked = options.places,
+                    title = stringResource(R.string.recap_total),
+                    value = figures.total,
+                    checked = options.total,
                     enabled = !sheet.isMaking,
-                    onCheckedChange = { onOptionsChange(options.copy(places = it)) },
+                    onCheckedChange = { checked -> onChangeOptions { it.copy(total = checked) } },
                 )
-            }
-            CardDivider()
-            OptionRow(
-                title = stringResource(R.string.recap_total),
-                value = figures.total,
-                checked = options.total,
-                enabled = !sheet.isMaking,
-                onCheckedChange = { onOptionsChange(options.copy(total = it)) },
-            )
-            figures.comparison?.let { comparison ->
-                CardDivider()
-                OptionRow(
-                    title = stringResource(R.string.recap_change),
-                    value = comparison,
-                    checked = options.comparison,
-                    enabled = !sheet.isMaking,
-                    onCheckedChange = { onOptionsChange(options.copy(comparison = it)) },
-                )
+                figures.comparison?.let { comparison ->
+                    CardDivider()
+                    OptionRow(
+                        title = stringResource(R.string.recap_change),
+                        value = comparison,
+                        checked = options.comparison,
+                        enabled = !sheet.isMaking,
+                        onCheckedChange = { checked -> onChangeOptions { it.copy(comparison = checked) } },
+                    )
+                }
             }
         }
         PillButton(
@@ -119,30 +138,6 @@ private fun RecapSheetContent(
                 .fillMaxWidth()
                 .padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 16.dp),
         )
-    }
-}
-
-/** A centered title with a close button, as on the place picker. */
-@Composable
-private fun SheetHeader(onClose: () -> Unit) {
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(64.dp),
-    ) {
-        Text(
-            text = stringResource(R.string.recap_title),
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-            modifier = Modifier.align(Alignment.Center),
-        )
-        IconButton(
-            onClick = onClose,
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 4.dp),
-        ) {
-            Icon(FoodJournalIcons.Close, contentDescription = stringResource(R.string.close))
-        }
     }
 }
 
@@ -190,8 +185,7 @@ private fun OptionRow(
 private fun RecapSheetPreview() {
     PreviewSurface {
         RecapSheetContent(
-            sheet = RecapSheet(
-                period = Period(PeriodKind.Week, LocalDate.of(2026, 11, 2)),
+            sheet = RecapSheetUiState(
                 figures = RecapFigures(
                     title = "Nov 2 – 8",
                     year = "2026",
@@ -202,7 +196,7 @@ private fun RecapSheetPreview() {
                 ),
                 options = RecapOptions(places = false),
             ),
-            onOptionsChange = {},
+            onChangeOptions = {},
             onShare = {},
             onClose = {},
         )

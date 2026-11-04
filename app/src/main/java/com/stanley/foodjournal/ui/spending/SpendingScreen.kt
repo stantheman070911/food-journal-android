@@ -104,7 +104,7 @@ fun SpendingScreen(
     uiState.recap?.let { sheet ->
         RecapSheet(
             sheet = sheet,
-            onOptionsChange = viewModel::setRecapOptions,
+            onChangeOptions = viewModel::changeRecapOptions,
             onShare = { viewModel.shareRecap(dark) },
             onDismiss = viewModel::closeRecap,
         )

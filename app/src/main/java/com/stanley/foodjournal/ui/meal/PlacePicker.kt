@@ -46,7 +46,6 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.TextFieldValue
@@ -59,6 +58,7 @@ import com.stanley.foodjournal.logic.PickerSubmit
 import com.stanley.foodjournal.logic.PlacePickerContent
 import com.stanley.foodjournal.logic.pickerSubmit
 import com.stanley.foodjournal.ui.components.UndoBar
+import com.stanley.foodjournal.ui.components.SheetHeader
 import com.stanley.foodjournal.ui.icons.FoodJournalIcons
 import com.stanley.foodjournal.ui.preview.PreviewSurface
 import com.stanley.foodjournal.ui.preview.ThemePreviews
@@ -134,7 +134,7 @@ private fun PlacePicker(
 ) {
     var editingId by rememberSaveable { mutableStateOf(initialEditingId) }
     Column(modifier.fillMaxSize()) {
-        PickerHeader(onClose = onClose)
+        SheetHeader(stringResource(R.string.meal_place), onClose = onClose)
         QueryField(
             query = query,
             onQueryChange = onQueryChange,
@@ -197,30 +197,6 @@ private fun PlacePicker(
                     PlaceRow(row = row, onSelect = { onSelect(row.place.id) }, onEdit = { editingId = row.place.id })
                 }
             }
-        }
-    }
-}
-
-/** A centered title with a close button, as on any sheet. */
-@Composable
-private fun PickerHeader(onClose: () -> Unit) {
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(64.dp),
-    ) {
-        Text(
-            text = stringResource(R.string.meal_place),
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-            modifier = Modifier.align(Alignment.Center),
-        )
-        IconButton(
-            onClick = onClose,
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 4.dp),
-        ) {
-            Icon(FoodJournalIcons.Close, contentDescription = stringResource(R.string.close))
         }
     }
 }

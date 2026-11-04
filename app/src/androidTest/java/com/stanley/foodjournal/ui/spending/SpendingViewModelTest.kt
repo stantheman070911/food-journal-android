@@ -16,13 +16,19 @@ import com.stanley.foodjournal.logic.PeriodKind
 import com.stanley.foodjournal.logic.RecapOptions
 import com.stanley.foodjournal.logic.RecapText
 import com.stanley.foodjournal.photos.PhotoStore
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -49,9 +55,27 @@ class SpendingViewModelTest {
     private val saves = CopyOnWriteArrayList<RecapOptions>()
     private val drawn = CopyOnWriteArrayList<RecapText>()
     private var drawingFails = false
+    private var savingFails = false
+    private var readingOptionsFails = false
+    private var drawingWaitsFor: CompletableDeferred<Unit>? = null
+
+    @Volatile
+    private var drawingStarted = false
+
+    @Volatile
+    private var drawingDropped = false
 
     @Volatile
     private var drawingFailed = false
+
+    @Volatile
+    private var readingOptionsFailed = false
+
+    /** As the app's scope does, logs a failure rather than crashing. */
+    private val backgroundFailures = CopyOnWriteArrayList<Throwable>()
+    private val appScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Default + CoroutineExceptionHandler { _, error -> backgroundFailures += error },
+    )
 
     @Before
     fun open() {
@@ -255,7 +279,7 @@ class SpendingViewModelTest {
         vm.openRecap(page.period)
         val sheet = vm.state { it.recap != null }.recap!!
 
-        assertEquals(page.period, sheet.period)
+        assertEquals("November", sheet.figures.title)
         assertEquals(RecapOptions(total = false), sheet.options)
         assertEquals("1 meal", sheet.figures.meals)
         assertEquals("450", sheet.figures.total)
@@ -271,7 +295,7 @@ class SpendingViewModelTest {
         vm.state { it.recap != null }
 
         val chosen = RecapOptions(total = false)
-        vm.setRecapOptions(chosen)
+        vm.changeRecapOptions { it.copy(total = false) }
         vm.state { it.recap?.options == chosen }
         vm.shareRecap(dark = false)
 
@@ -298,6 +322,83 @@ class SpendingViewModelTest {
         assertNull(vm.state { it.recap == null }.recap)
     }
 
+    @Test
+    fun closingTheSheetDropsARecapStillBeingDrawn() = runBlocking {
+        db.mealDao().insert(meal(LocalDateTime.of(2026, 11, 2, 12, 0)))
+        drawingWaitsFor = CompletableDeferred()
+        val vm = viewModel()
+        val period = vm.state { it.pages.isNotEmpty() }.pages.last().period
+        vm.openRecap(period)
+        vm.state { it.recap != null }
+
+        vm.shareRecap(dark = false)
+        withTimeout(3_000) { while (!drawingStarted) delay(20) }
+        vm.closeRecap()
+
+        withTimeout(3_000) { while (!drawingDropped) delay(20) }
+        assertNull(vm.state { it.recap == null }.recap)
+        assertNull(withTimeoutOrNull(200) { vm.recaps.first() })
+        assertEquals(emptyList<RecapText>(), drawn)
+
+        // The next recap starts afresh.
+        drawingWaitsFor = null
+        vm.openRecap(period)
+        vm.state { it.recap != null }
+        vm.shareRecap(dark = false)
+        assertEquals(File("/spending-test/recap.png"), withTimeout(3_000) { vm.recaps.first() })
+    }
+
+    @Test
+    fun changesMadeBeforeTheSheetRedrawsAllCount() = runBlocking {
+        db.mealDao().insert(meal(LocalDateTime.of(2026, 11, 2, 12, 0)))
+        val vm = viewModel()
+        vm.openRecap(vm.state { it.pages.isNotEmpty() }.pages.last().period)
+        vm.state { it.recap != null }
+
+        vm.changeRecapOptions { it.copy(meals = false) }
+        vm.changeRecapOptions { it.copy(places = false) }
+
+        val chosen = RecapOptions(meals = false, places = false)
+        vm.state { it.recap?.options == chosen }
+        withTimeout(3_000) { while (saves.size < 2) delay(20) }
+        assertEquals(chosen, saves.last())
+    }
+
+    /** A failure outside the app's scope would crash the app, and with it this test. */
+    @Test
+    fun aChoiceThatCantBeSavedStillShowsAndIsLogged() = runBlocking {
+        db.mealDao().insert(meal(LocalDateTime.of(2026, 11, 2, 12, 0)))
+        savingFails = true
+        val vm = viewModel()
+        vm.openRecap(vm.state { it.pages.isNotEmpty() }.pages.last().period)
+        vm.state { it.recap != null }
+
+        vm.changeRecapOptions { it.copy(total = false) }
+
+        vm.state { it.recap?.options == RecapOptions(total = false) }
+        withTimeout(3_000) { while (backgroundFailures.isEmpty()) delay(20) }
+        assertTrue(backgroundFailures.single() is IOException)
+    }
+
+    /** An uncaught failure would crash the app, and with it this test. */
+    @Test
+    fun aSheetThatCantBeReadStaysClosedAndCanBeTriedAgain() = runBlocking {
+        db.mealDao().insert(meal(LocalDateTime.of(2026, 11, 2, 12, 0)))
+        readingOptionsFails = true
+        val vm = viewModel()
+        val period = vm.state { it.pages.isNotEmpty() }.pages.last().period
+
+        vm.openRecap(period)
+        withTimeout(3_000) { while (!readingOptionsFailed) delay(20) }
+        // Once the main thread has moved on, the failed attempt has finished.
+        withContext(Dispatchers.Main) {}
+        assertNull(vm.state { true }.recap)
+
+        readingOptionsFails = false
+        vm.openRecap(period)
+        assertEquals(RecapOptions(), vm.state { it.recap != null }.recap!!.options)
+    }
+
     private suspend fun viewModel(): SpendingViewModel {
         val factory = viewModelFactory {
             initializer {
@@ -306,6 +407,13 @@ class SpendingViewModelTest {
                     placeDao = db.placeDao(),
                     photos = photos,
                     recapDrawing = { _, text, _ ->
+                        drawingStarted = true
+                        try {
+                            drawingWaitsFor?.await()
+                        } catch (e: CancellationException) {
+                            drawingDropped = true
+                            throw e
+                        }
                         if (drawingFails) {
                             drawingFailed = true
                             throw IOException("No room")
@@ -313,8 +421,18 @@ class SpendingViewModelTest {
                         drawn += text
                         File("/spending-test/recap.png")
                     },
-                    savedRecapOptions = flowOf(savedOptions),
-                    saveRecapOptions = { saves += it },
+                    savedRecapOptions = flow {
+                        if (readingOptionsFails) {
+                            readingOptionsFailed = true
+                            throw IOException("Can't read")
+                        }
+                        emit(savedOptions)
+                    },
+                    saveRecapOptions = {
+                        if (savingFails) throw IOException("No room")
+                        saves += it
+                    },
+                    appScope = appScope,
                     clock = { today },
                 )
             }

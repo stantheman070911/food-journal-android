@@ -32,6 +32,7 @@ import com.stanley.foodjournal.logic.recapFigures
 import com.stanley.foodjournal.photos.PhotoStore
 import com.stanley.foodjournal.recap.RecapDrawing
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -116,24 +117,23 @@ data class SpendingUiState(
     val pages: List<SpendingPage> = emptyList(),
     val selectedIndex: Int = 0,
     /** The Share sheet, while it is open. */
-    val recap: RecapSheet? = null,
+    val recap: RecapSheetUiState? = null,
 ) {
     val isEmpty: Boolean get() = !isLoading && pages.isEmpty()
 }
 
 /**
- * The Share sheet for [period]'s recap: everything it could show, [options] for which of it it
- * will, and whether the image [isMaking] now.
+ * The Share sheet: everything its recap could show, [options] for which of it it will, and
+ * whether the image [isMaking] now.
  */
-data class RecapSheet(
-    val period: Period,
+data class RecapSheetUiState(
     val figures: RecapFigures,
     val options: RecapOptions,
     val isMaking: Boolean = false,
 )
 
 /** An open Share sheet, with the meals its recap is drawn from. */
-private data class OpenRecap(val sheet: RecapSheet, val meals: List<Meal>)
+private data class OpenRecap(val sheet: RecapSheetUiState, val meals: List<Meal>)
 
 /** Which kind of period is shown, and a date inside the period in view. */
 private data class Selection(val kind: PeriodKind, val anchor: LocalDate)
@@ -149,9 +149,10 @@ class SpendingViewModel(
     placeDao: PlaceDao,
     private val photos: PhotoStore,
     private val recapDrawing: RecapDrawing,
-    /** The figures the last recap was shared with, remembered across launches. */
+    /** The figures last chosen for a recap, remembered across launches. */
     private val savedRecapOptions: Flow<RecapOptions>,
     private val saveRecapOptions: suspend (RecapOptions) -> Unit,
+    private val appScope: CoroutineScope,
     private val clock: () -> LocalDate = LocalDate::now,
 ) : ViewModel() {
     private val today = MutableStateFlow(clock())
@@ -182,26 +183,39 @@ class SpendingViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SpendingUiState())
 
     /**
-     * Opens the Share sheet for [period], with the figures the last recap was shared with. Its
-     * meals are read now, so the sheet shows what the image will.
+     * Opens the Share sheet for [period], with the figures last chosen. Its meals are read now, so
+     * the sheet shows what the image will. If they can't be read, that is logged and the sheet
+     * stays closed.
      */
     fun openRecap(period: Period) {
         if (recap.value != null || recapJob?.isActive == true) return
         recapJob = viewModelScope.launch {
-            val meals = mealDao.observeAll().first()
-            val inPeriod = meals.filter { it.eatenAt.toLocalDate() in period }
-            val previous = period.plus(-1)
-            val figures = recapFigures(period, inPeriod, meals.filter { it.eatenAt.toLocalDate() in previous }, today.value)
-            recap.value = OpenRecap(RecapSheet(period, figures, savedRecapOptions.first()), inPeriod)
+            try {
+                val meals = mealDao.observeAll().first()
+                val inPeriod = meals.filter { it.eatenAt.toLocalDate() in period }
+                val previous = period.plus(-1)
+                val figures = recapFigures(period, inPeriod, meals.filter { it.eatenAt.toLocalDate() in previous }, today.value)
+                recap.value = OpenRecap(RecapSheetUiState(figures, savedRecapOptions.first()), inPeriod)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Recap failed", e)
+            }
         }
     }
 
-    /** Chooses which figures the recap shows, and remembers the choice for the next one. */
-    fun setRecapOptions(options: RecapOptions) {
+    /**
+     * Changes which figures the recap shows, and remembers the choice for the next one. Each change
+     * builds on the last, even before the sheet has redrawn. It is saved in the app's scope, where
+     * a failure is logged rather than crashing the app, starting on the main thread so changes are
+     * saved in the order they were made.
+     */
+    fun changeRecapOptions(change: (RecapOptions) -> RecapOptions) {
         val open = recap.value ?: return
         if (open.sheet.isMaking) return
+        val options = change(open.sheet.options)
         recap.value = open.copy(sheet = open.sheet.copy(options = options))
-        viewModelScope.launch { saveRecapOptions(options) }
+        appScope.launch(Dispatchers.Main.immediate) { saveRecapOptions(options) }
     }
 
     /**
@@ -323,6 +337,7 @@ class SpendingViewModel(
                     recapDrawing = appContainer.recaps,
                     savedRecapOptions = appContainer.settings.recapOptions,
                     saveRecapOptions = appContainer.settings::setRecapOptions,
+                    appScope = appContainer.appScope,
                 )
             }
         }

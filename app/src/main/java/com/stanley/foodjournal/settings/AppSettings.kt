@@ -22,7 +22,7 @@ enum class ThemeChoice { System, Light, Dark }
 
 /**
  * The few things the app remembers outside the database: the theme chosen in Settings, the day
- * of the last backup, and which figures a recap last showed. Kept in DataStore, in the file
+ * of the last backup, and the figures last chosen for a recap. Kept in DataStore, in the file
  * "settings".
  */
 class AppSettings(private val store: DataStore<Preferences>) {
@@ -35,7 +35,7 @@ class AppSettings(private val store: DataStore<Preferences>) {
         .map { prefs -> prefs[LAST_BACKUP]?.let(LocalDate::ofEpochDay) }
         .distinctUntilChanged()
 
-    /** The figures the last recap was shared with; all of them before the first. */
+    /** The figures last chosen for a recap, shared or not; all of them until the first choice. */
     val recapOptions: Flow<RecapOptions> = store.data
         .map { prefs ->
             RecapOptions(

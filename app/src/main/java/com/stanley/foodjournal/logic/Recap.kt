@@ -154,13 +154,4 @@ fun recapFigures(period: Period, meals: List<Meal>, previousMeals: List<Meal>, t
     )
 }
 
-/** The recap's words for [period] with the figures [options] keeps, all of them by default. */
-fun recapText(
-    period: Period,
-    meals: List<Meal>,
-    previousMeals: List<Meal>,
-    today: LocalDate,
-    options: RecapOptions = RecapOptions(),
-): RecapText = recapFigures(period, meals, previousMeals, today).text(options)
-
 private fun count(n: Int, noun: String) = "${formatPrice(n)} $noun${if (n == 1) "" else "s"}"

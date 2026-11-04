@@ -130,6 +130,15 @@ class RecapTest {
         assertEquals("The same as the week before", recapText(earlier, meals, before, today).comparison)
     }
 
+    /** The recap's words with the figures [options] keeps, all of them by default. */
+    private fun recapText(
+        period: Period,
+        meals: List<Meal>,
+        previousMeals: List<Meal>,
+        today: LocalDate,
+        options: RecapOptions = RecapOptions(),
+    ) = recapFigures(period, meals, previousMeals, today).text(options)
+
     /** A meal [day] days after Nov 1, 2026, or at [eatenAt]. */
     private fun meal(
         id: Long,
