@@ -141,6 +141,7 @@
     <string name="empty_search">Nothing to search yet</string>
     <string name="empty_spending">No meals</string>
     <string name="map_empty">No meals with a location yet</string>
+    <string name="map_unreadable">The map couldn’t be read</string>
     <string name="map_no_meals">No meals</string>
     <string name="map_district_line">%1$s  ·  %2$s</string>
     <string name="map_pin">%1$s, %2$s</string>

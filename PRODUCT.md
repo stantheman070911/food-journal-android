@@ -123,17 +123,17 @@ Two records, Meal and Place. A meal belongs to at most one place.
 - **Sources.**
   - A photo taken in the app: the phone's location when the photo is taken, or the first fix after it.
   - A gallery photo with a location: the photo's own.
-  - Anything else, such as Skip or a gallery photo without a location: the phone's location while the form is filled in, following the latest fix.
+  - Anything else, such as Skip, a gallery photo without a location, or a first photo that can't be read: the phone's location while the form is filled in, following the latest fix.
 - **The row.** "Save location" sits on the card below Place, with the county and district in grey and a switch. It shows only once there is a location.
   - The switch starts on for a camera photo or a gallery photo's location. It starts off for the phone's location while typing, since the meal may be logged later, somewhere else. Once tapped, it stays as set.
   - On, the meal keeps the location, and places use it: the new meal's place is filled in, the picker lists places nearest first, and a new place, or one without coordinates, takes it. A place with coordinates keeps its own.
   - Off, the location is dropped, along with any place it filled in.
   - The whole row takes the tap. The switch is ink when on and outlined in ink when off.
 - **Saved meals.** The row reads "Location", with the switch on. Turning it off removes the location once the meal is saved. A saved meal never gains a location, since the phone is no longer where it was eaten.
-- **Permission.** Fine and coarse location are asked for together, once, on the first Add, with the camera.
+- **Permission.** Fine and coarse location are asked for together, once, on the first Add, with the camera. It counts as asked only once the request goes to Android, so an Add closed before then asks on the next one.
   - Refused, the row never shows. A gallery photo's location still fills in the place and gives coordinates to a new one, as it does without the row.
   - With approximate location only, the phone's location isn't used, since it can be kilometres off. A gallery photo's location still is.
-- **Finding it.** Android's fused provider starts when the camera opens: a fix under two minutes old at once, then a current one at high accuracy, for up to 30 seconds. Fixes worse than 100 m are not used. It never holds up the form or Save. A meal saved before a fix arrives has no location.
+- **Finding it.** Android's fused provider starts when the camera opens: a fix under two minutes old at once, then a current one at high accuracy, for up to 30 seconds. Fixes worse than 100 m are not used. A phone without the fused provider finds no location. It never holds up the form or Save. A meal saved before a fix arrives has no location.
 - **Privacy.** The location is stored in the database, never written into the photo, and never leaves the phone except in a backup.
 
 ## Places
@@ -287,7 +287,7 @@ The Map tab shows where meals were eaten: Taiwan with its county and district (é
 - **Where a meal is.** Its own location (see Where it was eaten), or else its place's coordinates.
 - **Pins.**
   - One pin per place with coordinates in Taiwan, counting all its meals. A place with more meals gets a slightly larger pin.
-  - A meal with a location but no place, or at a place without coordinates, gets its own smaller pin, named by the meal, or its day without a name.
+  - A meal with a location but no place, at a place without coordinates, or eaten in Taiwan at a place outside it, gets its own smaller pin, named by the meal, or its day without a name.
   - A pin is an ink dot with a ring in the background color, so it reads over the lines.
   - Tapping a pin within its 48 dp target opens Search with that place, as Spending's place rows do, or opens the lone meal.
   - Screen readers get each pin as a button: "æ»·ä¸‰å¡Š, 12 meals".
@@ -297,7 +297,7 @@ The Map tab shows where meals were eaten: Taiwan with its county and district (é
   - Tapping another district moves the selection, and tapping outside Taiwan clears it. The selection is kept while switching tabs.
 - **Meals outside Taiwan** have no pin. A grey line at the bottom counts them: "4 meals outside Taiwan".
 - **Layout.** The lines at the bottom leave room for the Add button.
-- **Empty state.** "No meals with a location yet". The Add button is already on the tab, so there is no button.
+- **Empty state.** "No meals with a location yet". The Add button is already on the tab, so there is no button. If the bundled boundary file can't be read, the tab says "The map couldn't be read" instead.
 
 ## Search
 

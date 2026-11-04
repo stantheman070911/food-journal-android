@@ -51,6 +51,8 @@ class LocationTracker(private val context: Context) : PhoneLocation {
 
     override fun start() {
         if (!isGranted(Manifest.permission.ACCESS_FINE_LOCATION) || request != null) return
+        // Asking a provider the phone doesn't have throws, so a phone without one simply finds none.
+        if (!manager.hasProvider(LocationManager.FUSED_PROVIDER)) return
         try {
             manager.getLastKnownLocation(LocationManager.FUSED_PROVIDER)?.takeIf { it.isRecent() }?.let(::publish)
             val signal = CancellationSignal()

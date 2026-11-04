@@ -263,16 +263,24 @@ class MealViewModel(
 
     /**
      * What opening the camera asks for: the camera while it is off, and for a new meal, location
-     * once ever. Call [onPermissionsChecked] once the answer is in, or at once when nothing is asked.
+     * once ever. Call [onPermissionsRequested] as the request goes to Android, then
+     * [onPermissionsChecked] once the answer is in, or at once when nothing is asked.
      */
     suspend fun permissionsToRequest(hasCamera: Boolean): List<String> = buildList {
         if (!hasCamera) add(Manifest.permission.CAMERA)
         if (isNew && !phoneLocation.isAllowed() && !locationAsked.first()) {
-            markLocationAsked()
             // Android asks for both together, and lets the user choose approximate.
             add(Manifest.permission.ACCESS_FINE_LOCATION)
             add(Manifest.permission.ACCESS_COARSE_LOCATION)
         }
+    }
+
+    /**
+     * Marks location as asked once [request] is actually shown, so a request dropped before then,
+     * as when the camera closes first, asks again on the next Add.
+     */
+    fun onPermissionsRequested(request: List<String>) {
+        if (Manifest.permission.ACCESS_FINE_LOCATION in request) appScope.launch { markLocationAsked() }
     }
 
     /**
@@ -559,8 +567,13 @@ class MealViewModel(
             val restore = fallback
             update {
                 val restored = it.copy(photo = restore?.name, photoIsPending = restore?.isPending ?: false)
-                // A saved meal's location never came from its photo, so it stays.
-                if (isNew) restored.withLocation(restore?.locationSource, restore?.location) else restored
+                when {
+                    // A saved meal's location never came from its photo, so it stays.
+                    !isNew -> restored
+                    restore?.locationSource != null -> restored.withLocation(restore.locationSource, restore.location)
+                    // A first photo that failed leaves the form without one, as Skip does.
+                    else -> restored.withLocation(LocationSource.Phone, phoneLocation.fix.value)
+                }
             }
             photoFailed = true
             savePending = false

@@ -65,6 +65,15 @@ class MealMapTest {
     }
 
     @Test
+    fun `a meal eaten in Taiwan at a place outside it gets its own pin`() {
+        val map = mealMap(listOf(meal(1, placeId = 4), meal(2, placeId = 4, latitude = 25.0, longitude = 121.45)), places, codeAt) { it.name!! }
+
+        assertEquals(listOf(MapPin(null, 2, "Meal 2", 25.0, 121.45, 1)), map.pins)
+        assertEquals(mapOf("W" to 1), map.mealsByDistrict)
+        assertEquals(1, map.outsideTaiwan)
+    }
+
+    @Test
     fun `meals outside Taiwan have no pin and are counted`() {
         val map = mealMap(
             listOf(meal(1, placeId = 4), meal(2, placeId = 4), meal(3, latitude = 10.0, longitude = 130.0), meal(4, placeId = 1)),

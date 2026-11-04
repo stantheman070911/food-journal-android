@@ -556,6 +556,18 @@ class MealViewModelTest {
     }
 
     @Test
+    fun aFailedFirstPhotoLeavesTheFormFollowingThePhone() = runBlocking {
+        val vm = newMealChecked()
+        processing.finish(capture(vm), ok = false)
+        awaitTrue { main { vm.uiState!!.photoFailed } }
+
+        phone.fix.value = noodlesSpot
+        awaitTrue { main { vm.uiState!!.draft.location } == noodlesSpot }
+        val row = main { vm.uiState!!.locationRow!! }
+        assertFalse(row.isOn)
+    }
+
+    @Test
     fun aMealSavedBeforeAnyFixArrivesSavesWithoutALocation() = runBlocking {
         val vm = newMealChecked()
         main {
@@ -675,7 +687,13 @@ class MealViewModelTest {
 
         val first = newMeal().permissionsToRequest(hasCamera = true)
         assertEquals(listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION), first)
-        assertTrue(locationAsked.value)
+        // A request that never reached Android, as when the camera closed first, is asked again.
+        assertFalse(locationAsked.value)
+        val again = newMeal()
+        assertEquals(first, again.permissionsToRequest(hasCamera = true))
+
+        again.onPermissionsRequested(first)
+        awaitTrue { locationAsked.value }
         assertEquals(emptyList<String>(), newMeal().permissionsToRequest(hasCamera = true))
     }
 

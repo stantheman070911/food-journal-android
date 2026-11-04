@@ -63,7 +63,7 @@ data class MealMap(
 /**
  * The pins and counts for [meals]. Each place with coordinates in Taiwan gets one pin, counting all
  * its meals. A meal with a location whose place has no coordinates, or that has no place, gets a pin
- * of its own, named by [mealName]. A meal is counted toward the district its position falls in, and
+ * of its own, named by [mealName]; so does a meal eaten in Taiwan at a place outside it. A meal is counted toward the district its position falls in, and
  * a meal whose position is in no district counts as outside Taiwan and has no pin.
  */
 fun mealMap(
@@ -82,10 +82,15 @@ fun mealMap(
     var outside = 0
     val atPlaces = meals.filter { meal -> meal.placeId?.let(byId::get)?.let { it.latitude != null && it.longitude != null } == true }
         .groupBy { it.placeId!! }
+    // Only places in Taiwan have a pin. A meal at a place elsewhere, eaten in Taiwan, gets its own.
+    val pinned = HashSet<Long>()
     for ((placeId, atPlace) in atPlaces) {
         val place = byId.getValue(placeId)
         val position = LocationFix(place.latitude!!, place.longitude!!)
-        if (codeAt(position) != null) pins += MapPin(placeId, null, place.name, position.latitude, position.longitude, atPlace.size)
+        if (codeAt(position) != null) {
+            pins += MapPin(placeId, null, place.name, position.latitude, position.longitude, atPlace.size)
+            pinned += placeId
+        }
     }
     for (meal in meals) {
         val position = mealPosition(meal, byId) ?: continue
@@ -95,7 +100,7 @@ fun mealMap(
             continue
         }
         byDistrict[code] = (byDistrict[code] ?: 0) + 1
-        if (meal.placeId == null || meal.placeId !in atPlaces) {
+        if (meal.placeId == null || meal.placeId !in pinned) {
             pins += MapPin(null, meal.id, mealName(meal), position.latitude, position.longitude, 1)
         }
     }

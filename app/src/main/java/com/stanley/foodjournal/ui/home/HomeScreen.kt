@@ -44,7 +44,7 @@ import com.stanley.foodjournal.ui.spending.SpendingScreen
 private const val TAB_FADE_MILLIS = 150
 
 /**
- * The three tabs, the bottom bar, and the Add button. A [searchRequest], from a screen above the
+ * The four tabs, the bottom bar, and the Add button. A [searchRequest], from a screen above the
  * tabs, opens Search with it once the tabs show again.
  */
 @Composable

@@ -79,7 +79,9 @@ fun MapScreen(
     val map = uiState.map
     when {
         uiState.isLoading -> Unit
-        uiState.isEmpty || map == null -> EmptyState(message = stringResource(R.string.map_empty), modifier = modifier)
+        // The bundled file should always read; if it can't, say so rather than claim there are no meals.
+        map == null -> EmptyState(message = stringResource(R.string.map_unreadable), modifier = modifier)
+        uiState.isEmpty -> EmptyState(message = stringResource(R.string.map_empty), modifier = modifier)
         else -> Box(modifier.fillMaxSize()) {
             TaiwanMap(
                 map = map,

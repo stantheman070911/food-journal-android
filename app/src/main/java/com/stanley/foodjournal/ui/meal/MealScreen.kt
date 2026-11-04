@@ -156,7 +156,13 @@ fun MealScreen(
     LaunchedEffect(stage) {
         if (stage != MealStage.Camera) return@LaunchedEffect
         val request = viewModel.permissionsToRequest(hasCamera)
-        if (request.isEmpty()) viewModel.onPermissionsChecked() else permissions.launch(request.toTypedArray())
+        if (request.isEmpty()) {
+            viewModel.onPermissionsChecked()
+        } else {
+            // Nothing suspends between the two, so location is marked asked only once it is.
+            viewModel.onPermissionsRequested(request)
+            permissions.launch(request.toTypedArray())
+        }
     }
     // Camera or location access may have been turned on in Settings.
     LifecycleResumeEffect(Unit) {
@@ -283,7 +289,7 @@ fun MealScreen(
                 )
             } else {
                 // On a saved meal the time is mostly read, so it heads the screen.
-                DateLine(text = formatMealTime(draft.eatenAt, today), onClick = { editingTime = true })
+                DateLine(text = formatMealTime(draft.eatenAt, today), enabled = !uiState.closing, onClick = { editingTime = true })
                 WeekSegments(steps = uiState.steps)
                 SteppingPhoto(
                     photoFile = uiState.photoFile,
@@ -351,6 +357,7 @@ fun MealScreen(
                     SaveLocationRow(
                         title = stringResource(if (uiState.isNew) R.string.meal_save_location else R.string.meal_location),
                         row = row,
+                        enabled = !uiState.closing,
                         onChange = actions.onSaveLocationChange,
                     )
                     Divider()
@@ -445,14 +452,14 @@ private fun closingIconColors() = IconButtonDefaults.iconButtonColors(
     disabledContentColor = LocalContentColor.current,
 )
 
-/** A saved meal's date, in grey at the photo's left edge. A tap edits it. */
+/** A saved meal's date, in grey at the photo's left edge. A tap edits it, until the screen closes. */
 @Composable
-private fun DateLine(text: String, onClick: () -> Unit) {
+private fun DateLine(text: String, enabled: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
-            .clickable(onClickLabel = stringResource(R.string.meal_change_time), role = Role.Button, onClick = onClick)
+            .clickable(enabled = enabled, onClickLabel = stringResource(R.string.meal_change_time), role = Role.Button, onClick = onClick)
             .padding(horizontal = 16.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
@@ -724,13 +731,13 @@ private fun NoteField(note: String, onNoteChange: (String) -> Unit) {
  * was eaten. The whole row takes the tap, as a switch row does in Settings.
  */
 @Composable
-private fun SaveLocationRow(title: String, row: LocationRow, onChange: (Boolean) -> Unit) {
+private fun SaveLocationRow(title: String, row: LocationRow, enabled: Boolean, onChange: (Boolean) -> Unit) {
     val colors = MaterialTheme.colorScheme
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp)
-            .toggleable(value = row.isOn, role = Role.Switch, onValueChange = onChange)
+            .toggleable(value = row.isOn, enabled = enabled, role = Role.Switch, onValueChange = onChange)
             .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

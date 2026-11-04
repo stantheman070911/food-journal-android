@@ -2,7 +2,7 @@ package com.stanley.foodjournal.ui.navigation
 
 import kotlinx.serialization.Serializable
 
-/** The three tabs, with the bottom bar and Add button. */
+/** The four tabs, with the bottom bar and Add button. */
 @Serializable
 data object HomeRoute
 
