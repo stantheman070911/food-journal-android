@@ -81,9 +81,9 @@
 
 需要 Android 16 以上。App 在搭載 Android 17 的 Pixel 8a 上開發與測試，尚未在 Android 16 上測試。之後的新版本只要以相同金鑰簽署，就能直接覆蓋安裝，並保留你的餐點。
 
-## 不在範圍內
+## 未包含的功能
 
-卡路里、營養、減重目標、社群動態、多種貨幣、地圖，以及雲端同步。這個 App 刻意保持精簡。
+這個 App 沒有卡路里、營養、減重目標、社群動態、多種貨幣、地圖，也沒有雲端同步。它刻意保持精簡。
 
 ## 開發者資訊
 
@@ -116,8 +116,7 @@ Kotlin、Jetpack Compose（Material 3）、Navigation Compose、Room、DataStore
 
 ### 文件（英文）
 
-- [產品文件](<Food Journal — Product Document.md>)：App 的功能、資料模型與花費計算規則。
-- [開發筆記](DECISIONS.md)：開發過程中每個待決問題是如何決定的。
+- [產品文件](PRODUCT.md)：App 的功能、外觀與建置方式。
 
 ## 授權
 
