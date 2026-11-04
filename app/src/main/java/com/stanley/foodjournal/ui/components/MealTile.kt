@@ -111,18 +111,24 @@ fun MealTile(
  * A plain tile's name, set so a word too long for the tile, as at a large font size, rarely breaks
  * just anywhere. The name first shrinks, by up to a fifth, until its longest word fits; past that,
  * words break with a hyphen. English patterns come first, as the interface is English; the phone's
- * own locales follow, so Chinese names keep their glyphs.
+ * own locales follow, so Chinese names keep their glyphs. [style] and [padding] are the Journal
+ * tile's unless a larger tile, such as a saved meal's, sets its own.
  */
 @Composable
-private fun tileNameStyle(name: String, width: Dp): TextStyle {
-    val base = MaterialTheme.typography.labelLarge.copy(
+fun tileNameStyle(
+    name: String,
+    width: Dp,
+    style: TextStyle = MaterialTheme.typography.labelLarge,
+    padding: Dp = NamePadding,
+): TextStyle {
+    val base = style.copy(
         hyphens = Hyphens.Auto,
         localeList = LocaleList(listOf(Locale("en")) + LocaleList.current.localeList),
     )
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
-    val scale = remember(name, base, density, width) {
-        val room = with(density) { (width - NamePadding * 2).toPx() }
+    val scale = remember(name, base, density, width, padding) {
+        val room = with(density) { (width - padding * 2).toPx() }
         val widest = unbreakableWords(name).maxOfOrNull { word ->
             measurer.measure(word, base, softWrap = false, maxLines = 1).size.width
         } ?: 0

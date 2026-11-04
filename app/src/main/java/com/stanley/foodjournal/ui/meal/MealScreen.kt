@@ -29,6 +29,7 @@ import java.io.File
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -106,6 +107,7 @@ import com.stanley.foodjournal.logic.groupDigits
 import com.stanley.foodjournal.logic.groupedToOriginal
 import com.stanley.foodjournal.logic.originalToGrouped
 import com.stanley.foodjournal.ui.components.PillButton
+import com.stanley.foodjournal.ui.components.tileNameStyle
 import com.stanley.foodjournal.ui.icons.FoodJournalIcons
 import com.stanley.foodjournal.ui.preview.PreviewSurface
 import com.stanley.foodjournal.ui.preview.ThemePreviews
@@ -522,12 +524,20 @@ private fun SteppingPhoto(
         if (photoFile != null && !processing) {
             MealPhoto(photoFile)
         } else if (!processing) {
-            Text(
-                text = name,
-                style = MaterialTheme.typography.titleLarge,
-                color = colors.onSurface,
-                modifier = Modifier.padding(20.dp),
-            )
+            // Set as the Journal's plain tile sets it, so a long word shrinks, then hyphenates.
+            BoxWithConstraints {
+                Text(
+                    text = name,
+                    style = tileNameStyle(
+                        name = name,
+                        width = maxWidth,
+                        style = MaterialTheme.typography.titleLarge,
+                        padding = PlainTilePadding,
+                    ),
+                    color = colors.onSurface,
+                    modifier = Modifier.padding(PlainTilePadding),
+                )
+            }
         }
     }
 }
@@ -744,6 +754,7 @@ private val GroupShape = RoundedCornerShape(16.dp)
 private val SegmentHeight = 3.dp
 private val SegmentGap = 2.dp
 private val DistrictMaxWidth = 150.dp
+private val PlainTilePadding = 20.dp
 
 /** How far a drag has to run to count as a swipe. */
 private val SwipeDistance = 48.dp
