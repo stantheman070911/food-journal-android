@@ -83,6 +83,7 @@ Two records, Meal and Place. A meal belongs to at most one place.
 - **Photo.** Shown at 3:4, inset 16 dp with 20 dp corners. Tap it to retake or pick another; Back from that camera returns to the form. Without a photo, a short grey tile reads "+ Add photo".
 - **Price.** Typed in the serif display style.
 - **Card.** Name, Place, Time, and Note sit on one grey card, divided by hairlines.
+- **Time.** Written with the date and weekday, as Search writes them: "Tue, Nov 3 · 18:03", or "Mon, Oct 27, 2025 · 19:05" outside the current year.
 - **Name suggestions.** Recent names, as borderless pills, scroll into view as they appear.
 - **Keyboard.** With the number pad up, the form scrolls so the price and Save stay above it.
 - **Save.**

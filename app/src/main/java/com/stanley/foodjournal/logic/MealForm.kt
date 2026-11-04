@@ -57,20 +57,13 @@ fun suggestNames(recent: List<String>, typed: String, limit: Int = 3): List<Stri
 }
 
 private val TimeOfDay = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH)
-private val DayThisYear = DateTimeFormatter.ofPattern("EEE, MMM d", Locale.ENGLISH)
-private val DayOtherYear = DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.ENGLISH)
 
-/** When a meal was eaten, as the Meal screen shows it: "Today · 12:40", "Mon, Oct 27 · 19:05". */
-fun formatMealTime(eatenAt: LocalDateTime, today: LocalDate): String {
-    val date = eatenAt.toLocalDate()
-    val day = when {
-        date == today -> "Today"
-        date == today.minusDays(1) -> "Yesterday"
-        date.year == today.year -> date.format(DayThisYear)
-        else -> date.format(DayOtherYear)
-    }
-    return "$day · ${eatenAt.format(TimeOfDay)}"
-}
+/**
+ * When a meal was eaten, as the Meal screen shows it: "Tue, Nov 3 · 18:03", with the year outside
+ * [today]'s year: "Mon, Oct 27, 2025 · 19:05".
+ */
+fun formatMealTime(eatenAt: LocalDateTime, today: LocalDate): String =
+    "${formatResultDate(eatenAt.toLocalDate(), today)} · ${eatenAt.format(TimeOfDay)}"
 
 private val ExifDateTime = DateTimeFormatter.ofPattern("yyyy:MM:dd HH:mm:ss", Locale.ROOT)
 
