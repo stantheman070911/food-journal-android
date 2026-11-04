@@ -1,6 +1,6 @@
 # Food Journal
 
-This document describes Food Journal as it is at version 1.01.01: what it does, how it looks, and how it is built. It records the app and sets no limits on it. When the app changes, change this document to match.
+This document describes Food Journal at version 1.01.01: what it does, how it looks, and how it is built.
 
 ## Overview
 
@@ -48,7 +48,7 @@ Two records, Meal and Place. A meal belongs to at most one place.
 - **A meal's day** is the date of `eatenAt`, so a 01:00 snack counts toward that day. Weeks run Monday to Sunday.
 - **`photo` is a file name**, not a path, so a restored backup works on a fresh install.
 - **Place names are cleaned** before they are saved or compared: Unicode NFKC (full-width letters become plain), ends trimmed, runs of spaces collapsed. Comparison ignores case, so `Café` and `CAFÉ` match. A case-insensitive unique index in the database is the backstop.
-- **Coordinates** come from a gallery photo's location when the place is created for that meal. Places created any other way have none. Places saved by early builds may hold coordinates taken from the phone.
+- **Coordinates** come from a gallery photo's location when the place is created for that meal. Places created any other way have none.
 - **A place with no meals left is removed**, once any undo bar closes.
 - **Nothing derived is stored.** Visits, totals, last visit, and time of day are computed from meals.
 - **Schema.** Room exports each schema version to `app/schemas/`, kept in Git for migrations. The current version is 1.
@@ -447,7 +447,7 @@ A recap turns a period in Spending into one image. It leaves the phone only when
 - **Pending photos.** A new photo moves from `pending/` to `photos/` when its meal is saved. Discarding a new meal deletes it, as does a capture that lands after the screen closed, or a photo replaced while it was still being resized.
 - **The startup sweep** removes files in `photos/` and `thumbs/` that no meal uses. It leaves recent pending files alone, so a Meal screen restored after Android closed the app keeps its photo. Pending files older than seven days are removed.
 
-**The Meal screen's state.** One ViewModel holds the photo, its metadata, and the draft. The camera is a stage of the Meal screen, not a separate destination. The draft is Compose snapshot state, copied to saved state on each change; a flow-based draft lost keystrokes when typing fast. Save reads the latest draft once the photo is ready.
+**The Meal screen's state.** One ViewModel holds the photo, its metadata, and the draft. The camera is a stage of the Meal screen, not a separate destination. The draft is Compose snapshot state, copied to saved state on each change, so fast typing never drops a keystroke. Save reads the latest draft once the photo is ready.
 
 **Background work.** The app-wide scope logs a failure instead of crashing, and other work carries on.
 
@@ -464,7 +464,7 @@ A recap turns a period in Spending into one image. It leaves the phone only when
 
 **Import checks**, before anything changes:
 
-- The format version is read before the records, so a newer backup is called newer even if its records no longer read.
+- The format version is read before the records, so a newer backup is called newer even if its records can't be read.
 - Every meal has a photo or a name, a price from 0 to 999,999, and a time that reads.
 - Ids are unique, and every place a meal names is in the file.
 - Place names are present and unique, ignoring case.
@@ -487,7 +487,7 @@ A recap turns a period in Spending into one image. It leaves the phone only when
 
 ## Development
 
-**Toolchain**, as of Nov 3, 2026:
+**Toolchain**
 
 | Tool | Version |
 | --- | --- |

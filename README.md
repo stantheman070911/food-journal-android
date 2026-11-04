@@ -116,7 +116,7 @@ Kotlin, Jetpack Compose with Material 3, Navigation Compose, Room, DataStore, Ca
 
 ### Documentation
 
-- [Product document](PRODUCT.md): what the app does, how it looks, and how it is built, as of the current version.
+- [Product document](PRODUCT.md): what the app does, how it looks, and how it is built.
 
 ## License
 

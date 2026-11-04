@@ -116,7 +116,7 @@ Kotlin、Jetpack Compose（Material 3）、Navigation Compose、Room、DataStore
 
 ### 文件（英文）
 
-- [產品文件](PRODUCT.md)：App 目前版本的功能、外觀與建置方式。
+- [產品文件](PRODUCT.md)：App 的功能、外觀與建置方式。
 
 ## 授權
 
