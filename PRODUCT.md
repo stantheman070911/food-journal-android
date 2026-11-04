@@ -553,8 +553,6 @@ ANDROID_SERIAL=emulator-5560 ./gradlew :app:connectedDebugAndroidTest
 - HEIC date and location.
 - Photo orientation with auto-rotate off.
 - Anything on Android 16, on a device or an emulator.
-- Timing of the 15-second target on a release build on the phone.
-- End-to-end UI tests of the logging flow, tab navigation, and the Meal screen's hand-off to Search.
 
 **Known issues**
 
