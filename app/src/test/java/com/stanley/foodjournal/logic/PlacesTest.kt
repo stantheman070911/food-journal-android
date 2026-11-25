@@ -29,6 +29,20 @@ class PlacesTest {
     }
 
     @Test
+    fun `a place more than 150 m away is elsewhere`() {
+        assertTrue(isElsewhere(at400m, here))
+        assertFalse(isElsewhere(at140m, here))
+        assertFalse(isElsewhere(at80m, here))
+    }
+
+    @Test
+    fun `a place without coordinates, or no location, is never elsewhere`() {
+        assertFalse(isElsewhere(noLocation, here))
+        assertFalse(isElsewhere(at400m, null))
+        assertFalse(isElsewhere(null, here))
+    }
+
+    @Test
     fun `prefills nothing when two places are nearby`() {
         assertNull(prefillPlace(listOf(at80m, at140m, at400m), here))
     }

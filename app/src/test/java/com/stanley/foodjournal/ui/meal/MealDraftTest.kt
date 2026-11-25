@@ -118,6 +118,23 @@ class MealDraftTest {
     }
 
     @Test
+    fun `a place elsewhere turns the switch off until it is tapped`() {
+        val here = LocationFix(25.05, 121.53)
+        val camera = MealDraft(eatenAt = meal.eatenAt).withLocation(LocationSource.Camera, here)
+
+        assertFalse(camera.withSwitchDefault(placeElsewhere = true).saveLocation)
+        assertTrue(camera.withSwitchDefault(placeElsewhere = true).withSwitchDefault(placeElsewhere = false).saveLocation)
+        val tapped = camera.copy(saveLocation = true, saveLocationTouched = true)
+        assertTrue(tapped.withSwitchDefault(placeElsewhere = true).saveLocation)
+        // The phone's location while typing stays off either way.
+        val phone = MealDraft(eatenAt = meal.eatenAt).withLocation(LocationSource.Phone, here)
+        assertFalse(phone.withSwitchDefault(placeElsewhere = false).saveLocation)
+        // A saved meal's location goes the same way.
+        val saved = MealDraft.from(meal.copy(latitude = 25.05, longitude = 121.53))
+        assertFalse(saved.withSwitchDefault(placeElsewhere = true).saveLocation)
+    }
+
+    @Test
     fun `a location is saved only while the row shows`() {
         val draft = MealDraft(eatenAt = meal.eatenAt, photo = "a.jpg", priceText = "80")
             .withLocation(LocationSource.Gallery, LocationFix(25.05, 121.53))

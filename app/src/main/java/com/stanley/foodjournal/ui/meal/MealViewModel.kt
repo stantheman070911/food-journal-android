@@ -29,6 +29,7 @@ import com.stanley.foodjournal.logic.LocationSource
 import com.stanley.foodjournal.logic.MealSteps
 import com.stanley.foodjournal.logic.PlacePickerContent
 import com.stanley.foodjournal.logic.cleanPriceInput
+import com.stanley.foodjournal.logic.isElsewhere
 import com.stanley.foodjournal.logic.mealSteps
 import com.stanley.foodjournal.logic.normalizePlaceName
 import com.stanley.foodjournal.logic.placePickerContent
@@ -292,15 +293,36 @@ class MealViewModel(
         if (isNew && !closing) phoneLocation.start()
     }
 
-    /** A saved place picked in the picker, or null for "No place". */
-    fun onPlaceSelected(placeId: Long?) =
+    /**
+     * A saved place picked in the picker, or null for "No place". A place elsewhere turns the
+     * Save location switch off; see [followChosenPlace].
+     */
+    fun onPlaceSelected(placeId: Long?) {
         update { it.copy(placeId = placeId, newPlaceName = null, placeTouched = true) }
+        followChosenPlace()
+    }
 
     /** A new place typed in the picker. It is created when the meal is saved. */
     fun onNewPlace(typed: String) {
         val name = normalizePlaceName(typed)
         if (name.isEmpty()) return
         update { it.copy(placeId = null, newPlaceName = name, placeTouched = true) }
+        followChosenPlace()
+    }
+
+    /**
+     * A place chosen by hand more than [com.stanley.foodjournal.logic.NEARBY_METERS] from the
+     * meal's location, as when a takeaway is logged at home, is where the meal came from: the
+     * switch turns off, so the meal keeps the place's location rather than the phone's or the
+     * photo's. Another place, or none, puts the switch back as its source sets it. A tapped
+     * switch stays as set.
+     */
+    private fun followChosenPlace() {
+        val current = draft ?: return
+        if (!current.placeTouched) return
+        val place = current.placeId?.let { id -> places.firstOrNull { it.place.id == id }?.place }
+        val settled = current.withSwitchDefault(placeElsewhere = isElsewhere(place, current.location))
+        if (settled != current) replaceDraft(settled)
     }
 
     /** The picker's rows for what has been typed. Read it from composition. */
@@ -679,7 +701,9 @@ class MealViewModel(
      */
     private fun prefill() {
         val current = draft ?: return
-        if (!isNew || current.placeTouched) return
+        if (!isNew) return
+        // A location that arrives after a place was chosen by hand may show the place is elsewhere.
+        if (current.placeTouched) return followChosenPlace()
         val placeId = prefillPlace(places.map { it.place }, location(current))?.id
         if (placeId != current.placeId) update { it.copy(placeId = placeId) }
     }

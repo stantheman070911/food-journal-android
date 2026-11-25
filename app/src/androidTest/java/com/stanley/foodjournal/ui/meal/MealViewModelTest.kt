@@ -641,6 +641,89 @@ class MealViewModelTest {
     }
 
     @Test
+    fun aTakeawayLoggedAtHomeKeepsThePlaceChosenByHand() = runBlocking {
+        // The noodle shop's photo is taken at the cafe, 1.2 km away, as after carrying it home.
+        val noodles = db.placeDao().insert(Place(name = "Noodles", latitude = noodlesSpot.latitude, longitude = noodlesSpot.longitude))
+        insertMeal(noon, "Earlier", placeId = noodles)
+        phone.fix.value = cafeSpot
+        val vm = newMealChecked()
+        processing.finish(capture(vm), ok = true)
+        awaitTrue { main { vm.uiState!!.locationRow } != null }
+        assertTrue(main { vm.uiState!!.locationRow!!.isOn })
+        awaitTrue { main { vm.placePicker("").places.isNotEmpty() } }
+
+        main { vm.onPlaceSelected(noodles) }
+        assertFalse(main { vm.uiState!!.locationRow!!.isOn })
+        main {
+            vm.onPriceChange("120")
+            vm.save()
+        }
+
+        awaitTrue { mealCount() == 2 }
+        val saved = db.mealDao().observeAll().first().single { it.name == null }
+        assertEquals(noodles, saved.placeId)
+        assertNull(saved.latitude)
+        assertNull(saved.longitude)
+        assertEquals(noodlesSpot.latitude, db.placeDao().get(noodles)!!.latitude!!, 0.0)
+    }
+
+    @Test
+    fun aPlaceChosenBeforeTheFixArrivesStillTurnsTheSwitchOff() = runBlocking {
+        val noodles = db.placeDao().insert(Place(name = "Noodles", latitude = noodlesSpot.latitude, longitude = noodlesSpot.longitude))
+        val vm = newMealChecked()
+        processing.finish(capture(vm), ok = true)
+        awaitTrue { main { vm.placePicker("").places.isNotEmpty() } }
+        main { vm.onPlaceSelected(noodles) }
+
+        phone.fix.value = cafeSpot
+        awaitTrue { main { vm.uiState!!.locationRow } != null }
+        assertFalse(main { vm.uiState!!.locationRow!!.isOn })
+
+        // Tapped back on, it stays on, and a nearby place leaves it alone.
+        main { vm.onSaveLocationChange(true) }
+        assertTrue(main { vm.uiState!!.locationRow!!.isOn })
+        main { vm.onPlaceSelected(null) }
+        assertTrue(main { vm.uiState!!.locationRow!!.isOn })
+    }
+
+    @Test
+    fun aNearbyPlaceOrAnotherChoiceKeepsTheSwitchAsItsSourceSetsIt() = runBlocking {
+        val noodles = db.placeDao().insert(Place(name = "Noodles", latitude = noodlesSpot.latitude, longitude = noodlesSpot.longitude))
+        val cafe = db.placeDao().insert(Place(name = "Cafe", latitude = cafeSpot.latitude, longitude = cafeSpot.longitude))
+        phone.fix.value = LocationFix(25.0331, 121.5297, accuracyMeters = 12f)
+        val vm = newMealChecked()
+        processing.finish(capture(vm), ok = true)
+        awaitTrue { main { vm.uiState!!.locationRow } != null }
+        awaitTrue { main { vm.placePicker("").places.size == 2 } }
+
+        main { vm.onPlaceSelected(noodles) }
+        assertTrue(main { vm.uiState!!.locationRow!!.isOn })
+        main { vm.onPlaceSelected(cafe) }
+        assertFalse(main { vm.uiState!!.locationRow!!.isOn })
+        main { vm.onNewPlace("Night market") }
+        assertTrue(main { vm.uiState!!.locationRow!!.isOn })
+    }
+
+    @Test
+    fun aSavedMealGivenAPlaceElsewhereLosesItsOwnLocation() = runBlocking {
+        val noodles = db.placeDao().insert(Place(name = "Noodles", latitude = noodlesSpot.latitude, longitude = noodlesSpot.longitude))
+        insertMeal(noon, "Earlier", placeId = noodles)
+        val mealId = db.mealDao().insert(
+            Meal(eatenAt = noon, name = "Tea", price = 50, latitude = cafeSpot.latitude, longitude = cafeSpot.longitude),
+        )
+        val vm = savedMeal(mealId)
+        awaitTrue { main { vm.uiState?.locationRow } != null }
+        awaitTrue { main { vm.placePicker("").places.isNotEmpty() } }
+
+        main { vm.onPlaceSelected(noodles) }
+        assertFalse(main { vm.uiState!!.locationRow!!.isOn })
+        main { vm.save() }
+
+        awaitTrue { db.mealDao().get(mealId)!!.placeId == noodles }
+        assertNull(db.mealDao().get(mealId)!!.latitude)
+    }
+
+    @Test
     fun aNewPlaceIsCreatedAtTheSavedLocation() = runBlocking {
         phone.fix.value = noodlesSpot
         val vm = newMealChecked()

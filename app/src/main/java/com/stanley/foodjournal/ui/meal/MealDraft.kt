@@ -60,6 +60,18 @@ data class MealDraft(
         saveLocation = if (saveLocationTouched || source == null) saveLocation else savesLocationByDefault(source),
     )
 
+    /**
+     * The switch as it stands until it is tapped: as [locationSource] sets it, but off while
+     * [placeElsewhere], since a place chosen by hand far from the location is where the meal came
+     * from. A tapped switch stays as set.
+     */
+    fun withSwitchDefault(placeElsewhere: Boolean): MealDraft {
+        val source = locationSource
+        if (saveLocationTouched || source == null) return this
+        val on = savesLocationByDefault(source) && !placeElsewhere
+        return if (on == saveLocation) this else copy(saveLocation = on)
+    }
+
     /** Whether the Save location row shows; see [showsLocationRow]. */
     fun showsLocationRow(isNew: Boolean, locationAllowed: Boolean): Boolean =
         showsLocationRow(isNew, location, locationAllowed)

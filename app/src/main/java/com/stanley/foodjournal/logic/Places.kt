@@ -64,6 +64,16 @@ fun prefillPlace(places: List<Place>, fix: LocationFix?): Place? {
 }
 
 /**
+ * Whether [place], chosen by hand, is somewhere other than [location]: it has coordinates more
+ * than [NEARBY_METERS] away, as when a takeaway bought there is logged at home. The meal then
+ * keeps the place's location rather than the phone's or the photo's.
+ */
+fun isElsewhere(place: Place?, location: LocationFix?): Boolean {
+    if (place == null || location == null) return false
+    return distanceTo(place, location)?.let { it > NEARBY_METERS } == true
+}
+
+/**
  * Places in picker order. With a usable [fix], nearest first, then places saved without a
  * location. Without one, most recently visited first. Ties fall back to the name.
  */
