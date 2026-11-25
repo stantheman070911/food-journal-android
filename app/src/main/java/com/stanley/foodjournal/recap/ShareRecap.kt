@@ -13,7 +13,7 @@ import java.io.File
 fun Context.shareRecap(file: File) {
     val uri = FileProvider.getUriForFile(this, "$packageName.recaps", file)
     val send = Intent(Intent.ACTION_SEND)
-        .setType("image/png")
+        .setType(RECAP_MIME_TYPE)
         .putExtra(Intent.EXTRA_STREAM, uri)
         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     // The clip lets the share sheet show the image as its preview.

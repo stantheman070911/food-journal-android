@@ -12,7 +12,7 @@ The ideas behind it:
 - **Fast logging.** Add, shutter, price, Save: under 15 seconds.
 - **Little is required.** A meal needs a photo or a name, plus a price.
 - **Photos lead.** Numbers support them. The interface is monochrome, so the food photos are the only color.
-- **Numbers are shown, never judged.** No budgets, targets, streaks, badges, or warnings.
+- **Numbers are shown, never judged.** No budgets, targets, streaks, badges, or warnings. Two gentle exceptions, both switchable in Settings: a reminder when a usual meal goes unlogged, and one note after a meal past midnight.
 - **Data stays on the phone.** No account, no sign-in, no network.
 - **One currency.** New Taiwan dollars, stored as whole dollars and shown with no prefix: "280".
 - **English interface.**
@@ -34,6 +34,7 @@ Two records, Meal and Place. A meal belongs to at most one place.
 | note | Text | |
 | placeId | Long | Optional link to Place. Set to empty when the place is deleted. |
 | latitude, longitude | Double | Where the meal was eaten, when saved with it. Empty otherwise. |
+| isSnack | Boolean | A snack rather than a meal. Default false. |
 
 **Place**
 
@@ -49,10 +50,10 @@ Two records, Meal and Place. A meal belongs to at most one place.
 - **A meal's day** is the date of `eatenAt`, so a 01:00 snack counts toward that day. Weeks run Monday to Sunday.
 - **`photo` is a file name**, not a path, so a restored backup works on a fresh install.
 - **Place names are cleaned** before they are saved or compared: Unicode NFKC (full-width letters become plain), ends trimmed, runs of spaces collapsed. Comparison ignores case, so `Café` and `CAFÉ` match. A case-insensitive unique index in the database is the backstop.
-- **Coordinates.** A meal's are where it was eaten, kept only while its Save location switch is on (see Where it was eaten). A place takes the location of the meal it is created for, or of the first meal saved with one while the place has none, and keeps its coordinates after that. Without location permission, only a new gallery meal's photo location gives a new place coordinates.
+- **Coordinates.** A meal's are where it was eaten, kept only while its Save location switch is on (see Where it was eaten). A place chosen by hand more than 150 m away turns the switch off, so a takeaway logged at home sits at the place it came from. A place takes the location of the meal it is created for, or of the first meal saved with one while the place has none, and keeps its coordinates after that. Without location permission, only a new gallery meal's photo location gives a new place coordinates.
 - **A place with no meals left is removed**, once any undo bar closes.
 - **Nothing derived is stored.** Visits, totals, last visit, and time of day are computed from meals.
-- **Schema.** Room exports each schema version to `app/schemas/`, kept in Git for migrations. The current version is 2, which added the meal's coordinates. Room migrates version 1 on its own, since the new columns may be empty.
+- **Schema.** Room exports each schema version to `app/schemas/`, kept in Git for migrations. The current version is 3: version 2 added the meal's coordinates, and version 3 whether it is a snack. Room migrates both on its own, since the new columns may be empty or default to a meal.
 
 ## Navigation
 
@@ -90,6 +91,10 @@ Two records, Meal and Place. A meal belongs to at most one place.
   - **Segments.** A row of thin segments between the date and the photo shows the week's meals, oldest on the left, with this meal's in ink and the others grey.
   - **Motion.** Each step crossfades in 150 ms, without the usual rise. Back returns to where the first meal was opened.
 - **Price.** Typed in the serif display style.
+- **Meal or Snack.** A Meal | Snack segmented pill, as Spending's, sits under the price, one tap either way.
+  - A new meal starts as a snack from 14:00 to 16:59, the afternoon block, and as a meal at any other time. Until it is tapped, it follows the time, including a gallery photo's date or a changed time.
+  - Picking a name suggestion gives the meal the kind that name's last meal had, unless the pill was tapped first.
+  - Once tapped, or for a saved meal, it stays as set whatever the time.
 - **Card.** Name, Place, Save location when there is a location, Time, and Note sit on one grey card, divided by hairlines.
 - **Time.** Written with the date and weekday, as Search writes them: "Tue, Nov 3 · 18:03", or "Mon, Oct 27, 2025 · 19:05" outside the current year.
 - **A saved meal's date.** A saved meal has no Time row. Its date heads the screen instead, between the top bar and the photo, in grey sans from the photo's left edge. Tapping it opens the date and time dialogs, and its action reads "Change time".
@@ -128,8 +133,9 @@ Two records, Meal and Place. A meal belongs to at most one place.
   - The switch starts on for a camera photo or a gallery photo's location. It starts off for the phone's location while typing, since the meal may be logged later, somewhere else. Once tapped, it stays as set.
   - On, the meal keeps the location, and places use it: the new meal's place is filled in, the picker lists places nearest first, and a new place, or one without coordinates, takes it. A place with coordinates keeps its own.
   - Off, the location is dropped, along with any place it filled in.
+  - **A place chosen by hand elsewhere.** Choosing a saved place whose coordinates are more than 150 m from the location turns the switch off, as for a takeaway bought there and logged at home. The meal then sits at the place, on the Map and in district searches, and the place keeps its own coordinates. This also applies when the location arrives after the place was chosen. Choosing a place within 150 m, a new place, or no place puts the switch back as its source sets it. A place without coordinates can't be told apart, so it leaves the switch alone. Once tapped, the switch stays as set.
   - The whole row takes the tap. The switch is ink when on and outlined in ink when off.
-- **Saved meals.** The row reads "Location", with the switch on. Turning it off removes the location once the meal is saved. A saved meal never gains a location, since the phone is no longer where it was eaten.
+- **Saved meals.** The row reads "Location", with the switch on. Turning it off removes the location once the meal is saved, as does choosing a place elsewhere, which is how an earlier takeaway is put right. A saved meal never gains a location, since the phone is no longer where it was eaten.
 - **Permission.** Fine and coarse location are asked for together, once, on the first Add, with the camera. It counts as asked only once the request goes to Android, so an Add closed before then asks on the next one.
   - Refused, the row never shows. A gallery photo's location still fills in the place and gives coordinates to a new one, as it does without the row.
   - With approximate location only, the phone's location isn't used, since it can be kilometres off. A gallery photo's location still is.
@@ -193,7 +199,7 @@ A place removed before Save, such as an empty place whose undo bar closed, is le
 - **Tiles.**
   - Portrait, 88 × 117 dp (3:4), from the 400 px thumbnails. About four and a half fit across.
   - Tiles sit 2 dp apart, and only the strip's two ends are rounded, so a week reads as one band.
-  - Each tile names its weekday in the lower left: white with a soft shadow over a photo, grey on a plain tile. A day with several meals has a tile for each.
+  - Each tile names its weekday in the lower left, "Tue", or "Tue · Snack" for a snack: white with a soft shadow over a photo, grey on a plain tile. A day with several meals has a tile for each.
   - No prices on tiles. Totals are visible but never the focus.
 - **Meals without a photo** are plain grey tiles with the name, up to four lines.
   - A word too wide for the tile first shrinks by up to a fifth.
@@ -227,11 +233,12 @@ The Spending tab answers how much, where, and when, for a week, a month, or a ye
 2. The period name in the serif headline, with a Share pill beside it (see Share Recap).
 3. The total, in the serif display.
 4. **The change line.** The change from the previous period as a whole percent with a true minus: "−12% vs Oct", "+4% vs last week", "0% vs 2025". It is grey, never red or green.
-5. **Averages.** "312 a day · 156 a meal", in grey sans.
-6. Four sections under small grey labels, on the plain background:
+5. **Averages.** "312 a day · 156 a meal", in grey sans. The average a meal leaves snacks out; a period of only snacks shows the day's average alone.
+6. Sections under small grey labels, on the plain background:
    - **Over time.** One bar per day for a week or month, and one per month for a year.
    - **By place.** The top five places by spend. Each has its total, its visits ("4 visits"), and a share bar. The rest, and meals without a place, sum to "Other", with its meals ("6 meals").
-   - **By time of day.** Morning, Midday, Evening, and Late, each with its total and a share bar. All four always show.
+   - **Meals and snacks.** "18 meals" and "6 snacks", each with its total and a share bar. It shows only when the period has a snack.
+   - **By time of day.** Breakfast, Lunch, Afternoon, Dinner, and Late, each with its total and a share bar. All five always show.
    - **Priciest.** The three most expensive meals, as tiles.
 
 **Rules**
@@ -247,7 +254,7 @@ The Spending tab answers how much, where, and when, for a week, a month, or a ye
 - **Rounding.**
   - The percent rounds halves away from zero. Anything that rounds to zero shows "0%" with no sign. A change too large for an Int is held at the largest one.
   - The daily average is the total divided by the days elapsed. The per-meal average divides by every meal, including meals at 0, which lower it. Both round to whole dollars, halves up.
-- **Time-of-day bands.** Morning 05:00–10:59, midday 11:00–15:59, evening 16:00–21:59, late 22:00–04:59.
+- **Time-of-day bands.** Breakfast 05:00–10:59, lunch 11:00–13:59, afternoon 14:00–16:59, dinner 17:00–19:59, and late 20:00–04:59, past midnight. The Meal screen's snack default uses the same afternoon.
 - **Visits** are the place's meals in the period. Counts are grouped: "1,043 meals".
 - **Share bars** are measured against the period total, so all are on one scale. They are empty when the total is 0. There is no percent text.
 - **Ties** in top places and priciest meals go to the most recent.
@@ -299,9 +306,31 @@ The Map tab shows where meals were eaten: Taiwan with its county and district (�
 - **Layout.** The lines at the bottom leave room for the Add button.
 - **Empty state.** "No meals with a location yet". The Add button is already on the tab, so there is no button. If the bundled boundary file can't be read, the tab says "The map couldn't be read" instead.
 
+## Reminders
+
+Two nudges, each with a switch in Settings (see Settings and backup).
+
+**Meal reminders**
+
+- **Off until turned on.** Turning the switch on asks for Android's notification permission. Refused, the switch stays off and its line reads "Notifications are off · Open settings", which opens the app's notification settings. The same line shows if notifications are turned off later in Android.
+- **Usual times.** The day has five blocks, as Spending's time of day: Breakfast 05:00–10:59, Lunch 11:00–13:59, Afternoon 14:00–16:59, Dinner 17:00–19:59, and Late 20:00–04:59. A late block's small hours belong to the evening before.
+  - A block has a usual time when something was logged in it on at least half of the last 28 days, or of the days since the first entry when that is sooner. Today never counts.
+  - The usual time is the median of each day's first entry in the block, to the minute, running across midnight for the late block.
+  - Nothing is usual until there are 7 days of history.
+  - Settings lists them under the switch: "Lunch 12:30 · Dinner 19:10", or "Once a meal has a usual time".
+- **When it comes.** An hour after a block's usual time, if nothing has been logged in that block that day. Meals and snacks both count, and so does an entry added later from the gallery.
+- **What it says.** "Did you forget to log your meal?", with "Lunch, usually around 12:30" below. A tap opens a new meal at the camera. It goes away on its own once that block is logged.
+- **Timing.** One inexact alarm is kept for the next reminder, so it may come a few minutes late, and no exact-alarm permission is needed. It is set again whenever the meals, the switch, or the permission change, and after a restart, an update of the app, or a change of clock or time zone. A reminder that fires over two hours late, as after the phone slept through it, is dropped.
+
+**The late-night note**
+
+- **When.** Right after a new meal is saved that was eaten between 00:00 and 04:59, and logged as it happened, within an hour. An entry added later from the gallery, or an edit, never shows it.
+- **What.** A grey bar on the tabs, as the undo bar is, reading "Let's not eat so late, shall we?" for 4 seconds, with no action. It can be swiped away.
+- **On by default.** Its switch in Settings turns it off.
+
 ## Search
 
-- **Layout.** The search field is a grey pill, with the place or district chip inside it before the text. Below it sit two pill filters, "Dates" and "★ Favorites". Then the total, "42 meals · 12,340", in sans. Then the results, newest first.
+- **Layout.** The search field is a grey pill, with the place or district chip inside it before the text. Below it sit three pill filters, "Dates", "★ Favorites", and "Snacks", which scroll sideways when a date range leaves no room. Then the total, "42 meals · 12,340", in sans. Then the results, newest first.
 - **Before typing,** Search lists every meal, newest first, with the total.
 - **Matching.**
   - Ignores case and full-width letters, cleaned as place names are.
@@ -309,17 +338,17 @@ The Map tab shows where meals were eaten: Taiwan with its county and district (�
   - Chinese matches by substring.
   - Filtering runs in memory, over every meal.
 - **Dates.** "Dates" opens Material's date-range dialog, which can't pick future days. Once set, the pill reads "Oct 1 – Nov 4", written as the Journal writes weeks, with an × that clears it. Both days count in full. The two days are saved as one value, so they always change together.
-- **Favorites** reads as a switch, on or off.
+- **Favorites** and **Snacks** read as switches, on or off. Snacks keeps only the snacks, and the total reads "4 snacks · 340".
 - **The place chip.**
   - With a chip, the text searches within that place. Its × clears it.
   - A chip whose place is merged away or deleted disappears and filters nothing out. It comes back if the change is undone.
-- **The district chip,** "臺北市 大安區", opened from the Map tab, holds the meals eaten in that district: by the meal's own location, or else its place's coordinates. Text, dates, and Favorites filter within it, and its × clears it. A search holds a place chip or a district chip, not both. A chip whose district is no longer in the bundled data disappears and filters nothing out.
+- **The district chip,** "臺北市 大安區", opened from the Map tab, holds the meals eaten in that district: by the meal's own location, or else its place's coordinates. Text, dates, Favorites, and Snacks filter within it, and its × clears it. A search holds a place chip or a district chip, not both. A chip whose district is no longer in the bundled data disappears and filters nothing out.
 - **Opening Search from elsewhere.** "Meals here", Spending's place rows and bars, and the Map tab's pins and districts open the Search tab with a fresh search: only that place or district, or Spending's dates, or a place with dates.
   - The new search replaces the one showing, and survives tab switches.
   - Back returns to Journal and drops it, as Back drops any tab's state.
 - **Result rows.**
   - A 3:4 thumbnail, or a grey tile without a photo.
-  - The name, with "Tue, Nov 3 · 林家乾麵" in grey below. The year shows only outside the current year.
+  - The name, with "Tue, Nov 3 · 林家乾麵" in grey below, or "Tue, Nov 3 · Snack · 林家乾麵" for a snack. The year shows only outside the current year.
   - The price on the right in tabular sans, and a small star for favorites.
   - A meal without a name shows its date and place as its only line.
   - A tap opens the meal. Place names in rows can't be tapped.
@@ -347,21 +376,27 @@ A recap turns a period in Spending into one image. It leaves the phone only when
 - **The band** follows the app's theme, white in light and black in dark, in the app's greys.
   - The period is set in Fraunces' display cut, as the app writes it, and shrinks if it would run into the year at its right. The year reads "2025 – 26" for a week across New Year, and is left out for a Year recap.
   - "Food Journal" sits below the year.
-- **Figures.** "24 meals · 12 places · 3,450". Places counts places with at least one meal, and is left out when there are none.
+- **Figures.** "24 meals · 12 places · 3,450", or "18 meals · 6 snacks · 12 places · 3,450" once there are snacks. The Meals switch covers both counts. Places counts places with at least one meal, and is left out when there are none.
   - Below, in grey, the comparison is stated plainly: "120 less than last week", "120 more than Oct", "The same as 2025". It shows only when Spending would show its change line.
   - Figures switched off drop out of their line. If all three are off, the comparison moves up into its place. The period and year always show.
-- **The image.** A lossless PNG, 3240 × 5760, three times Instagram Stories' size. Each photo is decoded at the pixels its tile covers, from the 400 px thumbnail when the tile is no larger.
+- **The image.** A JPEG at quality 85, 2160 × 3840, twice Instagram Stories' size, small enough for messaging apps: about 0.5 MB for a week and 0.8 MB for a month or a year of photos, measured on the emulator. Each photo is decoded at the pixels its tile covers, from the 400 px thumbnail when the tile is no larger.
 - **Sharing.** The image goes through AndroidX's `FileProvider`, over the cache's `recaps/` folder only. Each recap replaces the last.
 
 ## Settings and backup
 
-**The Settings screen.** The Journal's settings icon opens a full screen with "← Settings", the title in the serif headline. Three sections follow under grey labels, Appearance, Backup, and About. Rows sit on rounded grey cards, with a semibold title and a grey line below. A row that opens a page ends in a chevron.
+**The Settings screen.** The Journal's settings icon opens a full screen with "← Settings", the title in the serif headline. Four sections follow under grey labels, Appearance, Reminders, Backup, and About. Rows sit on rounded grey cards, with a semibold title and a grey line below. A row that opens a page ends in a chevron.
 
 **Appearance**
 
 - A System, Light, and Dark switch, using the segmented pill Spending uses. System is the default.
 - The choice goes to Android's per-app night mode, `UiModeManager.setApplicationNightMode`, which applies before the app draws, so launch never flashes the wrong theme.
 - Android can't report it back, so DataStore keeps the choice for the switch. The app sets it again at launch in case the two drift apart.
+
+**Reminders**
+
+- **Meal reminders**, a switch, with the usual times below it (see Reminders).
+- **Late-night note**, a switch, with "After a meal logged past midnight" below it.
+- Switches are ink when on and outlined in ink when off, as on the Meal screen, and the whole row takes the tap.
 
 **Backup rows**
 
@@ -460,7 +495,8 @@ A recap turns a period in Spending into one image. It leaves the phone only when
 | Lists | LazyColumn, LazyRow, HorizontalPager | About a thousand meals a year needs no paging |
 | Charts | Compose Canvas | |
 | Map | Compose Canvas | Boundaries from a bundled file; no map library, tiles, or network |
-| Settings | DataStore (Preferences) | Theme, last backup day, recap figures, whether location was asked |
+| Settings | DataStore (Preferences) | Theme, last backup day, recap figures, whether location was asked, the two reminder switches |
+| Reminders | Framework `AlarmManager` and `NotificationManager` | One inexact alarm; no WorkManager |
 | Camera | CameraX | In-app capture |
 | Gallery | Android Photo Picker | No storage permission |
 | Location | Framework `LocationManager` | The fused provider, with no library |
@@ -495,8 +531,8 @@ A recap turns a period in Spending into one image. It leaves the phone only when
 **Code layout**, under `app/src/main/java/com/stanley/foodjournal/`:
 
 - `data/`: Room entities and DAOs.
-- `logic/`: pure rules with JVM tests: `Spending.kt`, `Search.kt`, `Recap.kt`, `Weeks.kt`, `Places.kt`, `PlaceNames.kt`, `PlacePicker.kt`, `Districts.kt`, `MealMap.kt`, `MealForm.kt`, `TileNames.kt`, `PhotoSizing.kt`, and `Backup.kt`.
-- `photos/`, `backup/`, `recap/`, `edits/`, `settings/`, `location/`: photo files, backup and restore, recap drawing and sharing, undo, DataStore, and the phone's location.
+- `logic/`: pure rules with JVM tests: `Spending.kt`, `Search.kt`, `Recap.kt`, `Weeks.kt`, `Places.kt`, `PlaceNames.kt`, `PlacePicker.kt`, `Districts.kt`, `MealMap.kt`, `Reminders.kt`, `MealForm.kt`, `TileNames.kt`, `PhotoSizing.kt`, and `Backup.kt`.
+- `photos/`, `backup/`, `recap/`, `edits/`, `settings/`, `location/`, `reminders/`: photo files, backup and restore, recap drawing and sharing, undo, DataStore, the phone's location, and meal reminders.
 - `ui/`: one folder per screen, plus `components/`, `theme/`, `icons/`, `navigation/`, and `preview/`.
 
 **Photos**
@@ -528,7 +564,7 @@ A recap turns a period in Spending into one image. It leaves the phone only when
 
 **Backup file.** One ZIP:
 
-- `backup.json`: a format version (currently 2), the time of the export, the places, and the meals, with their ids and locations. Version 2 added the meals' locations; a version 1 backup restores without them.
+- `backup.json`: a format version (currently 3), the time of the export, the places, and the meals, with their ids, locations, and whether each is a snack. Version 2 added the meals' locations, and version 3 snacks; an older backup restores without them, every entry a meal.
 - `photos/`: the stored 1600 px photos, uncompressed, since JPEGs don't shrink further. Camera originals are never kept, and thumbnails are left out.
 
 **Import checks**, before anything changes:
@@ -550,7 +586,7 @@ A recap turns a period in Spending into one image. It leaves the phone only when
 
 **Privacy and permissions**
 
-- The only permissions are the camera and location, fine and coarse. The manifest strips INTERNET in case a library adds it; Gradle prints an expected merge warning. AndroidX's internal `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` is the only merged permission, and it is private to the app.
+- The permissions are the camera; location, fine and coarse; notifications, asked only when Meal reminders is turned on; and starting at boot, which Android grants without asking, so the reminder alarm is set again after a restart. The manifest strips INTERNET in case a library adds it; Gradle prints an expected merge warning. AndroidX's internal `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` is the only merged permission, and it is private to the app.
 - `allowBackup` is false, and data extraction rules exclude everything from both cloud backup and device-to-device transfer. The exported ZIP is the only backup, so the database and photos never return out of step.
 - Stored photos carry no metadata. A meal's location is kept in the database only. A recap leaves the phone only through the share sheet.
 
@@ -612,6 +648,7 @@ ANDROID_SERIAL=emulator-5560 ./gradlew :app:connectedDebugAndroidTest
   - the recap sheet
   - the Meal screen's date line, camera icon, and stepping gestures
   - the chart's bars
+  - meal reminders: shown while their block is empty, and taken down once it is logged
   - closing and stepping through a meal in the whole app, adding and removing their own test meals
 - **Fakes.** The Meal and Spending ViewModels take photo processing, the phone's location, and recap drawing through small interfaces, `PhotoProcessing`, `PhoneLocation`, and `RecapDrawing`, so tests drive them with fakes.
 - **Test-only code.** Test libraries never ship. Only an empty activity for hosting UI tests is in debug builds.
@@ -628,6 +665,7 @@ ANDROID_SERIAL=emulator-5560 ./gradlew :app:connectedDebugAndroidTest
 - `tools/build-districts.sh` on the ministry's shapefile. The bundled districts come from taiwan-atlas's 2021 copy until the ministry's download is back.
 - Photo orientation with auto-rotate off.
 - Anything on Android 16, on a device or an emulator.
+- A reminder's alarm firing on its own, on a phone over days, and how late Doze makes it. The tests call the alarm's work directly.
 
 **Known issues**
 

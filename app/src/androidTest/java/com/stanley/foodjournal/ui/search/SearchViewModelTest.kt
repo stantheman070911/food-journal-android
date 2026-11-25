@@ -156,6 +156,20 @@ class SearchViewModelTest {
     }
 
     @Test
+    fun snacksOnlyAndTheirRowsSaySnack() = runBlocking {
+        db.mealDao().insert(meal(LocalDateTime.of(2026, 11, 2, 12, 0), "Soup", 180))
+        db.mealDao().insert(meal(LocalDateTime.of(2026, 11, 3, 15, 0), "Cake", 90).copy(isSnack = true))
+        val vm = viewModel()
+        vm.state { it.count == 2 }
+
+        withContext(Dispatchers.Main) { vm.toggleSnacks() }
+
+        val state = vm.state { it.snacksOnly }
+        assertEquals(listOf("Cake"), state.results.map { it.name })
+        assertEquals("Tue, Nov 3 · Snack", state.results.single().detail)
+    }
+
+    @Test
     fun aPlaceThatIsGoneLeavesNoChipAndFiltersNothing() = runBlocking {
         db.mealDao().insert(meal(LocalDateTime.of(2026, 11, 2, 12, 0), "Soup", 180))
 

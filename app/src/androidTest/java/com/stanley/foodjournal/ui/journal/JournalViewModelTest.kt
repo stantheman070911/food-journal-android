@@ -66,12 +66,19 @@ class JournalViewModelTest {
         assertEquals(listOf(withPhoto, withoutPhoto), tiles.map { it.mealId })
         assertEquals(photos.thumbFile("a.jpg"), tiles[0].thumb)
         assertEquals(photos.photoFile("a.jpg"), tiles[0].photo)
-        assertEquals("Mon", tiles[0].weekday)
+        assertEquals("Mon", tiles[0].label)
         assertNull(tiles[1].thumb)
         assertNull(tiles[1].photo)
         assertEquals("Late-night snack", tiles[1].name)
         // A 01:10 snack counts toward the day it was eaten.
-        assertEquals("Tue", tiles[1].weekday)
+        assertEquals("Tue", tiles[1].label)
+    }
+
+    @Test
+    fun aSnacksTileSaysSo() = runBlocking {
+        db.mealDao().insert(meal(LocalDateTime.of(2026, 11, 4, 15, 30), name = "Cake").copy(isSnack = true))
+
+        assertEquals("Wed · Snack", weeks().single().tiles.single().label)
     }
 
     @Test

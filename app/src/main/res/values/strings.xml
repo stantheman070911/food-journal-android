@@ -26,6 +26,8 @@
     <string name="meal_next">Next meal</string>
     <string name="meal_photo_failed">That photo couldn’t be read. Try another.</string>
     <string name="meal_price">Price</string>
+    <string name="meal_kind_meal">Meal</string>
+    <string name="meal_kind_snack">Snack</string>
     <string name="meal_name">Name</string>
     <string name="meal_time">Time</string>
     <string name="meal_change_time">Change time</string>
@@ -99,6 +101,8 @@
     <string name="spending_vs_previous_week">%1$s vs previous week</string>
     <string name="spending_vs">%1$s vs %2$s</string>
     <string name="spending_averages">%1$s a day  ·  %2$s a meal</string>
+    <string name="spending_average_day">%1$s a day</string>
+    <string name="spending_meals_and_snacks">Meals and snacks</string>
     <string name="spending_over_time">Over time</string>
     <string name="spending_by_place">By place</string>
     <string name="spending_by_time">By time of day</string>
@@ -114,9 +118,10 @@
     <string name="recap_change">Change</string>
     <string name="spending_show_amount">Show amount</string>
     <string name="spending_show_meals">Show meals</string>
-    <string name="spending_morning">Morning</string>
-    <string name="spending_midday">Midday</string>
-    <string name="spending_evening">Evening</string>
+    <string name="spending_breakfast">Breakfast</string>
+    <string name="spending_lunch">Lunch</string>
+    <string name="spending_afternoon">Afternoon</string>
+    <string name="spending_dinner">Dinner</string>
     <string name="spending_late">Late</string>
     <plurals name="spending_visits">
         <item quantity="one">%1$s visit</item>
@@ -126,10 +131,15 @@
         <item quantity="one">%1$s meal</item>
         <item quantity="other">%1$s meals</item>
     </plurals>
+    <plurals name="snack_count">
+        <item quantity="one">%1$s snack</item>
+        <item quantity="other">%1$s snacks</item>
+    </plurals>
 
     <string name="search_hint">Search</string>
     <string name="search_dates">Dates</string>
     <string name="search_favorites">Favorites</string>
+    <string name="search_snacks">Snacks</string>
     <string name="search_total">%1$s  ·  %2$s</string>
     <string name="search_no_results">No meals found</string>
     <string name="search_clear_text">Clear search</string>
@@ -150,4 +160,15 @@
         <item quantity="other">%1$s meals outside Taiwan</item>
     </plurals>
     <string name="log_first_meal">Log your first meal</string>
+    <string name="reminders_channel">Meal reminders</string>
+    <string name="reminder_title">Did you forget to log your meal?</string>
+    <string name="reminder_text">%1$s, usually around %2$s</string>
+    <string name="late_night_note">Let\'s not eat so late, shall we?</string>
+    <string name="settings_reminders">Reminders</string>
+    <string name="reminders_meals">Meal reminders</string>
+    <string name="reminders_meals_off">When a usual meal isn\'t logged</string>
+    <string name="reminders_meals_none">Once a meal has a usual time</string>
+    <string name="reminders_blocked">Notifications are off · Open settings</string>
+    <string name="reminders_late_night">Late-night note</string>
+    <string name="reminders_late_night_detail">After a meal logged past midnight</string>
 </resources>

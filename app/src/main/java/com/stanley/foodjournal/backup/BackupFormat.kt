@@ -16,9 +16,10 @@ import java.util.Locale
 
 /**
  * The version of the backup file this app writes. A newer one is refused, an older one read.
- * Version 2 adds where each meal was eaten; a version 1 backup restores without it.
+ * Version 2 adds where each meal was eaten, and version 3 whether it was a snack. An older backup
+ * restores without them, as meals.
  */
-const val BACKUP_FORMAT = 2
+const val BACKUP_FORMAT = 3
 
 /** The records, at the top of the ZIP. */
 const val BACKUP_JSON = "backup.json"
@@ -58,6 +59,7 @@ data class BackupMeal(
     val placeId: Long? = null,
     val latitude: Double? = null,
     val longitude: Double? = null,
+    val isSnack: Boolean = false,
 )
 
 /** Readable, and tolerant of fields a later version of the same format may add. */
@@ -76,7 +78,7 @@ fun backupOf(meals: List<Meal>, places: List<Place>, exportedAt: LocalDateTime) 
     meals = meals.map {
         BackupMeal(
             it.id, times.fromLocalDateTime(it.eatenAt), it.photo, it.name, it.price, it.isFavorite, it.note, it.placeId,
-            it.latitude, it.longitude,
+            it.latitude, it.longitude, it.isSnack,
         )
     },
 )
@@ -86,7 +88,7 @@ fun BackupFile.restoredPlaces(): List<Place> = places.map { Place(it.id, it.name
 
 /** The meals to put back, once [checkBackup] has passed. */
 fun BackupFile.restoredMeals(): List<Meal> = meals.map {
-    Meal(it.id, times.toLocalDateTime(it.eatenAt), it.photo, it.name, it.price, it.isFavorite, it.note, it.placeId, it.latitude, it.longitude)
+    Meal(it.id, times.toLocalDateTime(it.eatenAt), it.photo, it.name, it.price, it.isFavorite, it.note, it.placeId, it.latitude, it.longitude, it.isSnack)
 }
 
 /** When the backup was made, or null if that can't be read. */

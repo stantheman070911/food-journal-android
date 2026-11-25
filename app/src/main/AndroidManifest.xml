@@ -24,6 +24,13 @@
         android:name="android.hardware.location.gps"
         android:required="false" />
 
+    <!--
+        Meal reminders, when turned on in Settings, which asks for this then. The alarm is
+        inexact, so it needs no exact-alarm permission. After a restart it is set again.
+    -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <application
         android:name=".FoodJournalApplication"
         android:allowBackup="false"
@@ -42,6 +49,22 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <receiver
+            android:name=".reminders.ReminderReceiver"
+            android:exported="false" />
+
+        <!-- Sets the reminder alarm again after a restart, an update, or a change of clock. -->
+        <receiver
+            android:name=".reminders.RescheduleReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
 
         <!-- Hands a recap image to the app it is shared with, for that share only. -->
         <provider

@@ -49,7 +49,7 @@ class RecapImagesTest {
     }
 
     @Test
-    fun aWeekDrawsAsAFullSizePng() = runBlocking {
+    fun aWeekDrawsAsAFullSizeJpeg() = runBlocking {
         val meals = (0 until 7).map { i ->
             // Two meals have no photo and show their name, as in the Journal.
             val photo = if (i == 2 || i == 5) null else photo(i)
@@ -69,8 +69,8 @@ class RecapImagesTest {
 
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.path, bounds)
-        assertEquals("image/png", bounds.outMimeType)
-        assertEquals(3240 to 5760, bounds.outWidth to bounds.outHeight)
+        assertEquals("image/jpeg", bounds.outMimeType)
+        assertEquals(2160 to 3840, bounds.outWidth to bounds.outHeight)
     }
 
     @Test
@@ -85,7 +85,7 @@ class RecapImagesTest {
 
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.path, bounds)
-        assertEquals(3240 to 5760, bounds.outWidth to bounds.outHeight)
+        assertEquals(2160 to 3840, bounds.outWidth to bounds.outHeight)
     }
 
     @Test
@@ -103,15 +103,18 @@ class RecapImagesTest {
         assertEquals(false to false, inkOnLines(null, null))
     }
 
-    /** Whether any pixel of a light recap's band, across [lines], isn't the white background. */
+    /**
+     * Whether any pixel of a light recap's band, across [lines], is darker than the white
+     * background, past the faint noise JPEG leaves around text.
+     */
     private fun hasInk(file: File, lines: IntRange): Boolean {
         val decoder = BitmapRegionDecoder.newInstance(file.path)
-        val region = decoder.decodeRegion(Rect(0, lines.first * 3, 3240, lines.last * 3), null)
+        val region = decoder.decodeRegion(Rect(0, lines.first * 2, 2160, lines.last * 2), null)
         decoder.recycle()
         val pixels = IntArray(region.width * region.height)
         region.getPixels(pixels, 0, region.width, 0, 0, region.width, region.height)
         region.recycle()
-        return pixels.any { it != Color.WHITE }
+        return pixels.any { Color.red(it) < 200 || Color.green(it) < 200 || Color.blue(it) < 200 }
     }
 
     /**

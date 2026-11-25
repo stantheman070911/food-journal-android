@@ -53,16 +53,47 @@ class SpendingTest {
     }
 
     @Test
-    fun `time bands split the day, with late running past midnight`() {
+    fun `five time bands split the day, with late running past midnight`() {
         assertEquals(TimeBand.Late, timeBand(LocalTime.of(4, 59)))
-        assertEquals(TimeBand.Morning, timeBand(LocalTime.of(5, 0)))
-        assertEquals(TimeBand.Morning, timeBand(LocalTime.of(10, 59)))
-        assertEquals(TimeBand.Midday, timeBand(LocalTime.of(11, 0)))
-        assertEquals(TimeBand.Midday, timeBand(LocalTime.of(15, 59)))
-        assertEquals(TimeBand.Evening, timeBand(LocalTime.of(16, 0)))
-        assertEquals(TimeBand.Evening, timeBand(LocalTime.of(21, 59)))
-        assertEquals(TimeBand.Late, timeBand(LocalTime.of(22, 0)))
+        assertEquals(TimeBand.Breakfast, timeBand(LocalTime.of(5, 0)))
+        assertEquals(TimeBand.Breakfast, timeBand(LocalTime.of(10, 59)))
+        assertEquals(TimeBand.Lunch, timeBand(LocalTime.of(11, 0)))
+        assertEquals(TimeBand.Lunch, timeBand(LocalTime.of(13, 59)))
+        assertEquals(TimeBand.Afternoon, timeBand(LocalTime.of(14, 0)))
+        assertEquals(TimeBand.Afternoon, timeBand(LocalTime.of(16, 59)))
+        assertEquals(TimeBand.Dinner, timeBand(LocalTime.of(17, 0)))
+        assertEquals(TimeBand.Dinner, timeBand(LocalTime.of(19, 59)))
+        assertEquals(TimeBand.Late, timeBand(LocalTime.of(20, 0)))
         assertEquals(TimeBand.Late, timeBand(LocalTime.of(0, 30)))
+    }
+
+    @Test
+    fun `only the afternoon starts as a snack`() {
+        assertTrue(startsAsSnack(LocalTime.of(14, 0)))
+        assertTrue(startsAsSnack(LocalTime.of(16, 59)))
+        assertFalse(startsAsSnack(LocalTime.of(13, 59)))
+        assertFalse(startsAsSnack(LocalTime.of(17, 0)))
+        assertFalse(startsAsSnack(LocalTime.of(23, 0)))
+    }
+
+    @Test
+    fun `snacks are counted apart and left out of the average a meal`() {
+        val spending = spend(
+            november,
+            listOf(meal(1, day(11, 1), 300), meal(2, day(11, 2, 15), 60, snack = true), meal(3, day(11, 3), 500), meal(4, day(11, 3, 15), 40, snack = true)),
+        )
+
+        assertEquals(900, spending.total)
+        assertEquals(400, spending.perMeal)
+        assertEquals(MealsAndSnacks(KindSpend(2, 800), KindSpend(2, 100)), spending.mealsAndSnacks)
+    }
+
+    @Test
+    fun `a period without snacks has no split, and one with only snacks no average a meal`() {
+        assertNull(spend(november, listOf(meal(1, day(11, 1), 300))).mealsAndSnacks)
+        val snacks = spend(november, listOf(meal(1, day(11, 1, 15), 60, snack = true)))
+        assertNull(snacks.perMeal)
+        assertEquals(MealsAndSnacks(KindSpend(0, 0), KindSpend(1, 60)), snacks.mealsAndSnacks)
     }
 
     @Test
@@ -315,7 +346,7 @@ class SpendingTest {
         val spending = spend(november, listOf(meal(1, day(11, 2, 1), 90), meal(2, day(11, 2, 12), 160)))
 
         assertEquals(
-            listOf(TimeBand.Morning to 0, TimeBand.Midday to 160, TimeBand.Evening to 0, TimeBand.Late to 90),
+            listOf(TimeBand.Breakfast to 0, TimeBand.Lunch to 160, TimeBand.Afternoon to 0, TimeBand.Dinner to 0, TimeBand.Late to 90),
             spending.bands,
         )
     }
@@ -379,6 +410,6 @@ class SpendingTest {
 
     private fun day(month: Int, day: Int, hour: Int = 12) = LocalDateTime.of(2026, month, day, hour, 0)
 
-    private fun meal(id: Long, eatenAt: LocalDateTime, price: Int = 100, place: Long? = null) =
-        Meal(id = id, eatenAt = eatenAt, name = "Meal $id", price = price, placeId = place)
+    private fun meal(id: Long, eatenAt: LocalDateTime, price: Int = 100, place: Long? = null, snack: Boolean = false) =
+        Meal(id = id, eatenAt = eatenAt, name = "Meal $id", price = price, placeId = place, isSnack = snack)
 }

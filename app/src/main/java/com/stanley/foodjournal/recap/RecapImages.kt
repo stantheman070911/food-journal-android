@@ -39,12 +39,12 @@ fun interface RecapDrawing {
 }
 
 /**
- * Draws a recap at three times Instagram Stories size, 3240 by 5760: every meal's photo as a
- * collage, with the period and its figures on a plain band below, white or black as the app's
- * theme is. A meal without a photo is the Journal's plain tile with its name. Layout is worked
- * out at Stories size and drawn scaled up, so text stays sharp and each photo is decoded at the
- * pixels its tile covers. The image is a lossless PNG in the cache, where Android's share sheet
- * reads it; each new recap replaces the last.
+ * Draws a recap at twice Instagram Stories size, 2160 by 3840: every meal's photo as a collage,
+ * with the period and its figures on a plain band below, white or black as the app's theme is.
+ * A meal without a photo is the Journal's plain tile with its name. Layout is worked out at
+ * Stories size and drawn scaled up, so text stays sharp and each photo is decoded at the pixels
+ * its tile covers. The image is a JPEG at quality [JPEG_QUALITY], small enough for messaging
+ * apps, in the cache, where Android's share sheet reads it; each new recap replaces the last.
  */
 class RecapImages(private val context: Context, private val photos: PhotoStore) : RecapDrawing {
     private val folder = File(context.cacheDir, RECAP_FOLDER)
@@ -76,7 +76,7 @@ class RecapImages(private val context: Context, private val photos: PhotoStore) 
             folder.deleteRecursively()
             folder.mkdirs()
             val file = File(folder, RECAP_FILE)
-            file.outputStream().buffered().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            file.outputStream().buffered().use { image.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, it) }
             file
         } finally {
             image.recycle()
@@ -219,7 +219,7 @@ class RecapImages(private val context: Context, private val photos: PhotoStore) 
         // Layout units are Stories pixels; the image is drawn SCALE times larger.
         const val WIDTH = 1080
         const val HEIGHT = 1920
-        const val SCALE = 3
+        const val SCALE = 2
         const val MARGIN = 40f
         const val BAND = 440f
         const val GAP = 6f
@@ -244,4 +244,10 @@ class RecapImages(private val context: Context, private val photos: PhotoStore) 
 /** The cache folder recaps are written to, which the manifest's file provider shares. */
 const val RECAP_FOLDER = "recaps"
 
-private const val RECAP_FILE = "food-journal-recap.png"
+/** The recap image's type, for the share sheet. */
+const val RECAP_MIME_TYPE = "image/jpeg"
+
+private const val RECAP_FILE = "food-journal-recap.jpg"
+
+// Chosen by measurement: a week's or a year's recap of photos comes to about 1 to 3 MB.
+private const val JPEG_QUALITY = 85

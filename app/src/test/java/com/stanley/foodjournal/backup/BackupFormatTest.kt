@@ -15,7 +15,7 @@ class BackupFormatTest {
     private val meals = listOf(
         Meal(id = 4, eatenAt = noon, photo = "a.jpg", name = null, price = 180, placeId = 1),
         Meal(id = 7, eatenAt = noon.plusHours(8), name = "Latte", price = 0, isFavorite = true, note = "Oat", placeId = 2),
-        Meal(id = 9, eatenAt = noon.minusDays(30), name = "Snack", price = 999_999),
+        Meal(id = 9, eatenAt = noon.minusDays(30), name = "Snack", price = 999_999, isSnack = true),
         Meal(id = 11, eatenAt = noon.minusDays(2), name = "Dumplings", price = 120, latitude = 25.0418, longitude = 121.549),
     )
     private val backup = backupOf(meals, places, LocalDateTime.of(2026, 11, 4, 1, 15))
@@ -34,7 +34,7 @@ class BackupFormatTest {
     fun `the file carries its format and wall-clock times`() {
         val json = BackupJson.encodeToString(BackupFile.serializer(), backup)
 
-        assertTrue(json.contains("\"format\": 2"))
+        assertTrue(json.contains("\"format\": 3"))
         assertTrue(json.contains("\"eatenAt\": \"2026-11-03T12:30:00\""))
         assertTrue(json.contains("\"exportedAt\": \"2026-11-04T01:15:00\""))
     }
@@ -57,7 +57,7 @@ class BackupFormatTest {
 
     @Test
     fun `a newer format is refused, and no format is not a backup`() {
-        assertEquals(BackupProblem.NewerVersion, checkBackup(backup.copy(format = 3), setOf("a.jpg")))
+        assertEquals(BackupProblem.NewerVersion, checkBackup(backup.copy(format = 4), setOf("a.jpg")))
         assertEquals(BackupProblem.NotABackup, checkBackup(backup.copy(format = 0), setOf("a.jpg")))
     }
 
@@ -96,6 +96,26 @@ class BackupFormatTest {
         val meal = (check as BackupCheck.Passed).file.restoredMeals().single()
         assertNull(meal.latitude)
         assertNull(meal.longitude)
+    }
+
+    @Test
+    fun `a version 2 backup restores its meals as meals, not snacks`() {
+        val json = """{"format":2,"exportedAt":"2026-11-04T01:15:00","places":[],
+            "meals":[{"id":1,"eatenAt":"2026-11-03T15:30:00","name":"Cake","price":90,"latitude":25.03,"longitude":121.53}]}"""
+
+        val meal = (readBackup(json, emptySet()) as BackupCheck.Passed).file.restoredMeals().single()
+
+        assertEquals(false, meal.isSnack)
+        assertEquals(25.03, meal.latitude)
+    }
+
+    @Test
+    fun `a snack comes back as a snack`() {
+        val json = BackupJson.encodeToString(BackupFile.serializer(), backup)
+
+        val restored = (readBackup(json, setOf("a.jpg")) as BackupCheck.Passed).file.restoredMeals()
+
+        assertEquals(listOf(9L), restored.filter { it.isSnack }.map { it.id })
     }
 
     @Test
@@ -149,7 +169,7 @@ class BackupFormatTest {
 
     @Test
     fun `a newer backup is newer even when its records no longer read`() {
-        val json = """{"format":3,"exportedAt":"2026-11-04T01:15:00","records":{"meals":[]}}"""
+        val json = """{"format":4,"exportedAt":"2026-11-04T01:15:00","records":{"meals":[]}}"""
 
         assertEquals(BackupCheck.Failed(BackupProblem.NewerVersion), readBackup(json, emptySet()))
     }

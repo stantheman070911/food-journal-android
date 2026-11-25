@@ -111,6 +111,7 @@ import com.stanley.foodjournal.logic.groupDigits
 import com.stanley.foodjournal.logic.groupedToOriginal
 import com.stanley.foodjournal.logic.originalToGrouped
 import com.stanley.foodjournal.ui.components.PillButton
+import com.stanley.foodjournal.ui.components.SegmentedPill
 import com.stanley.foodjournal.ui.components.tileNameStyle
 import com.stanley.foodjournal.ui.icons.FoodJournalIcons
 import com.stanley.foodjournal.ui.preview.PreviewSurface
@@ -199,6 +200,8 @@ fun MealScreen(
                             onReplacePhoto = viewModel::onRetakePhoto,
                             onPriceChange = viewModel::onPriceChange,
                             onNameChange = viewModel::onNameChange,
+                            onNameSuggestion = viewModel::onNameSuggestion,
+                            onSnackChange = viewModel::onSnackChange,
                             onNoteChange = viewModel::onNoteChange,
                             onEatenAtChange = viewModel::onEatenAtChange,
                             onPickPlace = { pickingPlace = true },
@@ -241,6 +244,8 @@ class MealActions(
     val onReplacePhoto: () -> Unit = {},
     val onPriceChange: (String) -> Unit = {},
     val onNameChange: (String) -> Unit = {},
+    val onNameSuggestion: (String) -> Unit = {},
+    val onSnackChange: (Boolean) -> Unit = {},
     val onNoteChange: (String) -> Unit = {},
     val onEatenAtChange: (LocalDateTime) -> Unit = {},
     val onPickPlace: () -> Unit = {},
@@ -317,11 +322,19 @@ fun MealScreen(
                 },
                 focusRequester = priceFocus,
             )
+            SegmentedPill(
+                options = listOf(false, true),
+                selected = draft.isSnack,
+                label = { isSnack -> stringResource(if (isSnack) R.string.meal_kind_snack else R.string.meal_kind_meal) },
+                onSelect = actions.onSnackChange,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+            )
             FieldGroup {
                 NameField(
                     name = draft.name,
                     suggestions = uiState.nameSuggestions,
                     onNameChange = actions.onNameChange,
+                    onSuggestion = actions.onNameSuggestion,
                 )
                 Divider()
                 FieldRow(
@@ -663,6 +676,7 @@ private fun NameField(
     name: String,
     suggestions: List<String>,
     onNameChange: (String) -> Unit,
+    onSuggestion: (String) -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
     FieldRow(label = stringResource(R.string.meal_name)) {
@@ -696,7 +710,7 @@ private fun NameField(
             suggestions.forEach { suggestion ->
                 SuggestionChip(
                     onClick = {
-                        onNameChange(suggestion)
+                        onSuggestion(suggestion)
                         focusManager.clearFocus()
                     },
                     label = { Text(suggestion) },

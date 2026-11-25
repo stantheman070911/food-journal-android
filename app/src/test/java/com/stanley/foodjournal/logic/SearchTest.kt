@@ -13,8 +13,15 @@ class SearchTest {
     private val soup = meal(1, LocalDateTime.of(2026, 11, 2, 12, 0), name = "Beef noodle soup", place = 1)
     private val latte = meal(2, LocalDateTime.of(2026, 11, 3, 9, 0), name = "Latte", note = "Oat milk", place = 2, favorite = true)
     private val photoOnly = meal(3, LocalDateTime.of(2026, 10, 20, 19, 0), name = null, place = 1)
-    private val snack = meal(4, LocalDateTime.of(2026, 11, 4, 1, 0), name = "ＢＵＢＢＬＥ tea")
+    private val snack = meal(4, LocalDateTime.of(2026, 11, 4, 1, 0), name = "ＢＵＢＢＬＥ tea", snack = true)
     private val all = listOf(soup, latte, photoOnly, snack)
+
+    @Test
+    fun `snacks only finds the snacks, within the other filters`() {
+        assertEquals(listOf(4L), ids(SearchFilter(snacksOnly = true)))
+        assertEquals(listOf(4L), ids(SearchFilter(snacksOnly = true, text = "tea")))
+        assertEquals(emptyList<Long>(), ids(SearchFilter(snacksOnly = true, favoritesOnly = true)))
+    }
 
     @Test
     fun `with nothing typed, every meal is found, newest first`() {
@@ -115,5 +122,6 @@ class SearchTest {
         note: String? = null,
         place: Long? = null,
         favorite: Boolean = false,
-    ) = Meal(id = id, eatenAt = eatenAt, name = name, note = note, price = 100, placeId = place, isFavorite = favorite)
+        snack: Boolean = false,
+    ) = Meal(id = id, eatenAt = eatenAt, name = name, note = note, price = 100, placeId = place, isFavorite = favorite, isSnack = snack)
 }

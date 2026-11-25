@@ -29,6 +29,7 @@ import com.stanley.foodjournal.logic.LocationSource
 import com.stanley.foodjournal.logic.MealSteps
 import com.stanley.foodjournal.logic.PlacePickerContent
 import com.stanley.foodjournal.logic.cleanPriceInput
+import com.stanley.foodjournal.logic.isElsewhere
 import com.stanley.foodjournal.logic.mealSteps
 import com.stanley.foodjournal.logic.normalizePlaceName
 import com.stanley.foodjournal.logic.placePickerContent
@@ -115,6 +116,8 @@ class MealViewModel(
     /** Whether location has been asked for, which happens once ever. */
     private val locationAsked: Flow<Boolean>,
     private val markLocationAsked: suspend () -> Unit,
+    /** A new meal was saved, eaten at the time given; the app may raise its late-night note. */
+    private val onNewMealSaved: (LocalDateTime) -> Unit = {},
 ) : ViewModel() {
     private val isNew = mealId == null
     private var original by mutableStateOf<Meal?>(null)
@@ -251,7 +254,24 @@ class MealViewModel(
 
     fun onNoteChange(note: String) = update { it.copy(note = note) }
 
-    fun onEatenAtChange(eatenAt: LocalDateTime) = update { it.copy(eatenAt = eatenAt) }
+    fun onEatenAtChange(eatenAt: LocalDateTime) = update { it.withEatenAt(eatenAt) }
+
+    /** Meal or Snack, chosen by hand. It stays as chosen, whatever the time. */
+    fun onSnackChange(isSnack: Boolean) = update { it.copy(isSnack = isSnack, isSnackTouched = true) }
+
+    /**
+     * A recent name picked from the suggestions. Until Meal or Snack is chosen by hand, the meal
+     * takes the kind the last meal of that name had.
+     */
+    fun onNameSuggestion(name: String) {
+        onNameChange(name)
+        if (draft?.isSnackTouched != false) return
+        viewModelScope.launch {
+            val last = mealDao.lastNamed(name) ?: return@launch
+            val current = draft ?: return@launch
+            if (current.name == name && !current.isSnackTouched) update { it.copy(isSnack = last.isSnack, isSnackTouched = true) }
+        }
+    }
 
     fun onToggleFavorite() = update { it.copy(isFavorite = !it.isFavorite) }
 
@@ -292,15 +312,36 @@ class MealViewModel(
         if (isNew && !closing) phoneLocation.start()
     }
 
-    /** A saved place picked in the picker, or null for "No place". */
-    fun onPlaceSelected(placeId: Long?) =
+    /**
+     * A saved place picked in the picker, or null for "No place". A place elsewhere turns the
+     * Save location switch off; see [followChosenPlace].
+     */
+    fun onPlaceSelected(placeId: Long?) {
         update { it.copy(placeId = placeId, newPlaceName = null, placeTouched = true) }
+        followChosenPlace()
+    }
 
     /** A new place typed in the picker. It is created when the meal is saved. */
     fun onNewPlace(typed: String) {
         val name = normalizePlaceName(typed)
         if (name.isEmpty()) return
         update { it.copy(placeId = null, newPlaceName = name, placeTouched = true) }
+        followChosenPlace()
+    }
+
+    /**
+     * A place chosen by hand more than [com.stanley.foodjournal.logic.NEARBY_METERS] from the
+     * meal's location, as when a takeaway is logged at home, is where the meal came from: the
+     * switch turns off, so the meal keeps the place's location rather than the phone's or the
+     * photo's. Another place, or none, puts the switch back as its source sets it. A tapped
+     * switch stays as set.
+     */
+    private fun followChosenPlace() {
+        val current = draft ?: return
+        if (!current.placeTouched) return
+        val place = current.placeId?.let { id -> places.firstOrNull { it.place.id == id }?.place }
+        val settled = current.withSwitchDefault(placeElsewhere = isElsewhere(place, current.location))
+        if (settled != current) replaceDraft(settled)
     }
 
     /** The picker's rows for what has been typed. Read it from composition. */
@@ -393,7 +434,7 @@ class MealViewModel(
                     if (draft?.photo != name) return@withContext
                     update {
                         val photoLocation = metadata.location
-                        it.copy(eatenAt = metadata.takenAt ?: it.eatenAt).withLocation(
+                        it.withEatenAt(metadata.takenAt ?: it.eatenAt).withLocation(
                             source = if (photoLocation != null) LocationSource.Gallery else LocationSource.Phone,
                             location = photoLocation ?: phoneLocation.fix.value,
                         )
@@ -652,6 +693,7 @@ class MealViewModel(
             }
             if (!toSave.canSave) return@launch
             mealDao.save(toSave.toMeal(mealId ?: 0, keepLocation), newPlace = toSave.newPlace(location))
+            if (isNew) onNewMealSaved(toSave.eatenAt)
             original?.photo?.takeIf { it != toSave.photo }?.let { photos.delete(it) }
             edits.removeEmptyPlaces()
         }
@@ -679,7 +721,9 @@ class MealViewModel(
      */
     private fun prefill() {
         val current = draft ?: return
-        if (!isNew || current.placeTouched) return
+        if (!isNew) return
+        // A location that arrives after a place was chosen by hand may show the place is elsewhere.
+        if (current.placeTouched) return followChosenPlace()
         val placeId = prefillPlace(places.map { it.place }, location(current))?.id
         if (placeId != current.placeId) update { it.copy(placeId = placeId) }
     }
@@ -743,6 +787,7 @@ class MealViewModel(
                     phoneLocation = container.newPhoneLocation(),
                     locationAsked = container.settings.locationAsked,
                     markLocationAsked = container.settings::setLocationAsked,
+                    onNewMealSaved = container::onNewMealSaved,
                 )
             }
         }

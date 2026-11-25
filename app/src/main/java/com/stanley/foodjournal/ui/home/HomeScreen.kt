@@ -4,6 +4,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
@@ -27,6 +28,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.stanley.foodjournal.R
+import com.stanley.foodjournal.ui.components.LateNightBar
 import com.stanley.foodjournal.ui.components.UndoBar
 import com.stanley.foodjournal.ui.icons.FoodJournalIcons
 import com.stanley.foodjournal.ui.journal.JournalScreen
@@ -73,7 +75,12 @@ fun HomeScreen(
         onSelect = tabNavController::navigateToTab,
         onAddMeal = onAddMeal,
         modifier = modifier,
-        undoBar = { UndoBar() },
+        undoBar = {
+            Column {
+                LateNightBar()
+                UndoBar()
+            }
+        },
     ) {
         NavHost(
             navController = tabNavController,

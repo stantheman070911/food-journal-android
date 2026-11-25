@@ -43,6 +43,10 @@ abstract class MealDao {
     )
     abstract suspend fun recentNames(limit: Int): List<String>
 
+    /** The most recent meal named [name], ignoring case, or null when none is. */
+    @Query("SELECT * FROM meal WHERE name = :name COLLATE NOCASE ORDER BY eatenAt DESC, id DESC LIMIT 1")
+    abstract suspend fun lastNamed(name: String): Meal?
+
     /** The photo file of every meal that has one. */
     @Query("SELECT photo FROM meal WHERE photo IS NOT NULL")
     abstract suspend fun photos(): List<String>

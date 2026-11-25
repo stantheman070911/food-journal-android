@@ -1,5 +1,8 @@
 package com.stanley.foodjournal.ui.settings
 
+import android.Manifest
+import android.content.Intent
+import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -16,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -23,6 +27,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -30,17 +36,22 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.stanley.foodjournal.R
 import com.stanley.foodjournal.backup.BackupProblem
 import com.stanley.foodjournal.backup.BackupWork
+import com.stanley.foodjournal.logic.formatClock
 import com.stanley.foodjournal.logic.formatPrice
+import com.stanley.foodjournal.reminders.label
 import com.stanley.foodjournal.settings.ThemeChoice
 import com.stanley.foodjournal.ui.components.CardDivider
 import com.stanley.foodjournal.ui.components.GroupedCard
@@ -72,6 +83,15 @@ fun SettingsScreen(
             onRestored()
         }
     }
+    val askNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        viewModel.onNotificationsAnswered(granted)
+    }
+    val context = LocalContext.current
+    // Android's settings may have changed the permission meanwhile.
+    LifecycleResumeEffect(Unit) {
+        viewModel.onNotificationsChecked()
+        onPauseOrDispose {}
+    }
     // A restore takes a moment; the screen stays until it is done.
     BackHandler(enabled = uiState.work == BackupWork.Restoring) {}
     SettingsScreen(
@@ -79,6 +99,19 @@ fun SettingsScreen(
         actions = SettingsActions(
             onBack = { if (uiState.work != BackupWork.Restoring) onBack() },
             onSelectTheme = viewModel::onSelectTheme,
+            onMealRemindersChange = { on ->
+                when {
+                    !on -> viewModel.onMealRemindersChange(false)
+                    uiState.reminders.notificationsAllowed -> viewModel.onMealRemindersChange(true)
+                    else -> askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            },
+            onOpenNotificationSettings = {
+                context.startActivity(
+                    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
+                )
+            },
+            onLateNightNoteChange = viewModel::onLateNightNoteChange,
             onExport = export,
             onImport = { import.launch(IMPORT_MIME_TYPES) },
             onOpenLicenses = onOpenLicenses,
@@ -94,6 +127,9 @@ fun SettingsScreen(
 class SettingsActions(
     val onBack: () -> Unit = {},
     val onSelectTheme: (ThemeChoice) -> Unit = {},
+    val onMealRemindersChange: (Boolean) -> Unit = {},
+    val onOpenNotificationSettings: () -> Unit = {},
+    val onLateNightNoteChange: (Boolean) -> Unit = {},
     val onExport: () -> Unit = {},
     val onImport: () -> Unit = {},
     val onOpenLicenses: () -> Unit = {},
@@ -121,6 +157,8 @@ fun SettingsScreen(uiState: SettingsUiState, actions: SettingsActions, modifier:
                     label = { stringResource(it.label) },
                     onSelect = actions.onSelectTheme,
                 )
+                SectionLabel(stringResource(R.string.settings_reminders))
+                RemindersCard(uiState.reminders, actions)
                 SectionLabel(stringResource(R.string.settings_backup))
                 GroupedCard {
                     SettingsRow(
@@ -163,6 +201,68 @@ fun SettingsScreen(uiState: SettingsUiState, actions: SettingsActions, modifier:
         is SettingsDialog.ConfirmImport -> ConfirmImportDialog(dialog, actions.onConfirmImport, actions.onDismissDialog)
         is SettingsDialog.ImportRefused -> MessageDialog(message = refusal(dialog.problem), onDismiss = actions.onDismissDialog)
         null -> uiState.failure?.let { BackupFailureDialog(it, actions.onFailureShown) }
+    }
+}
+
+/** Meal reminders and the late-night note, each a switch on one card. */
+@Composable
+private fun RemindersCard(reminders: RemindersUiState, actions: SettingsActions) {
+    GroupedCard {
+        val usual = reminders.usual.map { (band, time) -> "${stringResource(band.label)} ${formatClock(time)}" }
+        SwitchRow(
+            title = stringResource(R.string.reminders_meals),
+            detail = when {
+                reminders.blocked -> stringResource(R.string.reminders_blocked)
+                !reminders.mealRemindersShowOn -> stringResource(R.string.reminders_meals_off)
+                usual.isEmpty() -> stringResource(R.string.reminders_meals_none)
+                else -> usual.joinToString(" · ")
+            },
+            checked = reminders.mealRemindersShowOn,
+            onChange = if (reminders.blocked) {
+                { actions.onOpenNotificationSettings() }
+            } else {
+                actions.onMealRemindersChange
+            },
+        )
+        CardDivider()
+        SwitchRow(
+            title = stringResource(R.string.reminders_late_night),
+            detail = stringResource(R.string.reminders_late_night_detail),
+            checked = reminders.lateNightNote,
+            onChange = actions.onLateNightNoteChange,
+        )
+    }
+}
+
+/** A settings row whose whole width toggles a switch, in ink as the Meal screen's are. */
+@Composable
+private fun SwitchRow(title: String, detail: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onChange)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold), color = colors.onSurface)
+            Text(detail, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = null,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = colors.onPrimary,
+                checkedTrackColor = colors.primary,
+                checkedBorderColor = colors.primary,
+                uncheckedThumbColor = colors.onSurface,
+                uncheckedTrackColor = Color.Transparent,
+                uncheckedBorderColor = colors.onSurface,
+            ),
+        )
     }
 }
 

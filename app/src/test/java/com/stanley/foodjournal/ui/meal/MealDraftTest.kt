@@ -118,6 +118,43 @@ class MealDraftTest {
     }
 
     @Test
+    fun `a place elsewhere turns the switch off until it is tapped`() {
+        val here = LocationFix(25.05, 121.53)
+        val camera = MealDraft(eatenAt = meal.eatenAt).withLocation(LocationSource.Camera, here)
+
+        assertFalse(camera.withSwitchDefault(placeElsewhere = true).saveLocation)
+        assertTrue(camera.withSwitchDefault(placeElsewhere = true).withSwitchDefault(placeElsewhere = false).saveLocation)
+        val tapped = camera.copy(saveLocation = true, saveLocationTouched = true)
+        assertTrue(tapped.withSwitchDefault(placeElsewhere = true).saveLocation)
+        // The phone's location while typing stays off either way.
+        val phone = MealDraft(eatenAt = meal.eatenAt).withLocation(LocationSource.Phone, here)
+        assertFalse(phone.withSwitchDefault(placeElsewhere = false).saveLocation)
+        // A saved meal's location goes the same way.
+        val saved = MealDraft.from(meal.copy(latitude = 25.05, longitude = 121.53))
+        assertFalse(saved.withSwitchDefault(placeElsewhere = true).saveLocation)
+    }
+
+    @Test
+    fun `a new meal is a snack in the afternoon until it is chosen`() {
+        val lunch = MealDraft(eatenAt = LocalDateTime.of(2026, 11, 3, 12, 40))
+        assertFalse(lunch.isSnack)
+        val afternoon = lunch.withEatenAt(LocalDateTime.of(2026, 11, 3, 15, 10))
+        assertTrue(afternoon.isSnack)
+        assertFalse(afternoon.withEatenAt(LocalDateTime.of(2026, 11, 3, 18, 0)).isSnack)
+        val chosen = afternoon.copy(isSnack = false, isSnackTouched = true)
+        assertFalse(chosen.withEatenAt(LocalDateTime.of(2026, 11, 3, 15, 30)).isSnack)
+    }
+
+    @Test
+    fun `a saved snack stays a snack, whatever its time`() {
+        val snack = meal.copy(isSnack = true)
+        val draft = MealDraft.from(snack)
+        assertTrue(draft.isSnack)
+        assertEquals(snack, draft.toMeal(snack.id))
+        assertTrue(draft.withEatenAt(LocalDateTime.of(2026, 11, 3, 9, 0)).isSnack)
+    }
+
+    @Test
     fun `a location is saved only while the row shows`() {
         val draft = MealDraft(eatenAt = meal.eatenAt, photo = "a.jpg", priceText = "80")
             .withLocation(LocationSource.Gallery, LocationFix(25.05, 121.53))

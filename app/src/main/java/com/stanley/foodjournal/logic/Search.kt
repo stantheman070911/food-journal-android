@@ -16,6 +16,7 @@ data class SearchFilter(
     /** The last day, included. */
     val to: LocalDate? = null,
     val favoritesOnly: Boolean = false,
+    val snacksOnly: Boolean = false,
 )
 
 /**
@@ -39,6 +40,7 @@ fun searchMeals(
                 (filter.from == null || day >= filter.from) &&
                 (filter.to == null || day <= filter.to) &&
                 (!filter.favoritesOnly || meal.isFavorite) &&
+                (!filter.snacksOnly || meal.isSnack) &&
                 (words.isEmpty() || haystack(meal, placeNames).let { text -> words.all { it in text } })
         }
         .sortedWith(compareByDescending<Meal> { it.eatenAt }.thenByDescending { it.id })

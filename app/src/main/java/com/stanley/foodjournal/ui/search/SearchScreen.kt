@@ -3,6 +3,8 @@ package com.stanley.foodjournal.ui.search
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -90,6 +92,7 @@ fun SearchScreen(
             onClearDistrict = viewModel::clearDistrict,
             onSetDates = viewModel::setDates,
             onToggleFavorites = viewModel::toggleFavorites,
+            onToggleSnacks = viewModel::toggleSnacks,
             onOpenMeal = onOpenMeal,
             onAddMeal = onAddMeal,
         ),
@@ -104,6 +107,7 @@ class SearchActions(
     val onClearDistrict: () -> Unit = {},
     val onSetDates: (LocalDate?, LocalDate?) -> Unit = { _, _ -> },
     val onToggleFavorites: () -> Unit = {},
+    val onToggleSnacks: () -> Unit = {},
     val onOpenMeal: (Long) -> Unit = {},
     val onAddMeal: () -> Unit = {},
 )
@@ -252,12 +256,15 @@ private fun PlaceChip(chip: SearchChip) {
     }
 }
 
-/** The Dates and Favorites pills. A set filter is filled in ink. */
+/** The Dates, Favorites, and Snacks pills. A set filter is filled in ink. */
 @Composable
 private fun Filters(uiState: SearchUiState, actions: SearchActions) {
     var pickingDates by rememberSaveable { mutableStateOf(false) }
+    // Scrolls sideways once a date range leaves no room for all three pills.
     Row(
-        Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+        Modifier
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         val dates = uiState.dates
@@ -277,6 +284,12 @@ private fun Filters(uiState: SearchUiState, actions: SearchActions) {
             selected = uiState.favoritesOnly,
             icon = if (uiState.favoritesOnly) FoodJournalIcons.FavoriteOn else FoodJournalIcons.Favorite,
             onClick = actions.onToggleFavorites,
+            isSwitch = true,
+        )
+        FilterPill(
+            label = stringResource(R.string.search_snacks),
+            selected = uiState.snacksOnly,
+            onClick = actions.onToggleSnacks,
             isSwitch = true,
         )
     }
@@ -441,7 +454,11 @@ private fun Results(uiState: SearchUiState, onOpenMeal: (Long) -> Unit) {
             Text(
                 text = stringResource(
                     R.string.search_total,
-                    pluralStringResource(R.plurals.meal_count, uiState.count, formatPrice(uiState.count)),
+                    pluralStringResource(
+                        if (uiState.snacksOnly) R.plurals.snack_count else R.plurals.meal_count,
+                        uiState.count,
+                        formatPrice(uiState.count),
+                    ),
                     uiState.total,
                 ),
                 style = MaterialTheme.typography.bodyLarge,
