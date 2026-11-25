@@ -351,7 +351,7 @@ A recap turns a period in Spending into one image. It leaves the phone only when
 - **Figures.** "24 meals · 12 places · 3,450". Places counts places with at least one meal, and is left out when there are none.
   - Below, in grey, the comparison is stated plainly: "120 less than last week", "120 more than Oct", "The same as 2025". It shows only when Spending would show its change line.
   - Figures switched off drop out of their line. If all three are off, the comparison moves up into its place. The period and year always show.
-- **The image.** A lossless PNG, 3240 × 5760, three times Instagram Stories' size. Each photo is decoded at the pixels its tile covers, from the 400 px thumbnail when the tile is no larger.
+- **The image.** A JPEG at quality 85, 2160 × 3840, twice Instagram Stories' size, small enough for messaging apps: about 0.5 MB for a week and 0.8 MB for a month or a year of photos, measured on the emulator. Each photo is decoded at the pixels its tile covers, from the 400 px thumbnail when the tile is no larger.
 - **Sharing.** The image goes through AndroidX's `FileProvider`, over the cache's `recaps/` folder only. Each recap replaces the last.
 
 ## Settings and backup
