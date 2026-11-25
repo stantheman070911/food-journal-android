@@ -116,6 +116,8 @@ class MealViewModel(
     /** Whether location has been asked for, which happens once ever. */
     private val locationAsked: Flow<Boolean>,
     private val markLocationAsked: suspend () -> Unit,
+    /** A new meal was saved, eaten at the time given; the app may raise its late-night note. */
+    private val onNewMealSaved: (LocalDateTime) -> Unit = {},
 ) : ViewModel() {
     private val isNew = mealId == null
     private var original by mutableStateOf<Meal?>(null)
@@ -691,6 +693,7 @@ class MealViewModel(
             }
             if (!toSave.canSave) return@launch
             mealDao.save(toSave.toMeal(mealId ?: 0, keepLocation), newPlace = toSave.newPlace(location))
+            if (isNew) onNewMealSaved(toSave.eatenAt)
             original?.photo?.takeIf { it != toSave.photo }?.let { photos.delete(it) }
             edits.removeEmptyPlaces()
         }
@@ -784,6 +787,7 @@ class MealViewModel(
                     phoneLocation = container.newPhoneLocation(),
                     locationAsked = container.settings.locationAsked,
                     markLocationAsked = container.settings::setLocationAsked,
+                    onNewMealSaved = container::onNewMealSaved,
                 )
             }
         }

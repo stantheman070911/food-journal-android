@@ -45,6 +45,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 import java.time.LocalDateTime
+import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -59,6 +60,7 @@ class MealViewModelTest {
     private lateinit var processing: FakeProcessing
     private lateinit var phone: FakeLocation
     private val locationAsked = MutableStateFlow(false)
+    private val newMealsSaved: MutableList<LocalDateTime> = Collections.synchronizedList(mutableListOf())
     private val store = ViewModelStore()
 
     // One thousandth of a degree of latitude is about 111 m. Photo locations have no accuracy.
@@ -764,6 +766,24 @@ class MealViewModelTest {
     }
 
     @Test
+    fun onlyANewMealIsReportedOnceSavedForTheLateNightNote() = runBlocking {
+        val vm = newMealChecked()
+        skip(vm)
+        val eatenAt = main { vm.uiState!!.draft.eatenAt }
+        main { vm.save() }
+        awaitTrue { newMealsSaved == listOf(eatenAt) }
+
+        val saved = savedMeal(db.mealDao().observeAll().first().single().id)
+        awaitTrue { main { saved.uiState } != null }
+        main {
+            saved.onPriceChange("300")
+            saved.save()
+        }
+        awaitTrue { db.mealDao().observeAll().first().single().price == 300 }
+        assertEquals(listOf(eatenAt), newMealsSaved)
+    }
+
+    @Test
     fun aNewPlaceIsCreatedAtTheSavedLocation() = runBlocking {
         phone.fix.value = noodlesSpot
         val vm = newMealChecked()
@@ -888,6 +908,7 @@ class MealViewModelTest {
                     phoneLocation = phone,
                     locationAsked = locationAsked,
                     markLocationAsked = { locationAsked.value = true },
+                    onNewMealSaved = { newMealsSaved += it },
                 ) as T
             }
             ViewModelProvider.create(store, factory)["meal-${System.nanoTime()}", MealViewModel::class]

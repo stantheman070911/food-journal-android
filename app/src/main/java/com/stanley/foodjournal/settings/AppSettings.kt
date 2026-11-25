@@ -22,8 +22,8 @@ enum class ThemeChoice { System, Light, Dark }
 
 /**
  * The few things the app remembers outside the database: the theme chosen in Settings, the day
- * of the last backup, the figures last chosen for a recap, and whether location has been asked
- * for. Kept in DataStore, in the file "settings".
+ * of the last backup, the figures last chosen for a recap, whether location has been asked for,
+ * and the two reminder switches. Kept in DataStore, in the file "settings".
  */
 class AppSettings(private val store: DataStore<Preferences>) {
     val theme: Flow<ThemeChoice> = store.data
@@ -51,6 +51,24 @@ class AppSettings(private val store: DataStore<Preferences>) {
     val locationAsked: Flow<Boolean> = store.data
         .map { prefs -> prefs[LOCATION_ASKED] ?: false }
         .distinctUntilChanged()
+
+    /** Meal reminders, off until turned on in Settings. */
+    val remindersOn: Flow<Boolean> = store.data
+        .map { prefs -> prefs[REMINDERS] ?: false }
+        .distinctUntilChanged()
+
+    /** The note after a meal logged past midnight, on until turned off in Settings. */
+    val lateNightNote: Flow<Boolean> = store.data
+        .map { prefs -> prefs[LATE_NIGHT_NOTE] ?: true }
+        .distinctUntilChanged()
+
+    suspend fun setRemindersOn(on: Boolean) {
+        store.edit { it[REMINDERS] = on }
+    }
+
+    suspend fun setLateNightNote(on: Boolean) {
+        store.edit { it[LATE_NIGHT_NOTE] = on }
+    }
 
     suspend fun setLocationAsked() {
         store.edit { it[LOCATION_ASKED] = true }
@@ -81,6 +99,8 @@ class AppSettings(private val store: DataStore<Preferences>) {
         private val RECAP_TOTAL = booleanPreferencesKey("recapTotal")
         private val RECAP_COMPARISON = booleanPreferencesKey("recapComparison")
         private val LOCATION_ASKED = booleanPreferencesKey("locationAsked")
+        private val REMINDERS = booleanPreferencesKey("reminders")
+        private val LATE_NIGHT_NOTE = booleanPreferencesKey("lateNightNote")
 
         fun create(context: Context, scope: CoroutineScope) = AppSettings(
             PreferenceDataStoreFactory.create(scope = scope) { context.preferencesDataStoreFile("settings") },

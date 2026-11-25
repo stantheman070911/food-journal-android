@@ -14,20 +14,27 @@ import com.stanley.foodjournal.backup.BackupProblem
 import com.stanley.foodjournal.backup.BackupWork
 import com.stanley.foodjournal.backup.ImportRead
 import com.stanley.foodjournal.backup.PreparedImport
+import com.stanley.foodjournal.data.Meal
+import com.stanley.foodjournal.logic.TimeBand
 import com.stanley.foodjournal.logic.formatDay
+import com.stanley.foodjournal.logic.usualTimes
 import com.stanley.foodjournal.logic.formatFullDay
 import com.stanley.foodjournal.settings.AppSettings
 import com.stanley.foodjournal.settings.ThemeChoice
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.LocalTime
 
 /** A question or a refusal the Settings screen shows over itself. */
 sealed interface SettingsDialog {
@@ -37,8 +44,28 @@ sealed interface SettingsDialog {
     data class ImportRefused(val problem: BackupProblem) : SettingsDialog
 }
 
+/**
+ * The Reminders section. [mealRemindersOn] is the stored switch; it shows on only while
+ * [notificationsAllowed]. [usual] lists the blocks with a usual time, which reminders follow.
+ */
+data class RemindersUiState(
+    val mealRemindersOn: Boolean = false,
+    val notificationsAllowed: Boolean = true,
+    /** Notifications were asked for and refused, so the row sends to Android's settings instead. */
+    val notificationsRefused: Boolean = false,
+    val usual: List<Pair<TimeBand, LocalTime>> = emptyList(),
+    val lateNightNote: Boolean = true,
+) {
+    /** The switch is on and Android lets it work. */
+    val mealRemindersShowOn: Boolean get() = mealRemindersOn && notificationsAllowed
+
+    /** Notifications are off, so the row offers Android's settings. */
+    val blocked: Boolean get() = notificationsRefused || (mealRemindersOn && !notificationsAllowed)
+}
+
 data class SettingsUiState(
     val theme: ThemeChoice = ThemeChoice.System,
+    val reminders: RemindersUiState = RemindersUiState(),
     /** "Oct 2, 2026", or null when there has been no backup. */
     val lastBackup: String? = null,
     val work: BackupWork? = null,
@@ -65,6 +92,11 @@ class SettingsViewModel(
     private val appScope: CoroutineScope,
     version: String,
     private val today: () -> LocalDate = LocalDate::now,
+    meals: Flow<List<Meal>> = flowOf(emptyList()),
+    /** Whether Android lets the app show notifications. Read again on each [onNotificationsChecked]. */
+    private val canNotify: () -> Boolean = { true },
+    /** Tells the reminders the permission may have changed, so their alarm is set again. */
+    private val onPermissionChanged: () -> Unit = {},
 ) : ViewModel() {
     private data class Local(
         val isReading: Boolean = false,
@@ -75,11 +107,24 @@ class SettingsViewModel(
 
     private val local = MutableStateFlow(Local())
     private var readJob: Job? = null
+    private val allowed = MutableStateFlow(canNotify())
+    private val refused = MutableStateFlow(false)
+
+    private val reminders = combine(
+        settings.remindersOn,
+        settings.lateNightNote,
+        meals.map { usualTimes(it, today()).toList().sortedBy { (band, _) -> band.ordinal } },
+        allowed,
+        refused,
+    ) { on, lateNight, usual, allowed, refused ->
+        RemindersUiState(on, allowed, refused && !allowed, usual, lateNight)
+    }
 
     val uiState: StateFlow<SettingsUiState> =
-        combine(settings.theme, settings.lastBackup, backup.state, local) { theme, last, state, local ->
+        combine(settings.theme, settings.lastBackup, backup.state, local, reminders) { theme, last, state, local, reminders ->
             SettingsUiState(
                 theme = theme,
+                reminders = reminders,
                 lastBackup = last?.let(::formatFullDay),
                 work = state.work,
                 isReading = local.isReading,
@@ -96,6 +141,28 @@ class SettingsViewModel(
             settings.setTheme(choice)
             applyTheme(choice)
         }
+    }
+
+    /** Meal reminders on or off. On needs notifications, which the screen asks for first. */
+    fun onMealRemindersChange(on: Boolean) {
+        appScope.launch { settings.setRemindersOn(on) }
+    }
+
+    /** The answer to the notification request: on if allowed, off and sent to settings if refused. */
+    fun onNotificationsAnswered(granted: Boolean) {
+        refused.value = !granted
+        onNotificationsChecked()
+        onMealRemindersChange(granted)
+    }
+
+    /** Reads the permission again, as on returning from Android's settings. */
+    fun onNotificationsChecked() {
+        allowed.value = canNotify()
+        onPermissionChanged()
+    }
+
+    fun onLateNightNoteChange(on: Boolean) {
+        appScope.launch { settings.setLateNightNote(on) }
     }
 
     fun onExport(uri: Uri) = backup.export(uri)
@@ -159,6 +226,9 @@ class SettingsViewModel(
                     applyTheme = container.applyTheme,
                     appScope = container.appScope,
                     version = app.packageManager.getPackageInfo(app.packageName, 0).versionName.orEmpty(),
+                    meals = container.mealDao.observeAll(),
+                    canNotify = { container.reminders.canNotify },
+                    onPermissionChanged = container.reminders::onPermissionChanged,
                 )
             }
         }

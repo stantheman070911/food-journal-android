@@ -160,4 +160,15 @@
         <item quantity="other">%1$s meals outside Taiwan</item>
     </plurals>
     <string name="log_first_meal">Log your first meal</string>
+    <string name="reminders_channel">Meal reminders</string>
+    <string name="reminder_title">Did you forget to log your meal?</string>
+    <string name="reminder_text">%1$s, usually around %2$s</string>
+    <string name="late_night_note">Let\'s not eat so late, shall we?</string>
+    <string name="settings_reminders">Reminders</string>
+    <string name="reminders_meals">Meal reminders</string>
+    <string name="reminders_meals_off">When a usual meal isn\'t logged</string>
+    <string name="reminders_meals_none">Once a meal has a usual time</string>
+    <string name="reminders_blocked">Notifications are off · Open settings</string>
+    <string name="reminders_late_night">Late-night note</string>
+    <string name="reminders_late_night_detail">After a meal logged past midnight</string>
 </resources>

@@ -12,6 +12,10 @@ import com.stanley.foodjournal.location.PhoneLocation
 import com.stanley.foodjournal.logic.DistrictMap
 import com.stanley.foodjournal.photos.PhotoProcessor
 import com.stanley.foodjournal.photos.PhotoStore
+import com.stanley.foodjournal.logic.isLateNightMeal
+import com.stanley.foodjournal.reminders.MealReminders
+import kotlinx.coroutines.flow.MutableStateFlow
+import java.time.LocalDateTime
 import com.stanley.foodjournal.recap.RecapImages
 import com.stanley.foodjournal.settings.AppSettings
 import com.stanley.foodjournal.settings.ThemeChoice
@@ -68,6 +72,22 @@ class AppContainer(context: Context) {
 
     /** Taiwan's districts, or null if the bundled file can't be read. */
     suspend fun districtMap(): DistrictMap? = districts.await()
+
+    /** Meal reminders: the alarm for the next one, and the reminder itself. */
+    val reminders = MealReminders(context, mealDao, settings, appScope)
+
+    /**
+     * Raised after a new meal logged past midnight while the note is on; the tabs show "Let's not
+     * eat so late, shall we?" once, then lower it.
+     */
+    val lateNightNote = MutableStateFlow(false)
+
+    /** A new meal was saved: raises the late-night note if it was eaten past midnight, just now. */
+    fun onNewMealSaved(eatenAt: LocalDateTime) {
+        appScope.launch {
+            if (isLateNightMeal(eatenAt, LocalDateTime.now()) && settings.lateNightNote.first()) lateNightNote.value = true
+        }
+    }
 
     /** Finds where the phone is, for one Meal screen. Each screen starts afresh. */
     val newPhoneLocation: () -> PhoneLocation = { LocationTracker(context) }

@@ -13,6 +13,7 @@ class FoodJournalApplication : Application() {
         container = AppContainer(this)
         container.sweepOnLaunch()
         container.applyStoredTheme()
+        container.reminders.start()
     }
 }
 

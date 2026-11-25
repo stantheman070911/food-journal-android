@@ -12,7 +12,7 @@ The ideas behind it:
 - **Fast logging.** Add, shutter, price, Save: under 15 seconds.
 - **Little is required.** A meal needs a photo or a name, plus a price.
 - **Photos lead.** Numbers support them. The interface is monochrome, so the food photos are the only color.
-- **Numbers are shown, never judged.** No budgets, targets, streaks, badges, or warnings.
+- **Numbers are shown, never judged.** No budgets, targets, streaks, badges, or warnings. Two gentle exceptions, both switchable in Settings: a reminder when a usual meal goes unlogged, and one note after a meal past midnight.
 - **Data stays on the phone.** No account, no sign-in, no network.
 - **One currency.** New Taiwan dollars, stored as whole dollars and shown with no prefix: "280".
 - **English interface.**
@@ -306,6 +306,28 @@ The Map tab shows where meals were eaten: Taiwan with its county and district (�
 - **Layout.** The lines at the bottom leave room for the Add button.
 - **Empty state.** "No meals with a location yet". The Add button is already on the tab, so there is no button. If the bundled boundary file can't be read, the tab says "The map couldn't be read" instead.
 
+## Reminders
+
+Two nudges, each with a switch in Settings (see Settings and backup).
+
+**Meal reminders**
+
+- **Off until turned on.** Turning the switch on asks for Android's notification permission. Refused, the switch stays off and its line reads "Notifications are off · Open settings", which opens the app's notification settings. The same line shows if notifications are turned off later in Android.
+- **Usual times.** The day has five blocks, as Spending's time of day: Breakfast 05:00–10:59, Lunch 11:00–13:59, Afternoon 14:00–16:59, Dinner 17:00–19:59, and Late 20:00–04:59. A late block's small hours belong to the evening before.
+  - A block has a usual time when something was logged in it on at least half of the last 28 days, or of the days since the first entry when that is sooner. Today never counts.
+  - The usual time is the median of each day's first entry in the block, to the minute, running across midnight for the late block.
+  - Nothing is usual until there are 7 days of history.
+  - Settings lists them under the switch: "Lunch 12:30 · Dinner 19:10", or "Once a meal has a usual time".
+- **When it comes.** An hour after a block's usual time, if nothing has been logged in that block that day. Meals and snacks both count, and so does an entry added later from the gallery.
+- **What it says.** "Did you forget to log your meal?", with "Lunch, usually around 12:30" below. A tap opens a new meal at the camera. It goes away on its own once that block is logged.
+- **Timing.** One inexact alarm is kept for the next reminder, so it may come a few minutes late, and no exact-alarm permission is needed. It is set again whenever the meals, the switch, or the permission change, and after a restart, an update of the app, or a change of clock or time zone. A reminder that fires over two hours late, as after the phone slept through it, is dropped.
+
+**The late-night note**
+
+- **When.** Right after a new meal is saved that was eaten between 00:00 and 04:59, and logged as it happened, within an hour. An entry added later from the gallery, or an edit, never shows it.
+- **What.** A grey bar on the tabs, as the undo bar is, reading "Let's not eat so late, shall we?" for 4 seconds, with no action. It can be swiped away.
+- **On by default.** Its switch in Settings turns it off.
+
 ## Search
 
 - **Layout.** The search field is a grey pill, with the place or district chip inside it before the text. Below it sit three pill filters, "Dates", "★ Favorites", and "Snacks", which scroll sideways when a date range leaves no room. Then the total, "42 meals · 12,340", in sans. Then the results, newest first.
@@ -362,13 +384,19 @@ A recap turns a period in Spending into one image. It leaves the phone only when
 
 ## Settings and backup
 
-**The Settings screen.** The Journal's settings icon opens a full screen with "← Settings", the title in the serif headline. Three sections follow under grey labels, Appearance, Backup, and About. Rows sit on rounded grey cards, with a semibold title and a grey line below. A row that opens a page ends in a chevron.
+**The Settings screen.** The Journal's settings icon opens a full screen with "← Settings", the title in the serif headline. Four sections follow under grey labels, Appearance, Reminders, Backup, and About. Rows sit on rounded grey cards, with a semibold title and a grey line below. A row that opens a page ends in a chevron.
 
 **Appearance**
 
 - A System, Light, and Dark switch, using the segmented pill Spending uses. System is the default.
 - The choice goes to Android's per-app night mode, `UiModeManager.setApplicationNightMode`, which applies before the app draws, so launch never flashes the wrong theme.
 - Android can't report it back, so DataStore keeps the choice for the switch. The app sets it again at launch in case the two drift apart.
+
+**Reminders**
+
+- **Meal reminders**, a switch, with the usual times below it (see Reminders).
+- **Late-night note**, a switch, with "After a meal logged past midnight" below it.
+- Switches are ink when on and outlined in ink when off, as on the Meal screen, and the whole row takes the tap.
 
 **Backup rows**
 
@@ -467,7 +495,8 @@ A recap turns a period in Spending into one image. It leaves the phone only when
 | Lists | LazyColumn, LazyRow, HorizontalPager | About a thousand meals a year needs no paging |
 | Charts | Compose Canvas | |
 | Map | Compose Canvas | Boundaries from a bundled file; no map library, tiles, or network |
-| Settings | DataStore (Preferences) | Theme, last backup day, recap figures, whether location was asked |
+| Settings | DataStore (Preferences) | Theme, last backup day, recap figures, whether location was asked, the two reminder switches |
+| Reminders | Framework `AlarmManager` and `NotificationManager` | One inexact alarm; no WorkManager |
 | Camera | CameraX | In-app capture |
 | Gallery | Android Photo Picker | No storage permission |
 | Location | Framework `LocationManager` | The fused provider, with no library |
@@ -502,8 +531,8 @@ A recap turns a period in Spending into one image. It leaves the phone only when
 **Code layout**, under `app/src/main/java/com/stanley/foodjournal/`:
 
 - `data/`: Room entities and DAOs.
-- `logic/`: pure rules with JVM tests: `Spending.kt`, `Search.kt`, `Recap.kt`, `Weeks.kt`, `Places.kt`, `PlaceNames.kt`, `PlacePicker.kt`, `Districts.kt`, `MealMap.kt`, `MealForm.kt`, `TileNames.kt`, `PhotoSizing.kt`, and `Backup.kt`.
-- `photos/`, `backup/`, `recap/`, `edits/`, `settings/`, `location/`: photo files, backup and restore, recap drawing and sharing, undo, DataStore, and the phone's location.
+- `logic/`: pure rules with JVM tests: `Spending.kt`, `Search.kt`, `Recap.kt`, `Weeks.kt`, `Places.kt`, `PlaceNames.kt`, `PlacePicker.kt`, `Districts.kt`, `MealMap.kt`, `Reminders.kt`, `MealForm.kt`, `TileNames.kt`, `PhotoSizing.kt`, and `Backup.kt`.
+- `photos/`, `backup/`, `recap/`, `edits/`, `settings/`, `location/`, `reminders/`: photo files, backup and restore, recap drawing and sharing, undo, DataStore, the phone's location, and meal reminders.
 - `ui/`: one folder per screen, plus `components/`, `theme/`, `icons/`, `navigation/`, and `preview/`.
 
 **Photos**
@@ -557,7 +586,7 @@ A recap turns a period in Spending into one image. It leaves the phone only when
 
 **Privacy and permissions**
 
-- The only permissions are the camera and location, fine and coarse. The manifest strips INTERNET in case a library adds it; Gradle prints an expected merge warning. AndroidX's internal `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` is the only merged permission, and it is private to the app.
+- The permissions are the camera; location, fine and coarse; notifications, asked only when Meal reminders is turned on; and starting at boot, which Android grants without asking, so the reminder alarm is set again after a restart. The manifest strips INTERNET in case a library adds it; Gradle prints an expected merge warning. AndroidX's internal `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` is the only merged permission, and it is private to the app.
 - `allowBackup` is false, and data extraction rules exclude everything from both cloud backup and device-to-device transfer. The exported ZIP is the only backup, so the database and photos never return out of step.
 - Stored photos carry no metadata. A meal's location is kept in the database only. A recap leaves the phone only through the share sheet.
 
@@ -619,6 +648,7 @@ ANDROID_SERIAL=emulator-5560 ./gradlew :app:connectedDebugAndroidTest
   - the recap sheet
   - the Meal screen's date line, camera icon, and stepping gestures
   - the chart's bars
+  - meal reminders: shown while their block is empty, and taken down once it is logged
   - closing and stepping through a meal in the whole app, adding and removing their own test meals
 - **Fakes.** The Meal and Spending ViewModels take photo processing, the phone's location, and recap drawing through small interfaces, `PhotoProcessing`, `PhoneLocation`, and `RecapDrawing`, so tests drive them with fakes.
 - **Test-only code.** Test libraries never ship. Only an empty activity for hosting UI tests is in debug builds.
@@ -635,6 +665,7 @@ ANDROID_SERIAL=emulator-5560 ./gradlew :app:connectedDebugAndroidTest
 - `tools/build-districts.sh` on the ministry's shapefile. The bundled districts come from taiwan-atlas's 2021 copy until the ministry's download is back.
 - Photo orientation with auto-rotate off.
 - Anything on Android 16, on a device or an emulator.
+- A reminder's alarm firing on its own, on a phone over days, and how late Doze makes it. The tests call the alarm's work directly.
 
 **Known issues**
 

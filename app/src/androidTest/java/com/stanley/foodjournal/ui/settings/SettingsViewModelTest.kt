@@ -19,6 +19,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
+import java.time.LocalTime
+import com.stanley.foodjournal.logic.TimeBand
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -35,6 +37,8 @@ class SettingsViewModelTest {
     private val store = ViewModelStore()
     private val applied: MutableList<ThemeChoice> = Collections.synchronizedList(mutableListOf())
     private val today = LocalDate.of(2026, 11, 4)
+    @Volatile private var notificationsAllowed = true
+    @Volatile private var permissionChecks = 0
 
     @After
     fun tearDown() {
@@ -53,6 +57,32 @@ class SettingsViewModelTest {
         assertEquals(ThemeChoice.Dark, vm.state { it.theme == ThemeChoice.Dark }.theme)
         awaitTrue { applied == listOf(ThemeChoice.Dark) }
         assertEquals(ThemeChoice.Dark, f.settings.theme.first())
+    }
+
+    @Test
+    fun remindersFollowTheNotificationAnswerAndListUsualTimes() = runBlocking {
+        // Lunch at 12:30 on each of the last 14 days.
+        (1..14).forEach { f.db.mealDao().insert(Meal(eatenAt = today.minusDays(it.toLong()).atTime(12, 30), name = "Soup", price = 120)) }
+        notificationsAllowed = false
+        val vm = viewModel()
+        assertFalse(vm.state { true }.reminders.mealRemindersShowOn)
+
+        // Refused: the switch stays off and the row sends to Android's settings.
+        main { vm.onNotificationsAnswered(false) }
+        assertTrue(vm.state { it.reminders.blocked }.reminders.blocked)
+        assertFalse(f.settings.remindersOn.first())
+
+        // Allowed in Android's settings, then answered yes: on, with the usual times.
+        notificationsAllowed = true
+        main { vm.onNotificationsAnswered(true) }
+        val on = vm.state { it.reminders.mealRemindersShowOn }.reminders
+        assertFalse(on.blocked)
+        assertEquals(listOf(TimeBand.Lunch to LocalTime.of(12, 30)), on.usual)
+        assertTrue(permissionChecks >= 2)
+
+        main { vm.onLateNightNoteChange(false) }
+        vm.state { !it.reminders.lateNightNote }
+        assertFalse(f.settings.lateNightNote.first())
     }
 
     @Test
@@ -123,7 +153,10 @@ class SettingsViewModelTest {
     private suspend fun viewModel(): SettingsViewModel = main {
         val factory = viewModelFactory {
             initializer {
-                SettingsViewModel(f.settings, f.backup, applyTheme = { applied += it }, appScope = f.scope, version = "0.1", today = { today })
+                SettingsViewModel(
+                    f.settings, f.backup, applyTheme = { applied += it }, appScope = f.scope, version = "0.1", today = { today },
+                    meals = f.db.mealDao().observeAll(), canNotify = { notificationsAllowed }, onPermissionChanged = { permissionChecks++ },
+                )
             }
         }
         ViewModelProvider.create(store, factory)["settings-${System.nanoTime()}", SettingsViewModel::class]

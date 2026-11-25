@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -34,10 +35,19 @@ import com.stanley.foodjournal.ui.settings.SettingsScreen
 private const val SCREEN_MOTION_MILLIS = 220
 private const val STEP_FADE_MILLIS = 150
 
-/** The tabs, with the Meal and Settings screens rising over them. */
+/**
+ * The tabs, with the Meal and Settings screens rising over them. [addMeal] opens a new meal, as
+ * a meal reminder's tap asks, then [onAddMealHandled] lowers it.
+ */
 @Composable
-fun FoodJournalApp() {
+fun FoodJournalApp(addMeal: Boolean = false, onAddMealHandled: () -> Unit = {}) {
     val navController = rememberNavController()
+    LaunchedEffect(addMeal) {
+        if (addMeal) {
+            navController.navigate(MealRoute()) { launchSingleTop = true }
+            onAddMealHandled()
+        }
+    }
     // A place picked from the Meal screen's "Meals here", for the tabs to open in Search. Saved,
     // so a rotation between closing the Meal screen and opening Search can't lose it.
     var searchPlaceId by rememberSaveable { mutableStateOf<Long?>(null) }

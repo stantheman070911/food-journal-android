@@ -72,6 +72,21 @@ class AppSettingsTest {
         withSettings { settings -> assertEquals(true, settings.locationAsked.first()) }
     }
 
+    @Test
+    fun remindersStartOffAndTheLateNightNoteOn() = runBlocking {
+        withSettings { settings ->
+            assertEquals(false, settings.remindersOn.first())
+            assertEquals(true, settings.lateNightNote.first())
+            settings.setRemindersOn(true)
+            settings.setLateNightNote(false)
+        }
+
+        withSettings { settings ->
+            assertEquals(true, settings.remindersOn.first())
+            assertEquals(false, settings.lateNightNote.first())
+        }
+    }
+
     /** One DataStore at a time per file, as in the app: each launch opens it afresh. */
     private suspend fun withSettings(block: suspend (AppSettings) -> Unit) {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

@@ -65,6 +65,7 @@ import com.stanley.foodjournal.logic.ComparedWith
 import com.stanley.foodjournal.logic.Period
 import com.stanley.foodjournal.logic.PeriodKind
 import com.stanley.foodjournal.logic.TimeBand
+import com.stanley.foodjournal.reminders.label
 import com.stanley.foodjournal.logic.formatPrice
 import com.stanley.foodjournal.ui.components.EmptyState
 import com.stanley.foodjournal.ui.components.MealTile
@@ -564,14 +565,6 @@ private val PeriodKind.label: Int
         PeriodKind.Year -> R.string.spending_year
     }
 
-private val TimeBand.label: Int
-    get() = when (this) {
-        TimeBand.Breakfast -> R.string.spending_breakfast
-        TimeBand.Lunch -> R.string.spending_lunch
-        TimeBand.Afternoon -> R.string.spending_afternoon
-        TimeBand.Dinner -> R.string.spending_dinner
-        TimeBand.Late -> R.string.spending_late
-    }
 
 
 private val ChartHeight = 180.dp
