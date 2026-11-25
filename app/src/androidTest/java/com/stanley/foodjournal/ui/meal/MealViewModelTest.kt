@@ -724,6 +724,46 @@ class MealViewModelTest {
     }
 
     @Test
+    fun aNameSuggestionTakesThatNamesLastKindAndSavesIt() = runBlocking {
+        db.mealDao().insert(Meal(eatenAt = noon, name = "Bubble tea", price = 60, isSnack = true))
+        val vm = newMealChecked()
+        main {
+            vm.onSkipPhoto()
+            vm.onSnackChange(false)
+        }
+        // Chosen by hand, the kind stays as chosen.
+        main { vm.onNameSuggestion("Bubble tea") }
+        delay(300)
+        assertFalse(main { vm.uiState!!.draft.isSnack })
+
+        val fresh = newMealChecked()
+        main { fresh.onSkipPhoto() }
+        main { fresh.onNameSuggestion("Bubble tea") }
+        awaitTrue { main { fresh.uiState!!.draft.isSnack } }
+        main {
+            fresh.onPriceChange("60")
+            fresh.save()
+        }
+        awaitTrue { mealCount() == 2 }
+        assertEquals(2, db.mealDao().observeAll().first().count { it.isSnack })
+    }
+
+    @Test
+    fun aSavedSnackKeepsItsKindAndCanBecomeAMeal() = runBlocking {
+        val mealId = db.mealDao().insert(Meal(eatenAt = noon, name = "Cake", price = 90, isSnack = true))
+        val vm = savedMeal(mealId)
+        awaitTrue { main { vm.uiState } != null }
+        assertTrue(main { vm.uiState!!.draft.isSnack })
+        assertFalse(main { vm.uiState!!.showSave })
+
+        main { vm.onSnackChange(false) }
+        assertTrue(main { vm.uiState!!.showSave })
+        main { vm.save() }
+
+        awaitTrue { !db.mealDao().get(mealId)!!.isSnack }
+    }
+
+    @Test
     fun aNewPlaceIsCreatedAtTheSavedLocation() = runBlocking {
         phone.fix.value = noodlesSpot
         val vm = newMealChecked()

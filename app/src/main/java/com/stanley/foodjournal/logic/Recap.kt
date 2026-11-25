@@ -70,7 +70,7 @@ data class RecapOptions(
 data class RecapFigures(
     val title: String,
     val year: String?,
-    /** "24 meals" */
+    /** "24 meals", or "18 meals · 6 snacks" once there are snacks */
     val meals: String,
     /** "12 places" */
     val places: String?,
@@ -147,11 +147,21 @@ fun recapFigures(period: Period, meals: List<Meal>, previousMeals: List<Meal>, t
     return RecapFigures(
         title = title,
         year = year,
-        meals = count(meals.size, "meal"),
+        meals = mealCount(meals),
         places = places.takeIf { it > 0 }?.let { count(it, "place") },
         total = formatPrice(total),
         comparison = comparison,
     )
+}
+
+/** "24 meals", "18 meals · 6 snacks", or "6 snacks" when every one was a snack. */
+private fun mealCount(meals: List<Meal>): String {
+    val snacks = meals.count { it.isSnack }
+    val proper = meals.size - snacks
+    return listOfNotNull(
+        count(proper, "meal").takeIf { proper > 0 || snacks == 0 },
+        count(snacks, "snack").takeIf { snacks > 0 },
+    ).joinToString(" · ")
 }
 
 private fun count(n: Int, noun: String) = "${formatPrice(n)} $noun${if (n == 1) "" else "s"}"

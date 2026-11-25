@@ -16,7 +16,7 @@ import com.stanley.foodjournal.logic.Week
 import com.stanley.foodjournal.logic.formatDay
 import com.stanley.foodjournal.logic.formatPrice
 import com.stanley.foodjournal.logic.formatWeekRange
-import com.stanley.foodjournal.logic.formatWeekday
+import com.stanley.foodjournal.logic.formatTileLabel
 import com.stanley.foodjournal.logic.groupIntoWeeks
 import com.stanley.foodjournal.logic.needsBackupReminder
 import com.stanley.foodjournal.logic.weekStart
@@ -38,7 +38,8 @@ data class JournalTile(
     val mealId: Long,
     val thumb: File?,
     val name: String?,
-    val weekday: String,
+    /** The weekday, "Tue", or "Tue · Snack" for a snack. */
+    val label: String,
     val photo: File? = null,
 )
 
@@ -114,7 +115,7 @@ class JournalViewModel(
         mealId = id,
         thumb = photo?.let(photos::thumbFile),
         name = name,
-        weekday = formatWeekday(eatenAt.toLocalDate()),
+        label = formatTileLabel(eatenAt.toLocalDate(), isSnack),
         photo = photo?.let(photos::photoFile),
     )
 

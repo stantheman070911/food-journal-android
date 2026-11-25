@@ -7,6 +7,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
@@ -44,6 +45,32 @@ class MigrationTest {
             assertNull(meal.latitude)
             assertNull(meal.longitude)
             assertEquals(25.03, database.placeDao().get(3)!!.latitude)
+        } finally {
+            database.close()
+        }
+    }
+
+    @Test
+    fun version2MealsSurviveAsMeals() = runBlocking {
+        helper.createDatabase(DB, 2).use { db ->
+            db.execSQL(
+                "INSERT INTO meal (id, eatenAt, photo, name, price, isFavorite, note, placeId, latitude, longitude) " +
+                    "VALUES (8, '2026-11-04T15:10:00', NULL, 'Bubble tea', 60, 0, NULL, NULL, 25.04, 121.55)",
+            )
+        }
+
+        helper.runMigrationsAndValidate(DB, 3, true).close()
+
+        val database = Room.databaseBuilder(
+            ApplicationProvider.getApplicationContext(),
+            FoodJournalDatabase::class.java,
+            DB,
+        ).build()
+        try {
+            val meal = database.mealDao().get(8)!!
+            assertEquals("Bubble tea", meal.name)
+            assertEquals(25.04, meal.latitude!!, 0.0)
+            assertFalse(meal.isSnack)
         } finally {
             database.close()
         }

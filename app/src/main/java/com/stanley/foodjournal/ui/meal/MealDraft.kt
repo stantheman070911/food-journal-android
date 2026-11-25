@@ -9,6 +9,7 @@ import com.stanley.foodjournal.logic.parsePrice
 import com.stanley.foodjournal.logic.placeLocation
 import com.stanley.foodjournal.logic.savesLocationByDefault
 import com.stanley.foodjournal.logic.showsLocationRow
+import com.stanley.foodjournal.logic.startsAsSnack
 import java.io.Serializable
 import java.time.LocalDateTime
 
@@ -42,6 +43,9 @@ data class MealDraft(
     /** The Save location switch. It follows [locationSource] until it is tapped. */
     val saveLocation: Boolean = false,
     val saveLocationTouched: Boolean = false,
+    /** A snack rather than a meal. It follows [eatenAt] until it is chosen; see [withEatenAt]. */
+    val isSnack: Boolean = startsAsSnack(eatenAt.toLocalTime()),
+    val isSnackTouched: Boolean = false,
 ) : Serializable {
     val canSave: Boolean get() = canSave(hasPhoto = photo != null, name = name, priceText = priceText)
 
@@ -71,6 +75,13 @@ data class MealDraft(
         val on = savesLocationByDefault(source) && !placeElsewhere
         return if (on == saveLocation) this else copy(saveLocation = on)
     }
+
+    /**
+     * The draft at [eatenAt]. Until Meal or Snack is chosen, the afternoon makes it a snack and
+     * any other time a meal; see [startsAsSnack].
+     */
+    fun withEatenAt(eatenAt: LocalDateTime): MealDraft =
+        copy(eatenAt = eatenAt, isSnack = if (isSnackTouched) isSnack else startsAsSnack(eatenAt.toLocalTime()))
 
     /** Whether the Save location row shows; see [showsLocationRow]. */
     fun showsLocationRow(isNew: Boolean, locationAllowed: Boolean): Boolean =
@@ -102,6 +113,7 @@ data class MealDraft(
             placeId = if (newPlaceName != null) null else placeId,
             latitude = saved?.latitude,
             longitude = saved?.longitude,
+            isSnack = isSnack,
         )
     }
 
@@ -122,6 +134,8 @@ data class MealDraft(
             longitude = meal.longitude,
             locationSource = LocationSource.Saved.takeIf { meal.latitude != null && meal.longitude != null },
             saveLocation = meal.latitude != null && meal.longitude != null,
+            isSnack = meal.isSnack,
+            isSnackTouched = true,
         )
     }
 }

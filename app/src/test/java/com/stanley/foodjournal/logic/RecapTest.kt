@@ -76,6 +76,14 @@ class RecapTest {
     }
 
     @Test
+    fun `snacks are counted beside the meals`() {
+        val meals = listOf(meal(1, day = 3, price = 200), meal(2, day = 3, price = 60, snack = true), meal(3, day = 4, price = 40, snack = true))
+        assertEquals("1 meal · 2 snacks · 300", recapText(week, meals, emptyList(), today).stats)
+        val snack = listOf(meal(1, day = 3, price = 60, snack = true))
+        assertEquals("1 snack · 60", recapText(week, snack, emptyList(), today).stats)
+    }
+
+    @Test
     fun `each figure can be left off`() {
         val meals = listOf(meal(1, day = 2, price = 180, place = 1), meal(2, day = 2, price = 20))
         val lastWeek = listOf(meal(10, day = -4, price = 300))
@@ -147,6 +155,7 @@ class RecapTest {
         price: Int = 100,
         place: Long? = null,
         favorite: Boolean = false,
+        snack: Boolean = false,
         eatenAt: LocalDateTime = LocalDateTime.of(2026, 11, 1, 12, 0).plusDays(day.toLong()).plusMinutes(minute.toLong()),
-    ) = Meal(id = id, eatenAt = eatenAt, name = "Meal $id", price = price, placeId = place, isFavorite = favorite)
+    ) = Meal(id = id, eatenAt = eatenAt, name = "Meal $id", price = price, placeId = place, isFavorite = favorite, isSnack = snack)
 }

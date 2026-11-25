@@ -95,3 +95,7 @@ fun formatDateRange(start: LocalDate, end: LocalDate, today: LocalDate): String 
 
 /** The day a meal was eaten, as its tile labels it: "Mon". */
 fun formatWeekday(date: LocalDate): String = date.format(Weekday)
+
+/** A Journal tile's label: its weekday, "Tue", or "Tue · Snack" for a snack. */
+fun formatTileLabel(date: LocalDate, isSnack: Boolean): String =
+    if (isSnack) "${formatWeekday(date)} · Snack" else formatWeekday(date)

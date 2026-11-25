@@ -63,15 +63,28 @@ fun elapsedDays(period: Period, today: LocalDate): Int = when {
     else -> ChronoUnit.DAYS.between(period.start, today).toInt() + 1
 }
 
-/** The four parts of the day. Late runs past midnight, from 22:00 to 04:59. */
-enum class TimeBand { Morning, Midday, Evening, Late }
+/**
+ * The five parts of the day: breakfast 05:00–10:59, lunch 11:00–13:59, the afternoon
+ * 14:00–16:59, dinner 17:00–19:59, and late, which runs past midnight, 20:00–04:59.
+ */
+enum class TimeBand { Breakfast, Lunch, Afternoon, Dinner, Late }
 
 fun timeBand(time: LocalTime): TimeBand = when (time.hour) {
-    in 5..10 -> TimeBand.Morning
-    in 11..15 -> TimeBand.Midday
-    in 16..21 -> TimeBand.Evening
+    in 5..10 -> TimeBand.Breakfast
+    in 11..13 -> TimeBand.Lunch
+    in 14..16 -> TimeBand.Afternoon
+    in 17..19 -> TimeBand.Dinner
     else -> TimeBand.Late
 }
+
+/** Whether a meal eaten at [time] starts as a snack: in the afternoon, between lunch and dinner. */
+fun startsAsSnack(time: LocalTime): Boolean = timeBand(time) == TimeBand.Afternoon
+
+/** How many of one kind, meals or snacks, and what they cost. */
+data class KindSpend(val count: Int, val total: Int)
+
+/** A period's meals and its snacks, apart. */
+data class MealsAndSnacks(val meals: KindSpend, val snacks: KindSpend)
 
 /**
  * One bar: a day of a week or month, or a month of a year. A future bar has no amount, so a meal
@@ -104,13 +117,16 @@ data class PeriodSpending(
     /** The signed change from the previous period in whole percent, or null to leave it out. */
     val change: Int?,
     val dailyAverage: Int,
-    val perMeal: Int,
+    /** The average of the meals alone, leaving snacks out, or null when there are only snacks. */
+    val perMeal: Int?,
     val bars: List<SpendingBar>,
     val topPlaces: List<PlaceSpend>,
     val other: OtherSpend?,
-    /** All four bands, in order, with their totals. */
+    /** All five bands, in order, with their totals. */
     val bands: List<Pair<TimeBand, Int>>,
     val priciest: List<Meal>,
+    /** The meals and the snacks apart, or null when the period has no snack. */
+    val mealsAndSnacks: MealsAndSnacks? = null,
 )
 
 private const val TOP_PLACES = 5
@@ -147,13 +163,14 @@ fun periodSpending(
     val other = if (otherMeals > 0) OtherSpend(total - top.sumOf { it.total }, otherMeals) else null
 
     val byBand = meals.groupBy { timeBand(it.eatenAt.toLocalTime()) }
+    val (snacks, proper) = meals.partition { it.isSnack }
 
     return PeriodSpending(
         period = period,
         total = total,
         change = change(period, total, previousMeals, today),
         dailyAverage = roundedDivision(total, elapsedDays(period, today)),
-        perMeal = roundedDivision(total, meals.size),
+        perMeal = proper.takeIf { it.isNotEmpty() }?.let { roundedDivision(it.sumOf { meal -> meal.price }, it.size) },
         bars = bars(period, meals, today),
         topPlaces = top,
         other = other,
@@ -162,6 +179,11 @@ fun periodSpending(
             .filter { it.price > 0 }
             .sortedWith(compareByDescending<Meal> { it.price }.thenByDescending { it.eatenAt }.thenByDescending { it.id })
             .take(PRICIEST),
+        mealsAndSnacks = if (snacks.isEmpty()) {
+            null
+        } else {
+            MealsAndSnacks(KindSpend(proper.size, proper.sumOf { it.price }), KindSpend(snacks.size, snacks.sumOf { it.price }))
+        },
     )
 }
 

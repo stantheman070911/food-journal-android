@@ -258,7 +258,8 @@ private fun PeriodPage(
             )
         }
         Text(
-            text = stringResource(R.string.spending_averages, figures.dailyAverage, figures.perMeal),
+            text = figures.perMeal?.let { perMeal -> stringResource(R.string.spending_averages, figures.dailyAverage, perMeal) }
+                ?: stringResource(R.string.spending_average_day, figures.dailyAverage),
             style = MaterialTheme.typography.bodyLarge,
             color = colors.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
@@ -283,6 +284,22 @@ private fun PeriodPage(
                     detail = pluralStringResource(R.plurals.meal_count, other.meals, formatPrice(other.meals)),
                     row = other.row,
                 )
+            }
+        }
+
+        if (figures.kinds.isNotEmpty()) {
+            Section(stringResource(R.string.spending_meals_and_snacks)) {
+                figures.kinds.forEach { kind ->
+                    ShareLine(
+                        name = pluralStringResource(
+                            if (kind.isSnack) R.plurals.snack_count else R.plurals.meal_count,
+                            kind.count,
+                            formatPrice(kind.count),
+                        ),
+                        detail = null,
+                        row = kind.row,
+                    )
+                }
             }
         }
 
@@ -549,9 +566,10 @@ private val PeriodKind.label: Int
 
 private val TimeBand.label: Int
     get() = when (this) {
-        TimeBand.Morning -> R.string.spending_morning
-        TimeBand.Midday -> R.string.spending_midday
-        TimeBand.Evening -> R.string.spending_evening
+        TimeBand.Breakfast -> R.string.spending_breakfast
+        TimeBand.Lunch -> R.string.spending_lunch
+        TimeBand.Afternoon -> R.string.spending_afternoon
+        TimeBand.Dinner -> R.string.spending_dinner
         TimeBand.Late -> R.string.spending_late
     }
 
@@ -585,10 +603,15 @@ private fun samplePage(): SpendingPage {
             ),
             other = OtherRow(2, ShareRow("365", 0.38f)),
             bands = listOf(
-                BandRow(TimeBand.Morning, ShareRow("180", 0.19f)),
-                BandRow(TimeBand.Midday, ShareRow("410", 0.43f)),
-                BandRow(TimeBand.Evening, ShareRow("365", 0.38f)),
+                BandRow(TimeBand.Breakfast, ShareRow("180", 0.19f)),
+                BandRow(TimeBand.Lunch, ShareRow("410", 0.43f)),
+                BandRow(TimeBand.Afternoon, ShareRow("0", 0f)),
+                BandRow(TimeBand.Dinner, ShareRow("365", 0.38f)),
                 BandRow(TimeBand.Late, ShareRow("0", 0f)),
+            ),
+            kinds = listOf(
+                KindRow(false, 4, ShareRow("865", 0.91f)),
+                KindRow(true, 1, ShareRow("90", 0.09f)),
             ),
             priciest = listOf(
                 PriciestTile(1, null, null, "Hot pot", "455"),

@@ -59,6 +59,7 @@ data class SearchUiState(
     /** The dates pill's label once dates are set: "Oct 1 – Nov 4". */
     val dates: String? = null,
     val favoritesOnly: Boolean = false,
+    val snacksOnly: Boolean = false,
     val count: Int = 0,
     val total: String = "0",
     val results: List<SearchResult> = emptyList(),
@@ -67,7 +68,7 @@ data class SearchUiState(
 }
 
 /**
- * Search over every meal, with a place or district chip, dates, and favorites. Each part is kept in
+ * Search over every meal, with a place or district chip, dates, favorites, and snacks. Each part is kept in
  * the saved state, so a search survives switching tabs. A [SearchRoute] with a place, a district,
  * or dates starts with just them.
  */
@@ -100,14 +101,16 @@ class SearchViewModel(
         route.fromDay?.let { from -> longArrayOf(from, route.toDay ?: from) },
     )
     private val favoritesOnly = savedState.getStateFlow(FAVORITES, false)
+    private val snacksOnly = savedState.getStateFlow(SNACKS, false)
+    private val switches = combine(favoritesOnly, snacksOnly) { favorites, snacks -> favorites to snacks }
 
     private val filter = combine(
         text,
         placeId,
         districtCode,
         days,
-        favoritesOnly,
-    ) { text, place, district, days, favorites ->
+        switches,
+    ) { text, place, district, days, (favorites, snacks) ->
         SearchFilter(
             text = text,
             placeId = place,
@@ -115,6 +118,7 @@ class SearchViewModel(
             from = days?.let { LocalDate.ofEpochDay(it[0]) },
             to = days?.let { LocalDate.ofEpochDay(it[1]) },
             favoritesOnly = favorites,
+            snacksOnly = snacks,
         )
     }
 
@@ -148,6 +152,10 @@ class SearchViewModel(
         savedState[FAVORITES] = !favoritesOnly.value
     }
 
+    fun toggleSnacks() {
+        savedState[SNACKS] = !snacksOnly.value
+    }
+
     private suspend fun uiState(meals: List<Meal>, places: List<Place>, filter: SearchFilter): SearchUiState {
         val names = places.associate { it.id to it.name }
         // A place merged away or deleted leaves no chip, and filters nothing out. So does a
@@ -177,6 +185,7 @@ class SearchViewModel(
             to = filter.to,
             dates = filter.from?.let { from -> formatDateRange(from, filter.to ?: from, now) },
             favoritesOnly = filter.favoritesOnly,
+            snacksOnly = filter.snacksOnly,
             count = found.size,
             total = formatPrice(found.sumOf { it.price }),
             results = found.map { meal ->
@@ -187,6 +196,7 @@ class SearchViewModel(
                     name = meal.name?.takeIf { it.isNotBlank() },
                     detail = listOfNotNull(
                         formatResultDate(meal.eatenAt.toLocalDate(), now),
+                        SNACK.takeIf { meal.isSnack },
                         meal.placeId?.let(names::get),
                     ).joinToString(" · "),
                     price = formatPrice(meal.price),
@@ -202,6 +212,10 @@ class SearchViewModel(
         private const val DISTRICT = "district"
         private const val DAYS = "days"
         private const val FAVORITES = "favorites"
+        private const val SNACKS = "snacks"
+
+        /** What a snack's row says between its date and place: "Tue, Nov 3 · Snack · 林家乾麵". */
+        private const val SNACK = "Snack"
 
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {

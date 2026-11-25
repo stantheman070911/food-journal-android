@@ -76,6 +76,9 @@ data class OtherRow(val meals: Int, val row: ShareRow)
 
 data class BandRow(val band: TimeBand, val row: ShareRow)
 
+/** The meals, or the snacks, of a period: how many, and their share. */
+data class KindRow(val isSnack: Boolean, val count: Int, val row: ShareRow)
+
 /** One of the priciest meals, as a tile with its price where the Journal shows the weekday. */
 data class PriciestTile(
     val mealId: Long,
@@ -93,12 +96,15 @@ data class SpendingFigures(
     val total: String,
     val change: ChangeLine?,
     val dailyAverage: String,
-    val perMeal: String,
+    /** The meals' average, leaving snacks out, or null when the period has only snacks. */
+    val perMeal: String?,
     val bars: List<ChartBar>,
     val places: List<PlaceRow>,
     val other: OtherRow?,
     val bands: List<BandRow>,
     val priciest: List<PriciestTile>,
+    /** The meals and the snacks, or empty when the period has no snack. */
+    val kinds: List<KindRow> = emptyList(),
 )
 
 /**
@@ -308,7 +314,7 @@ class SpendingViewModel(
             total = formatPrice(total),
             change = change?.let { ChangeLine(formatChange(it), comparedWith(period, today)) },
             dailyAverage = formatPrice(dailyAverage),
-            perMeal = formatPrice(perMeal),
+            perMeal = perMeal?.let(::formatPrice),
             bars = bars.map { bar ->
                 ChartBar(
                     amount = bar.amount,
@@ -323,6 +329,9 @@ class SpendingViewModel(
             places = topPlaces.map { PlaceRow(it.placeId, names.getValue(it.placeId), it.visits, share(it.total)) },
             other = other?.let { OtherRow(it.meals, share(it.total)) },
             bands = bands.map { (band, amount) -> BandRow(band, share(amount)) },
+            kinds = mealsAndSnacks?.let { (meals, snacks) ->
+                listOf(KindRow(false, meals.count, share(meals.total)), KindRow(true, snacks.count, share(snacks.total)))
+            }.orEmpty(),
             priciest = priciest.map { meal ->
                 PriciestTile(
                     mealId = meal.id,

@@ -252,7 +252,24 @@ class MealViewModel(
 
     fun onNoteChange(note: String) = update { it.copy(note = note) }
 
-    fun onEatenAtChange(eatenAt: LocalDateTime) = update { it.copy(eatenAt = eatenAt) }
+    fun onEatenAtChange(eatenAt: LocalDateTime) = update { it.withEatenAt(eatenAt) }
+
+    /** Meal or Snack, chosen by hand. It stays as chosen, whatever the time. */
+    fun onSnackChange(isSnack: Boolean) = update { it.copy(isSnack = isSnack, isSnackTouched = true) }
+
+    /**
+     * A recent name picked from the suggestions. Until Meal or Snack is chosen by hand, the meal
+     * takes the kind the last meal of that name had.
+     */
+    fun onNameSuggestion(name: String) {
+        onNameChange(name)
+        if (draft?.isSnackTouched != false) return
+        viewModelScope.launch {
+            val last = mealDao.lastNamed(name) ?: return@launch
+            val current = draft ?: return@launch
+            if (current.name == name && !current.isSnackTouched) update { it.copy(isSnack = last.isSnack, isSnackTouched = true) }
+        }
+    }
 
     fun onToggleFavorite() = update { it.copy(isFavorite = !it.isFavorite) }
 
@@ -415,7 +432,7 @@ class MealViewModel(
                     if (draft?.photo != name) return@withContext
                     update {
                         val photoLocation = metadata.location
-                        it.copy(eatenAt = metadata.takenAt ?: it.eatenAt).withLocation(
+                        it.withEatenAt(metadata.takenAt ?: it.eatenAt).withLocation(
                             source = if (photoLocation != null) LocationSource.Gallery else LocationSource.Phone,
                             location = photoLocation ?: phoneLocation.fix.value,
                         )

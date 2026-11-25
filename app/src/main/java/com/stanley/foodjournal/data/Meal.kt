@@ -1,5 +1,6 @@
 package com.stanley.foodjournal.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -11,7 +12,8 @@ import java.time.LocalDateTime
  *
  * [eatenAt] is wall-clock time where the meal was eaten, so its day and time of day never shift
  * when the phone changes time zone. [photo] is a file name inside the app's photo folder.
- * [latitude] and [longitude] are where it was eaten, when that was saved with it.
+ * [latitude] and [longitude] are where it was eaten, when that was saved with it. [isSnack]
+ * marks a snack rather than a meal.
  */
 @Entity(
     tableName = "meal",
@@ -36,4 +38,5 @@ data class Meal(
     val placeId: Long? = null,
     val latitude: Double? = null,
     val longitude: Double? = null,
+    @ColumnInfo(defaultValue = "0") val isSnack: Boolean = false,
 )

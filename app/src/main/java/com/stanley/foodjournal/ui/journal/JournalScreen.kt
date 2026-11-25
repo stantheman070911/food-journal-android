@@ -206,7 +206,7 @@ private fun WeekRow(week: JournalWeek, onOpenMeal: (Long) -> Unit) {
                     thumb = tile.thumb,
                     photo = tile.photo,
                     name = tile.name,
-                    label = tile.weekday,
+                    label = tile.label,
                     shape = stripShape(first = index == 0, last = index == week.tiles.lastIndex),
                     onClick = { onOpenMeal(tile.mealId) },
                 )

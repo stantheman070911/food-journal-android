@@ -230,7 +230,7 @@ class SpendingViewModelTest {
 
         assertEquals(listOf(PlaceRow(noodles, "林家乾麵", 2, ShareRow("400", 0.8f))), figures.places)
         assertEquals(OtherRow(1, ShareRow("100", 0.2f)), figures.other)
-        assertEquals(listOf("0", "400", "0", "100"), figures.bands.map { it.row.total })
+        assertEquals(listOf("0", "400", "0", "0", "100"), figures.bands.map { it.row.total })
     }
 
     @Test
